@@ -18,6 +18,13 @@ function isB64(a) {
   const s = a.trim();
   return !!s && (s.startsWith("EQ") || s.startsWith("UQ")) && /^[A-Za-z0-9_-]{48,68}$/.test(s);
 }
+function isHexLike(a) {
+  if (typeof a !== "string") return false;
+  const s = a.trim();
+  return !!s && (s.startsWith("0:") || /^[0-9a-fA-F:]{48,90}$/.test(s));
+}
+
+/** Синхронна нормалізація в EQ/UQ, якщо TonWeb уже є */
 function normalizeToBase64(addr) {
   const a = (addr || "").trim();
   if (!a) return null;
@@ -28,10 +35,36 @@ function normalizeToBase64(addr) {
       return new A(a).toString(true, true, true);
     }
   } catch {}
-  // м’який фолбек: приймаємо сирий/hex формат
-  if (a.startsWith("0:") || /^[0-9a-fA-F:]{48,90}$/.test(a)) return a;
+  // Якщо TonWeb недоступний — не повертаємо hex/0:, краще зачекати на конвертацію
   return null;
 }
+
+/** Гарантовано отримати EQ/UQ: якщо треба — підтягуємо TonWeb і конвертуємо */
+async function ensureBase64(addr) {
+  const a = (addr || "").trim();
+  if (!a) return null;
+  if (isB64(a)) return a;
+
+  // Спроба швидкої конвертації (TonWeb вже є)
+  let b64 = normalizeToBase64(a);
+  if (b64) return b64;
+
+  // Якщо адреса схожа на hex/0:, а TonWeb ще не підвантажений — підвантажимо і сконвертимо
+  if (isHexLike(a)) {
+    try {
+      if (!window.TonWeb) {
+        await import("https://unpkg.com/tonweb@0.0.66/dist/tonweb.min.js");
+      }
+      const A = window.TonWeb.utils.Address;
+      b64 = new A(a).toString(true, true, true);
+      if (isB64(b64)) return b64;
+    } catch (e) {
+      log("ensureBase64 convert failed:", e);
+    }
+  }
+  return null;
+}
+
 function shortAddr(a) { return a ? (a.slice(0,4) + "…" + a.slice(-4)) : ""; }
 
 async function waitTonLib(timeoutMs = 15000) {
@@ -52,8 +85,18 @@ function dispatchAddress(addr) {
   } catch {}
 }
 
+/** Головний синк адреси. НІКОЛИ не зберігає hex — лише EQ/UQ. */
 async function syncAddress(addr, { onConnect, onDisconnect } = {}, source = "unknown") {
-  const base64 = normalizeToBase64(addr) || (addr || "").trim();
+  // Прагнемо EQ/UQ; якщо ні — конвертуємо (у т.ч. підвантаживши TonWeb)
+  let base64 = normalizeToBase64(addr);
+  if (!base64 && isHexLike(addr)) {
+    base64 = await ensureBase64(addr);
+    if (base64) {
+      // після конвертації повторимо шлях уже з чистою адресою
+      return syncAddress(base64, { onConnect, onDisconnect }, source + "/hex->b64");
+    }
+  }
+  if (!base64 && isB64(addr)) base64 = addr?.trim() || null; // рідкісний випадок
 
   if (base64) {
     const changed = cachedBase64Addr !== base64;
@@ -61,7 +104,7 @@ async function syncAddress(addr, { onConnect, onDisconnect } = {}, source = "unk
     try { window.__magtAddr = base64; } catch {}
 
     if (changed) {
-      log("address set from:", source, base64);
+      log("address set from:", source, base64, "UI:", shortAddr(base64));
       dispatchAddress(base64);
       try { (await import("./ui.js")).setOwnRefLink(base64); } catch {}
     }
@@ -95,7 +138,7 @@ function deepFindAddress(obj, maxDepth = 8) {
       seen.add(o);
       const raw = o?.account?.address ?? o?.wallet?.account?.address ?? o?.address;
       if (raw) {
-        const b64 = normalizeToBase64(raw) || raw;
+        const b64 = normalizeToBase64(raw) || (isHexLike(raw) ? null : raw);
         if (b64) return b64;
       }
       if (d >= maxDepth) continue;
@@ -115,7 +158,7 @@ function addrFromUiAccount(ui){
     ui?.tonConnect?.account?.address ||
     ui?._wallet?.account?.address ||
     null;
-  const b64 = normalizeToBase64(raw) || raw;
+  const b64 = normalizeToBase64(raw);
   return b64 || deepFindAddress(ui, 8) || null;
 }
 function extractFromUi(ui) {
@@ -131,7 +174,7 @@ function extractFromUi(ui) {
     ui?.connector?.account?.address,
   ].filter(Boolean);
   for (const raw of quick) {
-    const b64 = normalizeToBase64(raw) || raw;
+    const b64 = normalizeToBase64(raw);
     if (b64) return b64;
   }
   return deepFindAddress(ui, 8);
