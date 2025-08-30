@@ -10,29 +10,54 @@ export const fmt = (n, d = 0) =>
 
 export const fmtUsd = (n, d = 2) => {
   const v = Number(n || 0);
-  return isFinite(v) ? `$${v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: d })}` : "$0";
+  return isFinite(v)
+    ? `$${v.toLocaleString("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: d,
+      })}`
+    : "$0";
 };
 
 /* ========== API url helper ========== */
-// api("/purchase") -> "https://api.example.com/purchase" або null (DEMO режим)
+/**
+ * Будує коректний URL до бекенду:
+ *  - якщо path уже абсолютний (http/https) — повертаємо як є, БЕЗ префікса
+ *  - інакше префіксуємо CONFIG.API_BASE (або window.API_BASE_OVERRIDE, якщо задано)
+ *  - прибираємо зайві слеші по краях
+ *
+ * Приклади:
+ *  api("/purchase")  -> "https://api.example.com/purchase"
+ *  api("http://x/y") -> "http://x/y" (без змін)
+ *  api(null)         -> null
+ */
 export function api(path) {
-  // пріоритет — ручний override у вікні
+  const p = String(path || "");
+  if (!p) return null;
+
+  // Якщо передали абсолютний URL — залишаємо як є
+  if (/^https?:\/\//i.test(p)) return p;
+
+  // Пріоритет — ручний override у вікні, потім з CONFIG
   const base =
-    window.API_BASE_OVERRIDE ||
+    (typeof window !== "undefined" && window.API_BASE_OVERRIDE) ||
     String(CONFIG.API_BASE || "").trim();
 
   if (!base) return null;
 
-  // прибрати зайві слеші
+  // приберемо зайві слеші
   const cleanBase = base.replace(/\/+$/g, "");
-  const cleanPath = String(path || "").replace(/^\/+/g, "");
+  const cleanPath = p.replace(/^\/+/g, "");
 
   return `${cleanBase}/${cleanPath}`;
 }
 
 /* ========== Misc utils ========== */
-export function shortAddr(a) { return a ? a.slice(0, 4) + "…" + a.slice(-4) : ""; }
-export function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+export function shortAddr(a) {
+  return a ? a.slice(0, 4) + "…" + a.slice(-4) : "";
+}
+export function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
 
 /* TON address helpers (щоб не дублювати по модулях) */
 export function isTonAddress(addr) {
@@ -56,7 +81,8 @@ export function normalizeToBase64Url(addr) {
 
 /* ========== Config sanity ========== */
 export function cfgReady() {
-  const bad = (v) => !v || String(v).includes("REPLACE") || String(v).trim().length < 8;
+  const bad = (v) =>
+    !v || String(v).includes("REPLACE") || String(v).trim().length < 8;
   return !(bad(CONFIG.USDT_MASTER) || bad(CONFIG.PRESALE_OWNER_ADDRESS));
 }
 
@@ -64,11 +90,15 @@ export function cfgReady() {
 export function setBtnLoading(btn, isLoading, labelLoading = "…") {
   if (!btn) return;
   // запам'ятати оригінальний текст
-  if (btn.dataset.label == null) btn.dataset.label = btn.textContent?.trim?.() || "";
+  if (btn.dataset.label == null)
+    btn.dataset.label = btn.textContent?.trim?.() || "";
   // тримати ширину, щоб не "скакав" лейаут
   if (!btn.dataset.wHeld) {
     const w = btn.getBoundingClientRect().width;
-    if (w) { btn.style.minWidth = `${Math.ceil(w)}px`; btn.dataset.wHeld = "1"; }
+    if (w) {
+      btn.style.minWidth = `${Math.ceil(w)}px`;
+      btn.dataset.wHeld = "1";
+    }
   }
   btn.disabled = !!isLoading;
   btn.classList.toggle("opacity-60", !!isLoading);
@@ -83,12 +113,22 @@ export async function waitForEl(selector, timeout = 10000) {
   return new Promise((resolve, reject) => {
     const tick = () => {
       const el = document.querySelector(selector);
-      if (el) { clearInterval(iv); clearTimeout(to); resolve(el); }
+      if (el) {
+        clearInterval(iv);
+        clearTimeout(to);
+        resolve(el);
+      }
     };
     const iv = setInterval(tick, 50);
     const to = setTimeout(() => {
       clearInterval(iv);
-      reject(new Error(`Timeout waiting for ${selector} after ${Math.round(performance.now() - start)}ms`));
+      reject(
+        new Error(
+          `Timeout waiting for ${selector} after ${Math.round(
+            performance.now() - start
+          )}ms`
+        )
+      );
     }, timeout);
     tick();
   });

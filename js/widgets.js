@@ -92,7 +92,7 @@ async function refreshProgress() {
     soldMag = Number(stats?.soldMag ?? 0);
     totalMagFromApi = Number(stats?.totalMag ?? 0);
     raisedUsd = Number(stats?.raisedUsd ?? 0);
-  } catch (e) {
+  } catch {
     // тихий фолбек
   }
 
@@ -108,7 +108,8 @@ async function refreshProgress() {
   const pct = total > 0 ? Math.max(0, Math.min(100, (sold / total) * 100)) : 0;
   const remaining = Math.max(0, total - sold);
 
-  ui.pct.textContent = `${fmtNum(pct, 2)}% sold`;
+  // локалізована мітка — як у index.html
+  ui.pct.textContent = `${fmtNum(pct, 2)}% продано`;
   ui.remaining.textContent = fmtNum(remaining, 0);
   ui.raised.textContent = `$${fmtNum(raised, 0)}`;
 
@@ -165,7 +166,7 @@ function initCalc() {
     if ($note) {
       if (listing > 0 && price > 0) {
         const x = listing / price;
-        $note.textContent = `Listing is ×${fmtNum(x, 2)} of presale price — potential ROI before fees/slippage.`;
+        $note.textContent = `Лістинг ×${fmtNum(x, 2)} від пресейл-ціни — потенційний ROI (без урахування комісій/слипеджу).`;
       } else {
         $note.textContent = "";
       }

@@ -1,6 +1,6 @@
 // /js/ton.js
 import { CONFIG } from "./config.js";
-import { safeFetch } from "./utils.js";
+import { safeFetch, api as apiUrl } from "./utils.js";
 
 /* ============================================
  * Helpers
@@ -116,7 +116,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   cell.bits.writeUint(0, 32); // opcode=0 => "text comment" convention
   cell.bits.writeString(note);
 
-  const forwardTon = TonWeb.utils.toNano(Number(CONFIG.FORWARD_TON || 0));       // скільки переслати пресейлу
+  const forwardTon = TonWeb.utils.toNano(Number(CONFIG.FORWARD_TON || 0));          // скільки переслати пресейлу
   const openTon    = TonWeb.utils.toNano(Number(CONFIG.JETTON_WALLET_TON || 0.15)); // на відкриття/виконання
 
   const body = await userJettonWallet.createTransferBody({
@@ -209,11 +209,18 @@ function saveDemoLeaders(obj) {
   try { localStorage.setItem("demo.ref.leaders", JSON.stringify(obj)); } catch {}
 }
 
+// утиліта для побудови абсолютного API-URL (з урахуванням override/CONFIG)
+// повертає null, якщо API недоступний (демо-режим)
+function endpoint(path) {
+  return apiUrl(path); // використовуємо /js/utils.js::api
+}
+
 export async function getPresaleStats() {
   const ep = CONFIG.ENDPOINTS?.stats;
-  if (CONFIG.API_BASE && ep) {
+  const url = ep && endpoint(ep);
+  if (url) {
     try {
-      const res = await safeFetch(CONFIG.API_BASE + ep, { cache: "no-cache" });
+      const res = await safeFetch(url, { cache: "no-cache" });
       if (res.ok) {
         const { soldMag, totalMag, raisedUsd } = await res.json();
         return {
@@ -236,9 +243,10 @@ export async function getPresaleStats() {
 export async function getRecentPurchases(limit = 20) {
   const lim = Math.max(1, Math.min(100, Number(limit) || 20));
   const ep = CONFIG.ENDPOINTS?.feed;
-  if (CONFIG.API_BASE && ep) {
+  const url = ep && endpoint(`${ep}?limit=${lim}`);
+  if (url) {
     try {
-      const res = await safeFetch(CONFIG.API_BASE + ep + `?limit=${lim}`, { cache: "no-cache" });
+      const res = await safeFetch(url, { cache: "no-cache" });
       if (res.ok) {
         const list = await res.json();
         if (Array.isArray(list)) return list.slice(0, lim);
@@ -254,9 +262,10 @@ export async function getRecentPurchases(limit = 20) {
 export async function getReferralLeaders(limit = 10) {
   const lim = Math.max(1, Math.min(100, Number(limit) || 10));
   const ep = CONFIG.ENDPOINTS?.leaders;
-  if (CONFIG.API_BASE && ep) {
+  const url = ep && endpoint(`${ep}?limit=${lim}`);
+  if (url) {
     try {
-      const res = await safeFetch(CONFIG.API_BASE + ep + `?limit=${lim}`, { cache: "no-cache" });
+      const res = await safeFetch(url, { cache: "no-cache" });
       if (res.ok) {
         const list = await res.json();
         if (Array.isArray(list)) return list.slice(0, lim);
@@ -275,9 +284,10 @@ export async function getReferralLeaders(limit = 10) {
 
 export async function pushPurchaseToBackend({ usd, tokens, address, ref }) {
   const ep = CONFIG.ENDPOINTS?.purchase;
-  if (!CONFIG.API_BASE || !ep) return { ok: true, demo: true };
+  const url = ep && endpoint(ep);
+  if (!url) return { ok: true, demo: true }; // демо-режим
   try {
-    const res = await safeFetch(CONFIG.API_BASE + ep, {
+    const res = await safeFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
