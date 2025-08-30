@@ -29,7 +29,7 @@ LPT7
 LPT8
 LPT9
 
-api/
+#api/
 
 .netlify/
 functions/
@@ -41,5 +41,5 @@ functions/.netlify/
 .netlify/
 
 
-api/
+#api/
 
