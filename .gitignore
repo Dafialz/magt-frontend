@@ -1,5 +1,41 @@
+# --- Node.js ---
 node_modules/
-.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Environment ---
 .env
+.env.*.local
+
+# --- System files ---
+.DS_Store
+Thumbs.db
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
+
+# --- Build outputs ---
+dist/
+build/
+.cache/
+*.tsbuildinfo
+
+# --- Logs ---
 *.log
+logs/
+*.out
+*.err
+
+# --- Temporary ---
+.tmp/
+temp/
+
+# --- API backend (виносимо в окремий репозиторій) ---
 api/
+
+# --- Netlify / Deployment ---
+.netlify/
