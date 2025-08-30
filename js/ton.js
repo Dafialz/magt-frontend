@@ -1,6 +1,6 @@
 // /js/ton.js
 import { CONFIG } from "./config.js";
-import { safeFetch, api as apiUrl } from "./utils.js";
+import { safeFetch } from "./utils.js";
 
 /* ============================================
  * Helpers
@@ -59,6 +59,32 @@ export const fmt = {
 };
 
 /* ============================================
+ * Абсолютні ендпоінти (безпечний билдер)
+ * ============================================ */
+
+function epUrl(key, qs = "") {
+  const abs = CONFIG?.ENDPOINTS?.[key];
+  if (abs && typeof abs === "string" && abs.startsWith("http")) {
+    return abs + qs;
+  }
+  // фолбек: якщо з якоїсь причини ENDPOINTS немає (не повинно статись у проді)
+  const base = (CONFIG.API_BASE || "").replace(/\/+$/g, "");
+  if (!base) return null;
+  const paths = {
+    stats: "/api/presale/stats",
+    feed: "/api/presale/feed",
+    leaders: "/api/presale/leaders",
+    purchase: "/api/presale/purchase",
+    claim: "/api/presale/claim",
+    order: "/api/order",
+    referral: "/api/referral",
+  };
+  const path = paths[key];
+  if (!path) return null;
+  return `${base}${path}${qs}`;
+}
+
+/* ============================================
  * TonConnect: USDT transfer
  * ============================================ */
 
@@ -104,7 +130,6 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     if (buyerBase64 === cleanRef) cleanRef = null;
   }
 
-  // зріз для коментаря (не обов'язково, але щоб payload був компактний)
   const buyerB64 = toBase64Url(userAddr);
   const refB64 = cleanRef ? toBase64Url(cleanRef) : "-";
   const ts = Date.now();
@@ -116,8 +141,8 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   cell.bits.writeUint(0, 32); // opcode=0 => "text comment" convention
   cell.bits.writeString(note);
 
-  const forwardTon = TonWeb.utils.toNano(Number(CONFIG.FORWARD_TON || 0));          // скільки переслати пресейлу
-  const openTon    = TonWeb.utils.toNano(Number(CONFIG.JETTON_WALLET_TON || 0.15)); // на відкриття/виконання
+  const forwardTon = TonWeb.utils.toNano(Number(CONFIG.FORWARD_TON || 0));       // для контракту пресейлу
+  const openTon    = TonWeb.utils.toNano(Number(CONFIG.JETTON_WALLET_TON || 0.15)); // на виконання tx
 
   const body = await userJettonWallet.createTransferBody({
     queryId: BigInt(ts),
@@ -209,15 +234,8 @@ function saveDemoLeaders(obj) {
   try { localStorage.setItem("demo.ref.leaders", JSON.stringify(obj)); } catch {}
 }
 
-// утиліта для побудови абсолютного API-URL (з урахуванням override/CONFIG)
-// повертає null, якщо API недоступний (демо-режим)
-function endpoint(path) {
-  return apiUrl(path); // використовуємо /js/utils.js::api
-}
-
 export async function getPresaleStats() {
-  const ep = CONFIG.ENDPOINTS?.stats;
-  const url = ep && endpoint(ep);
+  const url = epUrl("stats");
   if (url) {
     try {
       const res = await safeFetch(url, { cache: "no-cache" });
@@ -242,8 +260,7 @@ export async function getPresaleStats() {
 
 export async function getRecentPurchases(limit = 20) {
   const lim = Math.max(1, Math.min(100, Number(limit) || 20));
-  const ep = CONFIG.ENDPOINTS?.feed;
-  const url = ep && endpoint(`${ep}?limit=${lim}`);
+  const url = epUrl("feed", `?limit=${lim}`);
   if (url) {
     try {
       const res = await safeFetch(url, { cache: "no-cache" });
@@ -261,8 +278,7 @@ export async function getRecentPurchases(limit = 20) {
 
 export async function getReferralLeaders(limit = 10) {
   const lim = Math.max(1, Math.min(100, Number(limit) || 10));
-  const ep = CONFIG.ENDPOINTS?.leaders;
-  const url = ep && endpoint(`${ep}?limit=${lim}`);
+  const url = epUrl("leaders", `?limit=${lim}`);
   if (url) {
     try {
       const res = await safeFetch(url, { cache: "no-cache" });
@@ -283,9 +299,8 @@ export async function getReferralLeaders(limit = 10) {
 }
 
 export async function pushPurchaseToBackend({ usd, tokens, address, ref }) {
-  const ep = CONFIG.ENDPOINTS?.purchase;
-  const url = ep && endpoint(ep);
-  if (!url) return { ok: true, demo: true }; // демо-режим
+  const url = epUrl("purchase");
+  if (!url) return { ok: true, demo: true };
   try {
     const res = await safeFetch(url, {
       method: "POST",
