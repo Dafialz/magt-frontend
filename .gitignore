@@ -30,3 +30,6 @@ LPT8
 LPT9
 
 api/
+
+.netlify/
+functions/
