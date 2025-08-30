@@ -1,0 +1,91 @@
+<!-- /partials/nav.html -->
+<nav class="sticky top-0 z-50 bg-neutral-900/70 backdrop-blur-xl border-b border-white/10" data-nav aria-label="Primary">
+  <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+    <!-- Лого -->
+    <a href="#top" class="flex items-center gap-2" aria-label="Magic Time">
+      <img src="/assets/logo.png" alt="" class="w-7 h-7 rounded-xl shadow-soft" />
+      <span class="font-semibold" data-i18n="nav.brand">Magic Time</span>
+    </a>
+
+    <!-- Меню + перемикач мов -->
+    <ul class="hidden md:flex items-center gap-6 text-sm" role="menubar">
+      <li role="none"><a role="menuitem" href="#buy" class="hover:text-brand transition" data-i18n="nav.buy">Buy</a></li>
+      <li role="none"><a role="menuitem" href="#tokenomics" class="hover:text-brand transition" data-i18n="nav.tokenomics">Tokenomics</a></li>
+      <li role="none"><a role="menuitem" href="#roadmap" class="hover:text-brand transition" data-i18n="nav.roadmap">Roadmap</a></li>
+      <li role="none"><a role="menuitem" href="#faq" class="hover:text-brand transition" data-i18n="nav.faq">FAQ</a></li>
+
+      <!-- ▼ dropdown мов -->
+      <li class="relative" role="none">
+        <details id="lang-switcher" class="group">
+          <summary class="list-none cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10" aria-haspopup="listbox">
+            <img id="lang-flag" src="/assets/lang/uk.png" alt="" class="w-5 h-5 rounded-full" onerror="this.style.display='none'">
+            <span id="lang-label" class="hidden lg:inline">Українська</span>
+            <span class="opacity-70" aria-hidden="true">▾</span>
+          </summary>
+          <div class="absolute right-0 mt-2 w-44 bg-neutral-900/95 border border-white/10 rounded-xl shadow-soft z-50">
+            <ul class="text-sm max-h-80 overflow-auto py-1" role="listbox" aria-label="Language">
+              <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="uk" data-label="Українська" data-flag="/assets/lang/uk.png"><img src="/assets/lang/uk.png" alt="" class="w-5 h-5 rounded-full"> Українська</button></li>
+              <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="en" data-label="English" data-flag="/assets/lang/en.png"><img src="/assets/lang/en.png" alt="" class="w-5 h-5 rounded-full"> English</button></li>
+              <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="zh" data-label="中文" data-flag="/assets/lang/cn.png"><img src="/assets/lang/cn.png" alt="" class="w-5 h-5 rounded-full"> 中文</button></li>
+              <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="es" data-label="Español" data-flag="/assets/lang/es.png"><img src="/assets/lang/es.png" alt="" class="w-5 h-5 rounded-full"> Español</button></li>
+              <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="fr" data-label="Français" data-flag="/assets/lang/fr.png"><img src="/assets/lang/fr.png" alt="" class="w-5 h-5 rounded-full"> Français</button></li>
+              <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="ru" data-label="Русский" data-flag="/assets/lang/ru.png"><img src="/assets/lang/ru.png" alt="" class="w-5 h-5 rounded-full"> Русский</button></li>
+              <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="pt" data-label="Português" data-flag="/assets/lang/pt.png"><img src="/assets/lang/pt.png" alt="" class="w-5 h-5 rounded-full"> Português</button></li>
+              <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="id" data-label="Bahasa" data-flag="/assets/lang/id.png"><img src="/assets/lang/id.png" alt="" class="w-5 h-5 rounded-full"> Bahasa</button></li>
+            </ul>
+          </div>
+        </details>
+      </li>
+
+      <!-- TonConnect кнопка (контейнер) -->
+      <li role="none">
+        <div id="tonconnect" class="w-[180px] h-10"></div>
+      </li>
+    </ul>
+
+    <!-- Бургер -->
+    <label for="nav-burger" class="md:hidden p-2 rounded-lg hover:bg-white/10 cursor-pointer" aria-label="Open menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </label>
+    <input type="checkbox" id="nav-burger" class="hidden" aria-hidden="true" />
+  </div>
+
+  <!-- Мобільне меню -->
+  <div id="mobile-panel" class="md:hidden hidden border-t border-white/10 bg-neutral-900/80 backdrop-blur-xl">
+    <div class="max-w-6xl mx-auto px-4 py-4 space-y-4">
+      <a href="#buy" class="block py-1 hover:text-brand" data-i18n="nav.buy">Buy</a>
+      <a href="#tokenomics" class="block py-1 hover:text-brand" data-i18n="nav.tokenomics">Tokenomics</a>
+      <a href="#roadmap" class="block py-1 hover:text-brand" data-i18n="nav.roadmap">Roadmap</a>
+      <a href="#faq" class="block py-1 hover:text-brand" data-i18n="nav.faq">FAQ</a>
+
+      <!-- Мови (мобільна версія) -->
+      <details id="lang-switcher-mobile" class="pt-2">
+        <summary class="list-none cursor-pointer flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10" aria-haspopup="listbox">
+          <img id="lang-flag-m" src="/assets/lang/uk.png" alt="" class="w-5 h-5 rounded-full" onerror="this.style.display='none'">
+          <span id="lang-label-m">Українська</span>
+          <span class="opacity-70" aria-hidden="true">▾</span>
+        </summary>
+        <div class="mt-2 w-full bg-neutral-900/95 border border-white/10 rounded-xl shadow-soft">
+          <ul class="text-sm max-h-80 overflow-auto py-1" role="listbox" aria-label="Language">
+            <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="uk" data-label="Українська" data-flag="/assets/lang/uk.png"><img src="/assets/lang/uk.png" alt="" class="w-5 h-5 rounded-full"> Українська</button></li>
+            <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="en" data-label="English" data-flag="/assets/lang/en.png"><img src="/assets/lang/en.png" alt="" class="w-5 h-5 rounded-full"> English</button></li>
+            <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="zh" data-label="中文" data-flag="/assets/lang/cn.png"><img src="/assets/lang/cn.png" alt="" class="w-5 h-5 rounded-full"> 中文</button></li>
+            <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="es" data-label="Español" data-flag="/assets/lang/es.png"><img src="/assets/lang/es.png" alt="" class="w-5 h-5 rounded-full"> Español</button></li>
+            <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="fr" data-label="Français" data-flag="/assets/lang/fr.png"><img src="/assets/lang/fr.png" alt="" class="w-5 h-5 rounded-full"> Français</button></li>
+            <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="ru" data-label="Русский" data-flag="/assets/lang/ru.png"><img src="/assets/lang/ru.png" alt="" class="w-5 h-5 rounded-full"> Русский</button></li>
+            <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="pt" data-label="Português" data-flag="/assets/lang/pt.png"><img src="/assets/lang/pt.png" alt="" class="w-5 h-5 rounded-full"> Português</button></li>
+            <li><button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10" data-lang="id" data-label="Bahasa" data-flag="/assets/lang/id.png"><img src="/assets/lang/id.png" alt="" class="w-5 h-5 rounded-full"> Bahasa</button></li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- TonConnect кнопка (контейнер) -->
+      <div id="tonconnect-mobile" class="w-full h-10"></div>
+    </div>
+  </div>
+</nav>
+
+<!-- Мінімальний CSS для мобільного меню -->
+<style>
+  #nav-burger:checked ~ #mobile-panel { display: block; }
+</style>

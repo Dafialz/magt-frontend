@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Базові дрібниці */
+@layer base {
+  html { scroll-behavior: smooth; }
+  body { @apply text-white bg-neutral-950; }
+}
+
+/* Компоненти */
+@layer components {
+  /* напівпрозорий топ-бар */
+  .nav-blur {
+    @apply fixed inset-x-0 top-0 z-40 border-b border-white/10;
+    background: rgba(8, 10, 18, .60);
+    backdrop-filter: blur(10px);
+  }
+
+  /* “скло” для карток */
+  .glass {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 10px 40px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06);
+    backdrop-filter: blur(10px);
+    border-radius: 18px;
+  }
+
+  /* секція-герой як на скріні */
+  .hero-wrap {
+    @apply relative overflow-hidden;
+    min-height: 340px; /* дає місце заголовку поверх фону */
+  }
+
+  .container-xl { @apply max-w-6xl mx-auto px-4; }
+}

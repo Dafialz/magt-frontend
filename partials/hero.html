@@ -1,0 +1,173 @@
+<!-- /partials/hero.html -->
+<section class="relative">
+  <!-- TonConnect у правому верхньому куті HERO (опціонально; логіка монтування у tonconnect.js) -->
+  <div class="absolute right-4 top-4 z-20">
+    <div id="tonconnect-hero" data-ton-root></div>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-4 py-6 lg:py-10">
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <img src="/assets/logo.png" alt="MAGT" class="w-10 h-10 rounded-2xl object-contain shadow-soft">
+        <h1 class="text-xl lg:text-2xl font-bold" data-i18n="hero.title">Magic Time (MAGT) — Presale</h1>
+      </div>
+      <div class="hidden lg:block"></div>
+    </div>
+
+    <div class="mt-8 grid lg:grid-cols-2 gap-6 items-start" id="buy">
+      <!-- Параметри -->
+      <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" aria-labelledby="presale-params">
+        <h2 id="presale-params" class="text-lg font-semibold" data-i18n="hero.params">Параметри пресейлу</h2>
+        <p class="mt-2 text-neutral-300 text-sm" data-i18n-html="hero.desc">
+          Оплата: <b>USDT (Jetton)</b> у мережі TON. Ціль збору: <b>$20,000,000</b>.
+        </p>
+
+        <div class="mt-6 grid sm:grid-cols-3 gap-4">
+          <div class="rounded-2xl border border-white/10 p-4">
+            <div class="text-sm text-neutral-400" data-i18n="hero.level.label">Поточний рівень</div>
+            <div id="ui-level" class="text-2xl font-semibold nmbr">1</div>
+          </div>
+          <div class="rounded-2xl border border-white/10 p-4">
+            <div class="text-sm text-neutral-400" data-i18n="hero.price.label">Ціна (за 1 MAGT)</div>
+            <div class="text-2xl font-semibold nmbr">$<span id="ui-price">0.003830</span></div>
+          </div>
+          <div class="rounded-2xl border border-white/10 p-4">
+            <div class="text-sm text-neutral-400" data-i18n="hero.left.label">Залишок</div>
+            <div class="text-2xl font-semibold nmbr"><span id="ui-left">—</span> MAGT</div>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <div class="flex justify-between text-sm text-neutral-400">
+            <span data-i18n="hero.progress.label">Прогрес збору</span>
+            <span>$<span id="ui-raised">—</span> / $20,000,000</span>
+          </div>
+          <div class="w-full mt-2 h-3 rounded-full bg-white/10 overflow-hidden"
+               role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Presale progress">
+            <div id="bar" class="h-full w-0 bg-gradient-to-r from-cyan-400 to-violet-500"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Купівля -->
+      <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" aria-labelledby="buy-title">
+        <h2 id="buy-title" class="text-lg font-semibold" data-i18n="hero.buytitle">Купити MAGT за USDT</h2>
+
+        <!-- Реферальна програма -->
+        <div class="rounded-2xl border border-white/10 p-4 mb-4" aria-labelledby="ref-title">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div id="ref-title" class="font-semibold" data-i18n="hero.ref.title">Реферальна програма — 5%</div>
+              <div class="text-sm text-neutral-400" data-i18n="hero.ref.desc">Запроси друга — отримаєш 5% від його покупки.</div>
+            </div>
+          </div>
+
+          <div id="ref-detected" class="mt-3 hidden text-sm" aria-live="polite">
+            <div class="text-neutral-300" data-i18n-html="hero.ref.detected.line1">Ви прийшли за запрошенням: <b id="referrer-short"></b></div>
+            <div class="text-neutral-400" data-i18n="hero.ref.detected.line2">Під час покупки 5% буде нараховано запрошувачу.</div>
+          </div>
+
+          <!-- Блок видимий завжди; до конекту — плейсхолдер. Логіка в ui.js -->
+          <div id="ref-yourlink" class="mt-3">
+            <label class="block text-sm text-neutral-300 mb-1" for="ref-link" data-i18n="hero.ref.yourlink">Твій реф-лінк</label>
+            <div class="flex gap-2">
+              <input id="ref-link" type="text" readonly
+                     class="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs"
+                     data-i18n-aria="hero.ref.yourlink" aria-readonly="true" spellcheck="false" autocomplete="off"
+                     placeholder="Підключи гаманець — лінк з’явиться тут">
+              <button id="btn-copy-ref" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm"
+                      data-i18n="hero.ref.copy"
+                      data-i18n-aria="hero.ref.copy"
+                      aria-label="Copy referral link"
+                      disabled>Копіювати</button>
+            </div>
+            <div class="text-xs text-neutral-400 mt-2">
+              Лінк автоматично з’явиться після підключення гаманця.
+              <div class="mt-1">
+                <button id="btn-enter-addr" class="underline underline-offset-2 opacity-80 hover:opacity-100">
+                  Не з’явився? Ввести адресу вручну
+                </button>
+                <button id="btn-reset-manual" class="ml-2 underline underline-offset-2 opacity-60 hover:opacity-100 hidden">
+                  Скинути ручну адресу
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <label class="block mt-2 text-sm text-neutral-300" for="usdtIn" data-i18n="hero.amount">Сума у USDT</label>
+        <div class="mt-2 flex gap-3">
+          <input
+            id="usdtIn"
+            type="number"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            placeholder="100"
+            autocomplete="off"
+            class="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 focus:outline-none"
+            data-i18n-ph="hero.amount.ph"
+            aria-describedby="magt-receive ref-payout"
+          >
+          <button
+            id="btn-max"
+            class="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20"
+            data-i18n="hero.max"
+            data-i18n-aria="hero.max"
+            aria-label="MAX"
+          >MAX</button>
+        </div>
+
+        <div id="magt-receive" class="mt-3 text-sm text-neutral-400" data-i18n-html="hero.receive">
+          Отримаєш ≈ <span id="magOut" class="nmbr">0</span> MAGT
+        </div>
+
+        <!-- НОВИЙ блок з ціною та рівнем -->
+        <div id="price-under-output" class="mt-1 text-xs text-neutral-400">
+          Ціна зараз: $<span id="price-now">—</span> • Рівень <span id="level-now">—</span>
+        </div>
+
+        <!-- ВИПРАВЛЕНО блок -->
+        <div id="ref-payout" class="mt-2 text-xs text-neutral-400 hidden" aria-live="polite">
+          5% реф-винагорода: <span id="ref-bonus-usd">0</span> MAGT → <span id="ref-bonus-to">—</span>
+        </div>
+
+        <div class="mt-4 flex items-start gap-2 text-sm">
+          <input id="agree" type="checkbox" class="mt-1" aria-describedby="agree-note">
+          <label id="agree-note" for="agree" class="text-neutral-300" data-i18n="hero.agree">
+            Погоджуюсь з правилами пресейлу (безпека, блокування, обмеження).
+          </label>
+        </div>
+
+        <div class="mt-5 flex flex-wrap items-center gap-3">
+          <button id="btn-buy"
+                  class="px-4 py-3 rounded-2xl bg-cyan-400 text-neutral-900 font-semibold hover:opacity-90 disabled:opacity-40"
+                  data-i18n="hero.btn.buy"
+                  data-i18n-aria="hero.btn.buy"
+                  aria-label="Buy MAGT"
+                  disabled>Купити</button>
+
+          <div id="claim-wrap" data-claim-wrap class="hidden">
+            <button id="btn-claim"
+                    class="px-4 py-3 rounded-2xl bg-violet-400 text-neutral-900 font-semibold hover:opacity-90 disabled:opacity-40"
+                    data-i18n="hero.btn.claim"
+                    data-i18n-aria="hero.btn.claim"
+                    aria-label="Claim MAGT"
+                    disabled>Забрати MAGT</button>
+          </div>
+        </div>
+
+        <div class="mt-2 flex items-center gap-2 text-xs text-neutral-400 hidden" id="claim-info" aria-live="polite">
+          <span class="inline-flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1">
+            <span class="opacity-70">Доступно:</span>
+            <b id="claim-badge" class="tabular-nums">0</b>
+            <span>MAGT</span>
+          </span>
+          <span class="opacity-70">— після отримання показник оновиться автоматично.</span>
+        </div>
+
+        <div id="status" class="mt-4 text-sm text-neutral-300" role="status" aria-live="polite"></div>
+      </section>
+    </div>
+  </div>
+</section>

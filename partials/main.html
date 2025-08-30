@@ -1,0 +1,280 @@
+<!-- /partials/main.html -->
+
+<!-- Як купити -->
+<section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" aria-labelledby="how-title">
+  <h2 id="how-title" class="text-lg font-semibold" data-i18n="how.title">Як купити MAGT</h2>
+
+  <!-- семантичний список кроків -->
+  <ol class="mt-6 grid sm:grid-cols-3 gap-4" aria-label="Покрокова інструкція покупки">
+    <li class="rounded-2xl border border-white/10 p-4" aria-describedby="how-step1-d">
+      <div class="text-sm text-neutral-400" data-i18n="how.step1.t">Крок 1</div>
+      <div class="font-semibold mt-1" data-i18n="how.step1.h">Підключи гаманець</div>
+      <p id="how-step1-d" class="text-sm text-neutral-400 mt-1" data-i18n="how.step1.d">
+        Натисни <b>Connect Wallet</b> і обери Tonkeeper / Tonhub.
+      </p>
+    </li>
+    <li class="rounded-2xl border border-white/10 p-4" aria-describedby="how-step2-d">
+      <div class="text-sm text-neutral-400" data-i18n="how.step2.t">Крок 2</div>
+      <div class="font-semibold mt-1" data-i18n="how.step2.h">Вкажи суму USDT</div>
+      <p id="how-step2-d" class="text-sm text-neutral-400 mt-1" data-i18n="how.step2.d">
+        Введи суму, погодься з правилами і натисни <b>Купити</b>.
+      </p>
+    </li>
+    <li class="rounded-2xl border border-white/10 p-4" aria-describedby="how-step3-d">
+      <div class="text-sm text-neutral-400" data-i18n="how.step3.t">Крок 3</div>
+      <div class="font-semibold mt-1" data-i18n="how.step3.h">Підтверди в гаманці</div>
+      <p id="how-step3-d" class="text-sm text-neutral-400 mt-1" data-i18n="how.step3.d">
+        Після пресейлу зʼявиться кнопка <b>Claim</b>.
+      </p>
+    </li>
+  </ol>
+</section>
+
+<!-- Токеноміка -->
+<section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" id="tokenomics" aria-labelledby="tokenomics-title">
+  <h2 id="tokenomics-title" class="text-lg font-semibold" data-i18n="tokenomics.title">Токеноміка</h2>
+
+  <div class="mt-4 overflow-x-auto" role="region" aria-label="Таблиця токеноміки">
+    <table class="w-full text-sm">
+      <caption class="sr-only">Розподіл токенів MAGT і умови вестингу</caption>
+      <thead class="text-neutral-300">
+        <tr>
+          <th scope="col" class="text-left py-2 px-3" data-i18n="tokenomics.col.section">Розділ</th>
+          <th scope="col" class="text-right py-2 px-3">%</th>
+          <th scope="col" class="text-right py-2 px-3">MAGT</th>
+          <th scope="col" class="text-left py-2 px-3" data-i18n="tokenomics.col.vesting">Вестинг</th>
+        </tr>
+      </thead>
+      <tbody class="text-neutral-300/90">
+        <tr class="border-t border-white/10">
+          <th scope="row" class="py-2 px-3 font-medium" data-i18n="tokenomics.row.sale">Пресейл</th>
+          <td class="py-2 px-3 text-right">30%</td>
+          <td class="py-2 px-3 text-right">1 500 000 000</td>
+          <td class="py-2 px-3" data-i18n="tokenomics.vesting.none">Без вестингу</td>
+        </tr>
+        <tr class="border-t border-white/10">
+          <th scope="row" class="py-2 px-3 font-medium" data-i18n="tokenomics.row.liquidity">Ліквідність</th>
+          <td class="py-2 px-3 text-right">15%</td>
+          <td class="py-2 px-3 text-right">750 000 000</td>
+          <td class="py-2 px-3" data-i18n="tokenomics.vesting.lock6">Lock 6 міс.</td>
+        </tr>
+        <tr class="border-t border-white/10">
+          <th scope="row" class="py-2 px-3 font-medium" data-i18n="tokenomics.row.marketing">Маркетинг</th>
+          <td class="py-2 px-3 text-right">15%</td>
+          <td class="py-2 px-3 text-right">750 000 000</td>
+          <td class="py-2 px-3" data-i18n="tokenomics.vesting.unlock12">Розблок 12 міс.</td>
+        </tr>
+        <tr class="border-t border-white/10">
+          <th scope="row" class="py-2 px-3 font-medium" data-i18n="tokenomics.row.team">Команда</th>
+          <td class="py-2 px-3 text-right">20%</td>
+          <td class="py-2 px-3 text-right">1 000 000 000</td>
+          <td class="py-2 px-3" data-i18n="tokenomics.vesting.team">Cliff 6 міс. + 18 міс.</td>
+        </tr>
+        <tr class="border-t border-white/10">
+          <th scope="row" class="py-2 px-3 font-medium" data-i18n="tokenomics.row.devfund">Фонд розвитку</th>
+          <td class="py-2 px-3 text-right">20%</td>
+          <td class="py-2 px-3 text-right">1 000 000 000</td>
+          <td class="py-2 px-3" data-i18n="tokenomics.vesting.unlock24">Розблок 24 міс.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mt-4 grid md:grid-cols-[auto,1fr] gap-4 items-center">
+    <!-- SVG пончик із widgets.js -->
+    <div class="flex items-center gap-4">
+      <svg id="tok-chart" viewBox="0 0 120 120" class="w-28 h-28" aria-hidden="true"></svg>
+      <div id="tok-legend" class="text-sm"></div>
+    </div>
+    <p class="text-xs text-neutral-400" data-i18n="tokenomics.note">
+      * Приклад розподілу — оновимо після затвердження.
+    </p>
+  </div>
+</section>
+
+<!-- Дорожня карта -->
+<section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" id="roadmap" aria-labelledby="roadmap-title">
+  <h2 id="roadmap-title" class="text-lg font-semibold" data-i18n="roadmap.title">Дорожня карта</h2>
+  <ol class="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Етапи розвитку">
+    <li class="rounded-2xl border border-white/10 p-4" aria-label="Q3 2025">
+      <div class="text-sm text-neutral-400"><time datetime="2025-Q3">Q3 2025</time></div>
+      <div class="font-semibold mt-1" data-i18n="roadmap.q3.title">Пресейл & реф-система</div>
+      <p class="text-sm text-neutral-400 mt-1" data-i18n="roadmap.q3.desc">Запуск, збір коштів, комʼюніті.</p>
+    </li>
+    <li class="rounded-2xl border border-white/10 p-4" aria-label="Q4 2025">
+      <div class="text-sm text-neutral-400"><time datetime="2025-Q4">Q4 2025</time></div>
+      <div class="font-semibold mt-1" data-i18n="roadmap.q4.title">Лістинг & ліквідність</div>
+      <p class="text-sm text-neutral-400 mt-1" data-i18n="roadmap.q4.desc">DEX, додавання ліквідності, Claim.</p>
+    </li>
+    <li class="rounded-2xl border border-white/10 p-4" aria-label="Q1 2026">
+      <div class="text-sm text-neutral-400"><time datetime="2026-Q1">Q1 2026</time></div>
+      <div class="font-semibold mt-1" data-i18n="roadmap.q1.title">Партнерства</div>
+      <p class="text-sm text-neutral-400 mt-1" data-i18n="roadmap.q1.desc">Інтеграції, колаби, стимули.</p>
+    </li>
+    <li class="rounded-2xl border border-white/10 p-4" aria-label="Q2 2026">
+      <div class="text-sm text-neutral-400"><time datetime="2026-Q2">Q2 2026</time></div>
+      <div class="font-semibold mt-1" data-i18n="roadmap.q2.title">Екосистема</div>
+      <p class="text-sm text-neutral-400 mt-1" data-i18n="roadmap.q2.desc">DAO-механіки, нові продукти.</p>
+    </li>
+  </ol>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="max-w-6xl mx-auto" aria-labelledby="faq-title">
+  <div class="rounded-2xl bg-white/5 border border-white/10 p-6 md:p-8 shadow-soft">
+    <h2 id="faq-title" class="text-2xl md:text-3xl font-semibold mb-6" data-i18n="faq.title">FAQ</h2>
+
+    <!-- ARIA-готовий акордеон: кнопка керує панеллю через aria-controls -->
+    <div data-accordion class="space-y-3" role="list" aria-label="Поширені питання">
+      <!-- 1 -->
+      <div data-accordion-item class="border border-white/10 rounded-xl overflow-hidden" role="listitem">
+        <button id="faq-btn-1" class="w-full text-left px-4 py-3 font-medium flex items-center justify-between"
+                aria-expanded="false" aria-controls="faq-panel-1">
+          <span data-i18n="faq.q1">Що таке MagicTime (MAGT)?</span>
+          <span class="text-white/50" aria-hidden="true">▾</span>
+        </button>
+        <div id="faq-panel-1" data-accordion-body class="px-4 overflow-hidden transition-all duration-300"
+             style="max-height:0" role="region" aria-labelledby="faq-btn-1">
+          <div class="py-3 text-white/80 space-y-3" data-i18n-html="faq.a1">
+            <p><b>MagicTime</b> — інноваційний криптопроєкт...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2 -->
+      <div data-accordion-item class="border border-white/10 rounded-xl overflow-hidden" role="listitem">
+        <button id="faq-btn-2" class="w-full text-left px-4 py-3 font-medium flex items-center justify-between"
+                aria-expanded="false" aria-controls="faq-panel-2">
+          <span data-i18n="faq.q2">Якою валютою оплачувати?</span>
+          <span class="text-white/50" aria-hidden="true">▾</span>
+        </button>
+        <div id="faq-panel-2" data-accordion-body class="px-4 overflow-hidden transition-all duration-300"
+             style="max-height:0" role="region" aria-labelledby="faq-btn-2">
+          <div class="py-3 text-white/80" data-i18n="faq.a2">
+            USDT (Jetton) у мережі TON. Підключення — через TonConnect у вашому гаманці.
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 -->
+      <div data-accordion-item class="border border-white/10 rounded-xl overflow-hidden" role="listitem">
+        <button id="faq-btn-3" class="w-full text-left px-4 py-3 font-medium flex items-center justify-between"
+                aria-expanded="false" aria-controls="faq-panel-3">
+          <span data-i18n="faq.q3">Коли я отримаю MAGT?</span>
+          <span class="text-white/50" aria-hidden="true">▾</span>
+        </button>
+        <div id="faq-panel-3" data-accordion-body class="px-4 overflow-hidden transition-all duration-300"
+             style="max-height:0" role="region" aria-labelledby="faq-btn-3">
+          <div class="py-3 text-white/80" data-i18n-html="faq.a3">
+            Після завершення пресейлу з’явиться кнопка <b>Claim</b>...
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 -->
+      <div data-accordion-item class="border border-white/10 rounded-xl overflow-hidden" role="listitem">
+        <button id="faq-btn-4" class="w-full text-left px-4 py-3 font-medium flex items-center justify-between"
+                aria-expanded="false" aria-controls="faq-panel-4">
+          <span data-i18n="faq.q4">Як працює рефералка 5%?</span>
+          <span class="text-white/50" aria-hidden="true">▾</span>
+        </button>
+        <div id="faq-panel-4" data-accordion-body class="px-4 overflow-hidden transition-all duration-300"
+             style="max-height:0" role="region" aria-labelledby="faq-btn-4">
+          <div class="py-3 text-white/80 space-y-2" data-i18n-html="faq.a4">
+            <p>Запрошений купує MAGT за вашим реф-посиланням...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 -->
+      <div data-accordion-item class="border border-white/10 rounded-xl overflow-hidden" role="listitem">
+        <button id="faq-btn-5" class="w-full text-left px-4 py-3 font-medium flex items-center justify-between"
+                aria-expanded="false" aria-controls="faq-panel-5">
+          <span data-i18n="faq.q5">Як змінюється ціна під час пресейлу?</span>
+          <span class="text-white/50" aria-hidden="true">▾</span>
+        </button>
+        <div id="faq-panel-5" data-accordion-body class="px-4 overflow-hidden transition-all duration-300"
+             style="max-height:0" role="region" aria-labelledby="faq-btn-5">
+          <div class="py-3 text-white/80" data-i18n="faq.a5">
+            Пресейл іде раундами...
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 -->
+      <div data-accordion-item class="border border-white/10 rounded-xl overflow-hidden" role="listitem">
+        <button id="faq-btn-6" class="w-full text-left px-4 py-3 font-medium flex items-center justify-between"
+                aria-expanded="false" aria-controls="faq-panel-6">
+          <span data-i18n="faq.q6">Чи є мінімальна сума покупки?</span>
+          <span class="text-white/50" aria-hidden="true">▾</span>
+        </button>
+        <div id="faq-panel-6" data-accordion-body class="px-4 overflow-hidden transition-all duration-300"
+             style="max-height:0" role="region" aria-labelledby="faq-btn-6">
+          <div class="py-3 text-white/80" data-i18n="faq.a6">
+            Так, мінімальний платіж може бути встановлений...
+          </div>
+        </div>
+      </div>
+
+      <!-- 7 -->
+      <div data-accordion-item class="border border-white/10 rounded-xl overflow-hidden" role="listitem">
+        <button id="faq-btn-7" class="w-full text-left px-4 py-3 font-medium flex items-center justify-between"
+                aria-expanded="false" aria-controls="faq-panel-7">
+          <span data-i18n="faq.q7">Які гаманці підтримуються?</span>
+          <span class="text-white/50" aria-hidden="true">▾</span>
+        </button>
+        <div id="faq-panel-7" data-accordion-body class="px-4 overflow-hidden transition-all duration-300"
+             style="max-height:0" role="region" aria-labelledby="faq-btn-7">
+          <div class="py-3 text-white/80" data-i18n-html="faq.a7">
+            Будь-які TON-гаманці з підтримкою <b>TonConnect</b>...
+          </div>
+        </div>
+      </div>
+
+      <!-- 8 -->
+      <div data-accordion-item class="border border-white/10 rounded-xl overflow-hidden" role="listitem">
+        <button id="faq-btn-8" class="w-full text-left px-4 py-3 font-medium flex items-center justify-between"
+                aria-expanded="false" aria-controls="faq-panel-8">
+          <span data-i18n="faq.q8">Які комісії при оплаті?</span>
+          <span class="text-white/50" aria-hidden="true">▾</span>
+        </button>
+        <div id="faq-panel-8" data-accordion-body class="px-4 overflow-hidden transition-all duration-300"
+             style="max-height:0" role="region" aria-labelledby="faq-btn-8">
+          <div class="py-3 text-white/80" data-i18n="faq.a8">
+            Ви сплачуєте мережеву комісію...
+          </div>
+        </div>
+      </div>
+
+      <!-- 9 -->
+      <div data-accordion-item class="border border-white/10 rounded-xl overflow-hidden" role="listitem">
+        <button id="faq-btn-9" class="w-full text-left px-4 py-3 font-medium flex items-center justify-between"
+                aria-expanded="false" aria-controls="faq-panel-9">
+          <span data-i18n="faq.q9">Чи безпечно це? Які ризики?</span>
+          <span class="text-white/50" aria-hidden="true">▾</span>
+        </button>
+        <div id="faq-panel-9" data-accordion-body class="px-4 overflow-hidden transition-all duration-300"
+             style="max-height:0" role="region" aria-labelledby="faq-btn-9">
+          <div class="py-3 text-white/80" data-i18n="faq.a9">
+            Криптоінвестиції ризикові...
+          </div>
+        </div>
+      </div>
+
+      <!-- 10 -->
+      <div data-accordion-item class="border border-white/10 rounded-xl overflow-hidden" role="listitem">
+        <button id="faq-btn-10" class="w-full text-left px-4 py-3 font-medium flex items-center justify-between"
+                aria-expanded="false" aria-controls="faq-panel-10">
+          <span data-i18n="faq.q10">Де отримати підтримку?</span>
+          <span class="text-white/50" aria-hidden="true">▾</span>
+        </button>
+        <div id="faq-panel-10" data-accordion-body class="px-4 overflow-hidden transition-all duration-300"
+             style="max-height:0" role="region" aria-labelledby="faq-btn-10">
+          <div class="py-3 text-white/80" data-i18n-html="faq.a10">
+            Напишіть нам: <a class="underline text-brand" href="mailto:hello@mag.example">hello@mag.example</a> або у Telegram сапорт.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

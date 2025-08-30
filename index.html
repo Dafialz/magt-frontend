@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Magic Time — Presale TON + USDT</title>
+  <meta name="description" content="Офіційний пресейл Magic Time (MAGT) у мережі TON з оплатою USDT (Jetton)">
+  <meta name="theme-color" content="#0a0a0a">
+
+  <!-- не кешувати HTML -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
+  <!-- favicon -->
+  <link rel="icon" type="image/png" href="/assets/favicon.png?v=9">
+  <link rel="shortcut icon" href="/assets/favicon.png?v=9" type="image/png">
+
+  <!-- ⚡ Tailwind CDN (страховка) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { brand: '#65D2FF' },
+          boxShadow: { soft: '0 8px 30px rgba(0,0,0,.35)' },
+          borderRadius: { xl: '0.75rem', '2xl': '1rem' }
+        }
+      }
+    }
+  </script>
+
+  <!-- Локальні стилі -->
+  <link rel="stylesheet" href="/assets/styles.css?v=9">
+
+  <!-- дрібний стиль + ФОН + службові класи -->
+  <style>
+    body{
+      background-image:url('/assets/bg.png?v=9');
+      background-size:cover;
+      background-position:center top;
+      background-repeat:no-repeat;
+      background-attachment:fixed;
+      background-color:#0a0a0a;
+    }
+    .page-overlay{
+      position:fixed; inset:0; pointer-events:none;
+      background:
+        radial-gradient(1200px 600px at 50% -200px, rgba(10,10,10,.35), transparent 60%),
+        linear-gradient(180deg, rgba(10,10,10,.20), rgba(10,10,10,0) 25%, rgba(10,10,10,.25));
+      z-index:0;
+    }
+    .grad{background:linear-gradient(135deg,#65D2FF,#7C3AED)}
+    .shadow-soft{box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    html{scroll-behavior:smooth}
+    .nav-blur{
+      position:fixed; inset-inline:0; top:0; z-index:40;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background:rgba(8,10,18,.60);
+      -webkit-backdrop-filter:blur(10px);
+      backdrop-filter:blur(10px);
+    }
+    .hero-wrap{ position:relative; overflow:hidden; min-height:340px; }
+    .container-xl{ max-width:72rem; margin-inline:auto; padding-inline:1rem; }
+    header, main, footer { position:relative; z-index:10; }
+    .glass{background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10)}
+  </style>
+
+  <!-- бібліотеки -->
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tonweb@0.0.61/dist/tonweb.min.js"></script>
+
+  <!-- === API override без ребілду ===
+       1) Додай до адреси сторінки ?api=https://твій-бекенд
+          (запишеться в localStorage і використається на всіх перезавантаженнях)
+       2) Або розкоментуй рядок нижче й задай домен вручну -->
+  <script>
+    (function () {
+      try {
+        var url = new URL(location.href);
+        var q = url.searchParams.get("api");
+        if (q) {
+          localStorage.setItem("magt_api_override", q);
+          // опційно прибрати ?api з URL (щоб не світити)
+          url.searchParams.delete("api");
+          // не міняємо URL автоматично, щоб не дробити історію
+        }
+        var saved = localStorage.getItem("magt_api_override");
+        if (q || saved) {
+          window.API_BASE_OVERRIDE = q || saved;
+          console.log("[MAGT] API override:", window.API_BASE_OVERRIDE);
+        }
+        // ЖОРСТКЕ ЗАДАННЯ (якщо треба):
+        // window.API_BASE_OVERRIDE = "https://YOUR-BACKEND-URL";
+      } catch (e) {
+        console.warn("[MAGT] API override init failed", e);
+      }
+    })();
+  </script>
+
+  <!-- === ДОДАНО: жорстке задання бекенду для всіх === -->
+  <script>
+    // Публічний бекенд Render:
+    window.API_BASE_OVERRIDE = "https://magt-api.onrender.com";
+    console.log("[MAGT] API override (hard):", window.API_BASE_OVERRIDE);
+  </script>
+
+  <noscript>
+    <style>
+      [data-js], template { display:none !important; }
+      .nojs { display:block; }
+    </style>
+  </noscript>
+</head>
+<body class="min-h-screen text-white pt-16" id="top" data-js>
+  <div class="page-overlay"></div>
+
+  <!-- NAV -->
+  <div id="slot-nav" class="nav-blur"></div>
+
+  <!-- HEADER -->
+  <header class="hero-wrap">
+    <div id="slot-hero"></div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="container-xl py-12 space-y-10" id="slot-main"></main>
+
+  <!-- FOOTER -->
+  <footer class="container-xl border-t border-white/10 py-8">
+    <div id="slot-footer"></div>
+  </footer>
+
+  <!-- ВІДЖЕТИ (рендер здійснюватиметься у widgets.js після події partials:main-ready) -->
+  <template id="widgets-tpl">
+    <!-- ===== 1) Прогрес пресейлу + таймер ===== -->
+    <section id="sec-sale" class="glass rounded-3xl p-6 lg:p-8 shadow-soft">
+      <h2 class="text-lg font-semibold" data-i18n="widgets.saleProgress.title">Прогрес пресейлу</h2>
+
+      <div class="mt-4">
+        <div class="flex justify-between text-sm text-neutral-400">
+          <span id="sale-percent" data-i18n="widgets.saleProgress.percent">0% продано</span>
+          <span><span data-i18n="widgets.saleProgress.remaining">Залишок:</span> <b id="sale-remaining">—</b> MAGT</span>
+        </div>
+        <div class="w-full mt-2 h-3 rounded-full bg-white/10 overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Presale progress">
+          <div id="sale-bar" class="h-full w-0 bg-gradient-to-r from-cyan-400 to-violet-500"></div>
+        </div>
+        <div class="mt-2 text-sm text-neutral-400">
+          <span data-i18n="widgets.saleProgress.raised">Зібрано:</span> <b id="sale-raised">$—</b>
+        </div>
+      </div>
+
+      <div class="mt-6 rounded-2xl border border-white/10 p-4">
+        <div class="text-sm text-neutral-400" data-i18n="widgets.roundTimer.title">Раунд закінчиться через</div>
+        <div class="mt-2 flex items-baseline gap-3">
+          <div id="round-timer" class="text-2xl font-semibold tabular-nums">00:00:00</div>
+          <div class="text-xs text-neutral-400">
+            <span data-i18n="widgets.roundTimer.note">Наступна ціна після таймера.</span>
+            <span class="ml-1 opacity-70">(<span id="round-deadline-label">—</span>)</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 2) Калькулятор прибутку ===== -->
+    <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft">
+      <h2 class="text-lg font-semibold" data-i18n="widgets.calc.title">Калькулятор прибутку</h2>
+
+      <div class="mt-4 grid sm:grid-cols-2 gap-4">
+        <label class="block">
+          <span class="text-sm text-neutral-400" data-i18n="widgets.calc.invest">Твоя інвестиція (USD)</span>
+          <input id="calc-usd" type="number" min="0" step="0.01" inputmode="decimal"
+                class="mt-2 w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10" placeholder="100">
+        </label>
+        <label class="block">
+          <span class="text-sm text-neutral-400" data-i18n="widgets.calc.listing">Ціна лістингу (USD)</span>
+          <input id="calc-listing" type="number" min="0" step="0.000001" inputmode="decimal"
+                class="mt-2 w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10" placeholder="0.01">
+        </label>
+      </div>
+
+      <div class="mt-4 grid sm:grid-cols-2 gap-4">
+        <div class="rounded-2xl border border-white/10 p-4">
+          <div class="text-sm text-neutral-400" data-i18n="widgets.calc.receive">Отримаєш ≈</div>
+          <div id="calc-tokens" class="text-xl font-semibold">0 MAGT</div>
+        </div>
+        <div class="rounded-2xl border border-white/10 p-4">
+          <div class="text-sm text-neutral-400" data-i18n="widgets.calc.potential">Потенційна вартість</div>
+          <div id="calc-value" class="text-xl font-semibold">$—</div>
+        </div>
+      </div>
+      <div id="calc-note" class="mt-2 text-xs text-neutral-400"></div>
+    </section>
+
+    <!-- ===== 3) Токеноміка (donut) ===== -->
+    <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft">
+      <h2 class="text-lg font-semibold" data-i18n="nav.tokenomics">Токеноміка</h2>
+      <div class="mt-4 grid sm:grid-cols-[140px_1fr] gap-6 items-center">
+        <svg id="tok-chart" viewBox="0 0 120 120" class="w-[120px] h-[120px]"></svg>
+        <div id="tok-legend" class="grid gap-2"></div>
+      </div>
+    </section>
+
+    <!-- ===== 4) Живий фід покупок ===== -->
+    <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold" data-i18n="widgets.feed.title">Останні покупки</h2>
+        <div class="text-sm text-neutral-400">#<span id="feed-count">0</span></div>
+      </div>
+      <ul id="feed-list" class="mt-4 grid gap-2" role="list" aria-live="polite"></ul>
+    </section>
+
+    <!-- ===== 5) Реферальний лідерборд ===== -->
+    <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft">
+      <h2 class="text-lg font-semibold" data-i18n="widgets.leaders.title">Реферальний лідерборд</h2>
+      <div class="mt-4 overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-neutral-400">
+            <tr>
+              <th class="py-2 pr-6">#</th>
+              <th class="py-2 pr-6" data-i18n="widgets.leaders.address">Адреса</th>
+              <th class="py-2" data-i18n="widgets.leaders.volume">Обсяг (USD)</th>
+            </tr>
+          </thead>
+          <tbody id="leaders-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </template>
+
+  <!-- Маскот -->
+  <div id="mascot" class="fixed bottom-4 right-4 z-50 pointer-events-none" data-mascot>
+    <div class="glass rounded-2xl shadow-soft px-4 py-3 text-sm max-w-[260px] opacity-0 translate-y-2 transition">
+      <div class="flex gap-2">
+        <div class="w-8 h-8 rounded-full grad animate-pulse" aria-hidden="true"></div>
+        <div id="mascot-text" class="leading-snug">Привіт 👋 Підключи гаманець, щоб стартувати!</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nojs container-xl py-6 text-sm text-red-300">
+    Увімкніть JavaScript для повноцінної роботи сайту.
+  </div>
+
+  <!-- ===== Скрипти (весь runtime без інлайнів) ===== -->
+  <!-- 1) Підтягуємо partials і віддаємо події partials:loaded / partials:main-ready -->
+  <script type="module" src="/js/partials.js?v=9"></script>
+
+  <!-- 2) I18N (перемикач мови всередині модуля, без inline у nav.html) -->
+  <script type="module" src="/js/i18n.js?v=9"></script>
+
+  <!-- 3) UI дрібниці (акордеон, маскот тощо) -->
+  <script type="module" src="/js/accordion.js?v=9"></script>
+
+  <!-- 4) TonConnect (єдиний сінглтон і подія magt:address) -->
+  <script type="module" src="/js/tonconnect.js?v=9"></script>
+
+  <!-- 5) Базовий UI/стан/рефералка (централізовано, без інлайнів) -->
+  <script type="module" src="/js/ui.js?v=9"></script>
+
+  <!-- 6) Віджети: слухає partials:main-ready, рендерить шаблони з #widgets-tpl -->
+  <script type="module" src="/js/widgets.js?v=9"></script>
+
+  <!-- 7) Головна логіка (buy/claim/init) -->
+  <script type="module" src="/js/app.js?v=9"></script>
+</body>
+</html>
