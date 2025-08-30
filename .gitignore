@@ -33,3 +33,7 @@ api/
 
 .netlify/
 functions/
+
+.netlify/
+functions/.netlify/
+
