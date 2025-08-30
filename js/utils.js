@@ -16,10 +16,18 @@ export const fmtUsd = (n, d = 2) => {
 /* ========== API url helper ========== */
 // api("/purchase") -> "https://api.example.com/purchase" або null (DEMO режим)
 export function api(path) {
-  if (!CONFIG.API_BASE) return null;
-  const base = String(CONFIG.API_BASE || "").replace(/\/+$/g, "");
-  const p = String(path || "").replace(/^\/?/g, "");
-  return `${base}/${p}`;
+  // пріоритет — ручний override у вікні
+  const base =
+    window.API_BASE_OVERRIDE ||
+    String(CONFIG.API_BASE || "").trim();
+
+  if (!base) return null;
+
+  // прибрати зайві слеші
+  const cleanBase = base.replace(/\/+$/g, "");
+  const cleanPath = String(path || "").replace(/^\/+/g, "");
+
+  return `${cleanBase}/${cleanPath}`;
 }
 
 /* ========== Misc utils ========== */

@@ -70,10 +70,7 @@
   <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tonweb@0.0.61/dist/tonweb.min.js"></script>
 
-  <!-- === API override без ребілду ===
-       1) Додай до адреси сторінки ?api=https://твій-бекенд
-          (запишеться в localStorage і використається на всіх перезавантаженнях)
-       2) Або розкоментуй рядок нижче й задай домен вручну -->
+  <!-- === API override без ребілду === -->
   <script>
     (function () {
       try {
@@ -81,27 +78,23 @@
         var q = url.searchParams.get("api");
         if (q) {
           localStorage.setItem("magt_api_override", q);
-          // опційно прибрати ?api з URL (щоб не світити)
           url.searchParams.delete("api");
-          // не міняємо URL автоматично, щоб не дробити історію
         }
         var saved = localStorage.getItem("magt_api_override");
         if (q || saved) {
           window.API_BASE_OVERRIDE = q || saved;
           console.log("[MAGT] API override:", window.API_BASE_OVERRIDE);
         }
-        // ЖОРСТКЕ ЗАДАННЯ (якщо треба):
-        // window.API_BASE_OVERRIDE = "https://YOUR-BACKEND-URL";
       } catch (e) {
         console.warn("[MAGT] API override init failed", e);
       }
     })();
   </script>
 
-  <!-- === ДОДАНО: жорстке задання бекенду для всіх === -->
+  <!-- === ЖОРСТКЕ задання бекенду (переважує все інше) === -->
   <script>
-    // Публічний бекенд Render:
-    window.API_BASE_OVERRIDE = "https://magt-api.onrender.com";
+    // Використовуємо кастомний домен з SSL (щоб уникнути дублювань типу "https//..."):
+    window.API_BASE_OVERRIDE = "https://api.magtcoin.com";
     console.log("[MAGT] API override (hard):", window.API_BASE_OVERRIDE);
   </script>
 
@@ -229,7 +222,7 @@
   </template>
 
   <!-- Маскот -->
-  <div id="mascot" class="fixed bottom-4 right-4 z-50 pointer-events-none" data-mascot>
+  <div id="mascot" class="fixed bottom-4 right-4 z-50 pointer-events-none" data-mascот>
     <div class="glass rounded-2xl shadow-soft px-4 py-3 text-sm max-w-[260px] opacity-0 translate-y-2 transition">
       <div class="flex gap-2">
         <div class="w-8 h-8 rounded-full grad animate-pulse" aria-hidden="true"></div>
@@ -243,25 +236,12 @@
   </div>
 
   <!-- ===== Скрипти (весь runtime без інлайнів) ===== -->
-  <!-- 1) Підтягуємо partials і віддаємо події partials:loaded / partials:main-ready -->
   <script type="module" src="/js/partials.js?v=9"></script>
-
-  <!-- 2) I18N (перемикач мови всередині модуля, без inline у nav.html) -->
   <script type="module" src="/js/i18n.js?v=9"></script>
-
-  <!-- 3) UI дрібниці (акордеон, маскот тощо) -->
   <script type="module" src="/js/accordion.js?v=9"></script>
-
-  <!-- 4) TonConnect (єдиний сінглтон і подія magt:address) -->
   <script type="module" src="/js/tonconnect.js?v=9"></script>
-
-  <!-- 5) Базовий UI/стан/рефералка (централізовано, без інлайнів) -->
   <script type="module" src="/js/ui.js?v=9"></script>
-
-  <!-- 6) Віджети: слухає partials:main-ready, рендерить шаблони з #widgets-tpl -->
   <script type="module" src="/js/widgets.js?v=9"></script>
-
-  <!-- 7) Головна логіка (buy/claim/init) -->
   <script type="module" src="/js/app.js?v=9"></script>
 </body>
 </html>

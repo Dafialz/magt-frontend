@@ -5,7 +5,7 @@ import { fmt, clamp, setBtnLoading } from "./utils.js";
 
 /* ===== БАЗА ДЛЯ API =====
  * УВАГА: у проді CONFIG.API_BASE може бути "".
- * Тому для рефералок завжди використовуємо абсолютний ендпоінт з CONFIG.ENDPOINTS.referral.
+ * Для рефералок завжди використовуємо абсолютний ендпоінт із CONFIG.ENDPOINTS.referral.
  */
 const IS_LOCAL = (location.hostname === "localhost" || location.hostname === "127.0.0.1");
 const API_BASE =
@@ -47,7 +47,7 @@ function normalizeToBase64Url(addr) {
     }
   } catch {}
 
-  // фолбек — «0:...»/hex
+  // фолбек — «0:…»/hex
   if (a.startsWith("0:") || /^[0-9a-fA-F:]{48,90}$/.test(a)) return a;
 
   return null;
@@ -65,7 +65,7 @@ let REF_API_ON = true;               // вимикаємо лише при фа�
 let _lastProbeWallet = "";           // антидубль GET
 let _lastPostWallet  = "";           // антидубль POST
 
-// Використовуємо абсолютний ендпоінт з CONFIG.ENDPOINTS.referral
+// ✅ Використовуємо абсолютний ендпоінт із config.js
 const REF_ENDPOINT = (CONFIG?.ENDPOINTS?.referral || "").trim();
 
 /* safeguard: якщо хтось раптом конкатить API_BASE, зробимо запасний шлях */
@@ -261,7 +261,9 @@ export function updateRefBonus() {
     try {
       const amtId = ui.refBonusUsd?.id || "ref-bonus-usd";
       const toId  = ui.refBonusTo?.id  || "ref-bonus-to";
-      ui.refPayout.innerHTML = `5% реф-винагорода: <span id="${amtId}">0</span> MAGT → <span id="${toId}">—</span>`;
+      // ✅ динамічний відсоток із CONFIG.REF_BONUS_PCT
+      const pct = Number(CONFIG.REF_BONUS_PCT || 5);
+      ui.refPayout.innerHTML = `${pct}% реф-винагорода: <span id="${amtId}">0</span> MAGT → <span id="${toId}">—</span>`;
       ui.refBonusUsd = document.getElementById(amtId);
       ui.refBonusTo  = document.getElementById(toId);
       ui.refPayout.__magTplFixed = true;

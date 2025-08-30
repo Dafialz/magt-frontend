@@ -1,41 +1,30 @@
-# --- Node.js ---
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# --- Environment ---
-.env
-.env.*.local
-
-# --- System files ---
+# OS/сервісні
 .DS_Store
 Thumbs.db
-
-# --- IDE / Editor ---
-.vscode/
-.idea/
-*.swp
-
-# --- Build outputs ---
-dist/
-build/
-.cache/
-*.tsbuildinfo
-
-# --- Logs ---
+node_modules/
+.env
 *.log
-logs/
-*.out
-*.err
 
-# --- Temporary ---
-.tmp/
-temp/
-
-# --- API backend (виносимо в окремий репозиторій) ---
-api/
-
-# --- Netlify / Deployment ---
-.netlify/
+# Windows reserved filenames (на всяк випадок)
+NUL
+CON
+PRN
+AUX
+COM1
+COM2
+COM3
+COM4
+COM5
+COM6
+COM7
+COM8
+COM9
+LPT1
+LPT2
+LPT3
+LPT4
+LPT5
+LPT6
+LPT7
+LPT8
+LPT9

@@ -14,6 +14,7 @@ import {
 import { initTonConnect, getWalletAddress, getTonConnect, mountTonButtons } from "./tonconnect.js";
 import { onBuyClick, getUserUsdtBalance, showDebugJettonInfo } from "./buy.js";
 import { refreshClaimSection, startClaimPolling, stopClaimPolling } from "./claim.js";
+import { api } from "./utils.js";   // ✅ додано
 
 /* ================= Balance fallback (якщо claim.js недоступний) ================= */
 const $ = (s) => document.querySelector(s);
@@ -35,7 +36,9 @@ function renderBalance(amount) {
 async function fetchBalance(addr) {
   if (!addr) return;
   try {
-    const res = await fetch(`/api/balance?wallet=${encodeURIComponent(addr)}`, { cache: "no-store" });
+    const url = api(`/api/balance?wallet=${encodeURIComponent(addr)}`); // ✅ через utils.api
+    if (!url) return;
+    const res = await fetch(url, { cache: "no-store" });
     const data = await res.json().catch(() => null);
     if (!data || data.ok === false) return;
     const amount = data.magt ?? data.claimable ?? 0;
