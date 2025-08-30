@@ -29,17 +29,11 @@ LPT7
 LPT8
 LPT9
 
-#api/
-
+# Netlify
 .netlify/
 functions/
-
-.netlify/
 functions/.netlify/
 
-
-.netlify/
-
-
-#api/
-
+# Ігноруємо тільки базу, але не весь бекенд
+api/*.db
+api/*.db-*
