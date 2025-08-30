@@ -70,7 +70,7 @@
   <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tonweb@0.0.61/dist/tonweb.min.js"></script>
 
-  <!-- === API override без ребілду === -->
+  <!-- === API override без ребілду (query ?api=... або збережене в LS) === -->
   <script>
     (function () {
       try {
@@ -79,6 +79,7 @@
         if (q) {
           localStorage.setItem("magt_api_override", q);
           url.searchParams.delete("api");
+          history.replaceState(null, "", url.toString());
         }
         var saved = localStorage.getItem("magt_api_override");
         if (q || saved) {
@@ -89,13 +90,6 @@
         console.warn("[MAGT] API override init failed", e);
       }
     })();
-  </script>
-
-  <!-- === ЖОРСТКЕ задання бекенду (переважує все інше) === -->
-  <script>
-    // Використовуємо кастомний домен з SSL (щоб уникнути дублювань типу "https//..."):
-    window.API_BASE_OVERRIDE = "https://api.magtcoin.com";
-    console.log("[MAGT] API override (hard):", window.API_BASE_OVERRIDE);
   </script>
 
   <noscript>
@@ -222,7 +216,7 @@
   </template>
 
   <!-- Маскот -->
-  <div id="mascot" class="fixed bottom-4 right-4 z-50 pointer-events-none" data-mascот>
+  <div id="mascot" class="fixed bottom-4 right-4 z-50 pointer-events-none" data-mascot>
     <div class="glass rounded-2xl shadow-soft px-4 py-3 text-sm max-w-[260px] opacity-0 translate-y-2 transition">
       <div class="flex gap-2">
         <div class="w-8 h-8 rounded-full grad animate-pulse" aria-hidden="true"></div>
