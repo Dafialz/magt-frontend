@@ -1,11 +1,11 @@
-# OS / служебне
+# OS / service
 .DS_Store
 Thumbs.db
 node_modules/
 .env
 *.log
 
-# Windows-reserved
+# Windows reserved filenames
 NUL
 CON
 PRN
@@ -29,12 +29,12 @@ LPT7
 LPT8
 LPT9
 
-# Render/Netlify службові
+# Netlify build folders
 .netlify/
 functions/
 functions/.netlify/
 
-# Ігноруємо лише локальну БД
-api/magt.db
-api/magt.db-shm
-api/magt.db-wal
+# DB artifacts inside api (allow code, ignore DB)
+api/**/*.db
+api/**/*.db-shm
+api/**/*.db-wal
