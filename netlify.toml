@@ -1,77 +1,57 @@
 # ========= Build =========
 [build]
-  publish   = "."
-  functions = "functions"
-
-# (Опціонально дублювати не потрібно, але залишимо явно)
-[functions]
-  directory    = "functions"
-  node_bundler = "esbuild"
+  publish = "."
 
 # ========= Headers =========
-# Статичні ассети – агресивний кеш
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# JS – без кешу, щоб не залипали старі скрипти
 [[headers]]
   for = "/js/*"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
-# Головний CSS без fingerprint – теж без кешу
 [[headers]]
   for = "/styles.css"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
-# Partials – завжди свіжі
 [[headers]]
   for = "/partials/*"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
-# HTML – без кешу
 [[headers]]
   for = "/*.html"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
-# TonConnect manifest – короткий кеш, правильний content-type
 [[headers]]
   for = "/tonconnect-manifest.json"
   [headers.values]
     Content-Type = "application/json; charset=utf-8"
     Cache-Control = "public, max-age=60"
 
-# i18n JSON – помірний кеш
 [[headers]]
   for = "/i18n/*"
   [headers.values]
     Content-Type = "application/json; charset=utf-8"
     Cache-Control = "public, max-age=300"
 
-# Базові security headers
 [[headers]]
   for = "/*"
   [headers.values]
-    X-Content-Type-Options = "nosniff"
-    X-Frame-Options        = "SAMEORIGIN"
-    Referrer-Policy        = "strict-origin-when-cross-origin"
-    Permissions-Policy     = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
-    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    Cross-Origin-Opener-Policy = "same-origin"
-    Cross-Origin-Resource-Policy = "same-origin"
+    X-Content-Type-Options      = "nosniff"
+    X-Frame-Options             = "SAMEORIGIN"
+    Referrer-Policy             = "strict-origin-when-cross-origin"
+    Permissions-Policy          = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+    Strict-Transport-Security   = "max-age=31536000; includeSubDomains; preload"
+    Cross-Origin-Opener-Policy  = "same-origin"
+    Cross-Origin-Resource-Policy= "same-origin"
 
 # ========= Redirects =========
-# Проксі на Netlify Functions
-[[redirects]]
-  from   = "/api/*"
-  to     = "/.netlify/functions/:splat"
-  status = 200
-
 # SPA rewrite
 [[redirects]]
   from   = "/*"
