@@ -2,22 +2,23 @@
 const IS_BROWSER = typeof window !== "undefined" && typeof location !== "undefined";
 const IS_LOCAL   = IS_BROWSER && (location.hostname === "localhost" || location.hostname === "127.0.0.1");
 
-// >>> РЕАЛЬНИЙ ПУБЛІЧНИЙ API-ДОМЕН (БЕЗ ПЛЕЙСХОЛДЕРІВ)
+// Публічний продовий бекенд
 const PROD_API_BASE = "https://api.magtcoin.com";
 
-// Дозволяємо override через window.API_BASE_OVERRIDE (для тестів/стендів)
+// Даємо можливість примусово підмінити API через window.API_BASE_OVERRIDE (для тестів/стендів)
 const OVERRIDE = (IS_BROWSER && window.API_BASE_OVERRIDE) ? String(window.API_BASE_OVERRIDE).trim() : "";
 
-// У локалці — http://127.0.0.1:8787, у проді — порожній рядок (щоб не дублювався домен у старих конкатенаціях)
+// У локалці використовуємо локальний бекенд; у проді рядок порожній,
+// щоб не злипався домен у конкатенаціях і використовувались абсолютні ендпоінти нижче.
 const API_BASE_RUNTIME = OVERRIDE || (IS_LOCAL ? "http://127.0.0.1:8787" : "");
 
-// Абсолютна база для ендпоінтів
+// Абсолютна база, яку реально підставляємо в ENDPOINTS
 const API_BASE_ABS = API_BASE_RUNTIME || PROD_API_BASE;
 
 function join(base, path) {
   if (!base) return path;
   if (!path) return base;
-  return base.replace(/\/+$/,"") + "/" + String(path).replace(/^\/+/,"");
+  return base.replace(/\/+$/, "") + "/" + String(path).replace(/^\/+/, "");
 }
 
 export const CONFIG = {
@@ -49,7 +50,8 @@ export const CONFIG = {
   REF_BIND_ONCE: true,
   REF_DAILY_CAP_USD: 0,
   REF_TOTAL_CAP_USD: 0,
-  REF_DEBUG_DEMO: true,
+  // у проді вимикаємо демо-емуляцію подій
+  REF_DEBUG_DEMO: false,
 
   /* ===== Дані пресейлу / таймер ===== */
   TOTAL_SUPPLY: 5_000_000_000,
@@ -85,7 +87,8 @@ export const CONFIG = {
   CLAIM_POLL_INTERVAL_MS: 30000,
 
   /* ===== API ===== */
-  API_BASE: API_BASE_RUNTIME, // у проді "" — щоб не дублювалося при старих конкатенаціях
+  // у проді тримаємо порожнім (використовуємо абсолютні ендпоінти нижче)
+  API_BASE: API_BASE_RUNTIME,
   ENDPOINTS: {
     stats:    join(API_BASE_ABS, "/api/presale/stats"),
     feed:     join(API_BASE_ABS, "/api/presale/feed"),
@@ -95,6 +98,7 @@ export const CONFIG = {
     order:    join(API_BASE_ABS, "/api/order"),
     referral: join(API_BASE_ABS, "/api/referral"),
   },
+
   __DEBUG: { API_BASE_RUNTIME, API_BASE_ABS, OVERRIDE, IS_LOCAL },
 };
 
@@ -104,8 +108,10 @@ if (!CONFIG.USDT_MASTER || !CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Н�
 if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BОНУС_PCT виглядає підозріло. Рекомендується 0..50%");
 
 if (IS_BROWSER) {
-  console.log("[MAGT CONFIG] API_BASE:", CONFIG.API_BASE || "(empty, use absolute endpoints)",
-              "API_BASE_ABS:", CONFIG.__DEBUG.API_BASE_ABS,
-              "override:", CONFIG.__DEBUG.OVERRIDE || "(none)",
-              "is_local:", CONFIG.__DEBUG.IS_LOCAL);
+  console.log(
+    "[MAGT CONFIG] API_BASE:", CONFIG.API_BASE || "(empty, use absolute endpoints)",
+    "API_BASE_ABS:", CONFIG.__DEBUG.API_BASE_ABS,
+    "override:", CONFIG.__DEBUG.OVERRIDE || "(none)",
+    "is_local:", CONFIG.__DEBUG.IS_LOCAL
+  );
 }
