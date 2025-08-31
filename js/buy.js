@@ -24,6 +24,18 @@ function isTonAddress(addr) {
   return /^[A-Za-z0-9_-]{48,68}$/.test(a);
 }
 
+// локальна перевірка підключення, безпечна щодо різних версій SDK
+function isConnected(ui) {
+  return Boolean(
+    ui?.account?.address ||
+    ui?.state?.account?.address ||
+    ui?.wallet?.account?.address ||
+    ui?.connector?.wallet?.account?.address ||
+    ui?.tonConnect?.account?.address ||
+    ui?._wallet?.account?.address
+  );
+}
+
 /* ===== баланс USDT (довідково) ===== */
 export async function getUserUsdtBalance() {
   try {
@@ -123,8 +135,9 @@ export async function onBuyClick() {
   const walletAddress = getWalletAddress();
   const tonConnectUI = getTonConnect();
 
-  if (!walletAddress || !tonConnectUI) {
-    openConnectModal();
+  // якщо SDK ще не піднявся — просимо підключити гаманець
+  if (!tonConnectUI || !walletAddress || !isConnected(tonConnectUI)) {
+    await openConnectModal();
     _buyInFlight = false;
     return toast("Підключи гаманець");
   }

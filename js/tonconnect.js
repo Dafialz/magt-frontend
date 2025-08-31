@@ -239,9 +239,39 @@ export function getWalletAddress() {
 export function getTonConnect() {
   return primaryUi || window.__tcui || null;
 }
+
+// невеликий хелпер, аби визначити, чи вже є підключення
+function _isConnected(ui) {
+  if (!ui) return false;
+  return Boolean(
+    ui?.account?.address ||
+    ui?.state?.account?.address ||
+    ui?.wallet?.account?.address ||
+    ui?.connector?.wallet?.account?.address ||
+    ui?.tonConnect?.account?.address ||
+    ui?._wallet?.account?.address
+  );
+}
+
 export async function openConnectModal() {
   await mountTonButtons().catch(()=>{});
-  (primaryUi || window.__tcui)?.openModal?.();
+  const ui = (primaryUi || window.__tcui);
+  if (!ui) return;
+
+  // Якщо вже підключено — нічого не робимо (уникаємо TON_CONNECT_SDK_ERROR I)
+  if (_isConnected(ui)) {
+    log("openConnectModal skipped: already connected");
+    return;
+  }
+
+  try {
+    await ui.openModal?.();
+  } catch (e) {
+    const msg = String(e?.message || e || "").toLowerCase();
+    // тихо ігноруємо “already connected”
+    if (msg.includes("already connected")) return;
+    log("openConnectModal error:", e);
+  }
 }
 
 export async function initTonConnect({ onConnect, onDisconnect } = {}) {
