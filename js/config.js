@@ -35,9 +35,9 @@ export const CONFIG = {
   HARD_CAP: 25_900_000,
 
   /* ===== TON RPC / мережа ===== */
-  // Використовуємо Toncenter з твоїм ключем, щоб не впиратись у 429
-  TON_RPC: "https://toncenter.com/api/v2/jsonRPC?api_key=a503464fcf4bd07fbee166734a28443a0604f0c422fab4af9a2a347c99e387b5",
-  // Резервний вузол (на випадок, якщо Toncenter тимчасово недоступний)
+  // ⚠️ Ключ із фронта прибрано. Ходимо тільки через наш бекенд-проксі.
+  TON_RPC: join(API_BASE_ABS, "/api/rpc"),
+  // (за бажання можна лишити резервний публічний вузол для локальних експериментів)
   TON_RPC_FALLBACK: "https://tonhubapi.com/jsonRPC",
 
   /* ===== USDT (Jetton) mainnet ===== */
@@ -108,6 +108,8 @@ export const CONFIG = {
     claim:    join(API_BASE_ABS, "/api/presale/claim"),
     order:    join(API_BASE_ABS, "/api/order"),
     referral: join(API_BASE_ABS, "/api/referral"),
+    // новий ендпоінт для RPC-проксі бекенда
+    rpc:      join(API_BASE_ABS, "/api/rpc"),
   },
 
   __DEBUG: { API_BASE_RUNTIME, API_BASE_ABS, OVERRIDE, IS_LOCAL },
