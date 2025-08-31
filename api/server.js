@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import Database from "better-sqlite3";
+// ⬇️ підключаємо файловий кеш покупок
+import purchasesRouter from "./purchases.js";
 
 /* ---------- конфіг ---------- */
 const PORT = process.env.PORT || 8787;
@@ -154,6 +156,10 @@ app.use(rateLimit({
 /* ---------- health & root ---------- */
 app.get("/health", (req, res) => res.json({ ok: true }));
 app.get("/", (req, res) => res.type("text/plain").send("Magt API is up. See /api/referral and /api/presale/*"));
+
+/* ---------- файловий кеш покупок (паралельно до SQLite) ---------- */
+// POST/GET /api/purchase
+app.use("/api/purchase", purchasesRouter);
 
 /* ---------- РЕФЕРАЛКА ---------- */
 // POST /api/referral — прив’язати реферера (одноразово)
