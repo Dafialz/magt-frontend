@@ -35,7 +35,10 @@ export const CONFIG = {
   HARD_CAP: 25_900_000,
 
   /* ===== TON RPC / мережа ===== */
-  TON_RPC: "https://toncenter.com/api/v2/jsonRPC",
+  // Використовуємо Toncenter з твоїм ключем, щоб не впиратись у 429
+  TON_RPC: "https://toncenter.com/api/v2/jsonRPC?api_key=a503464fcf4bd07fbee166734a28443a0604f0c422fab4af9a2a347c99e387b5",
+  // Резервний вузол (на випадок, якщо Toncenter тимчасово недоступний)
+  TON_RPC_FALLBACK: "https://tonhubapi.com/jsonRPC",
 
   /* ===== USDT (Jetton) mainnet ===== */
   USDT_MASTER: "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
