@@ -123,10 +123,9 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const JettonWallet = TonWeb.token.jetton.JettonWallet;
   const minter = new JettonMinter(tonweb.provider, { address: usdtMaster });
 
-  // ⚠️ Раніше ця помилка зʼявлялась, коли хтось передавав «minter» ззовні.
-  // Тепер ми самі створюємо JettonMinter і викликаємо його методи тут.
-  const userJettonWalletAddr = await minter.getWalletAddress(userAddr);
-  const presaleJettonWalletAddr = await minter.getWalletAddress(presaleOwner);
+  // ✅ ВАЖЛИВО: використовуємо правильний метод SDK
+  const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
+  const presaleJettonWalletAddr = await minter.getJettonWalletAddress(presaleOwner);
   const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
 
   const dec = Number(CONFIG.JETTON_DECIMALS ?? 6);

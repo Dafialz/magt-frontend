@@ -8,11 +8,11 @@ import { getWalletAddress, getTonConnect, openConnectModal } from "./tonconnect.
 
 /* ---------------- helpers ---------------- */
 export function mapTonConnectError(e) {
-  const m = (e?.message || "").toLowerCase();
-  if (m.includes("wallet_not_connected") || m.includes("wallet not connected")) return "Підключи гаманець і спробуй ще раз.";
-  if (m.includes("user reject") || m.includes("rejected")) return "Користувач скасував підпис.";
-  if (m.includes("manifest")) return "Помилка маніфесту TonConnect. Перевір /tonconnect-manifest.json.";
-  if (m.includes("network") || m.includes("rpc")) return "Мережна помилка RPC. Спробуй ще раз.";
+  const msg = (e?.message || String(e) || "").toLowerCase();
+  if (msg.includes("wallet_not_connected") || msg.includes("wallet not connected")) return "Підключи гаманець і спробуй ще раз.";
+  if (msg.includes("user reject") || msg.includes("rejected")) return "Користувач скасував підпис.";
+  if (msg.includes("manifest")) return "Помилка маніфесту TonConnect. Перевір /tonconnect-manifest.json.";
+  if (msg.includes("network") || msg.includes("rpc")) return "Мережна помилка RPC. Спробуй ще раз.";
   return "Скасовано або помилка відправки.";
 }
 
@@ -40,7 +40,8 @@ export async function getUserUsdtBalance() {
     const JettonWallet = TonWeb.token.jetton.JettonWallet;
 
     const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
-    const userJettonWalletAddr = await minter.getWalletAddress(userAddr);
+    // ✅ правильний метод SDK
+    const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
     const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
     const data = await userJettonWallet.getData();
     const raw = data.balance;
@@ -70,8 +71,9 @@ export async function showDebugJettonInfo() {
   const JettonWallet  = TonWeb.token.jetton.JettonWallet;
   const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
 
-  const userJettonWalletAddr    = await minter.getWalletAddress(userAddr);
-  const presaleJettonWalletAddr = await minter.getWalletAddress(presaleOwner);
+  // ✅ правильний метод SDK
+  const userJettonWalletAddr    = await minter.getJettonWalletAddress(userAddr);
+  const presaleJettonWalletAddr = await minter.getJettonWalletAddress(presaleOwner);
 
   console.groupCollapsed("%cMAGT Presale • Jetton debug", "color:#65d2ff");
   console.log("USDT master:", masterAddr.toString(true, true, true));
