@@ -1,7 +1,7 @@
 // /js/buy.js
 import { CONFIG } from "./config.js";
-import { buildUsdtTransferTx, buildUsdtTxUsingConnected } from "./ton.js";
-import { api, cfgReady, setBtnLoading } from "./utils.js";
+import { buildUsdtTransferTx, buildUsdtTxUsingConnected, pushPurchaseToBackend } from "./ton.js";
+import { cfgReady, setBtnLoading } from "./utils.js";
 import { ui, state } from "./state.js";
 import { toast, recalc, refreshButtons, updateRefBonus } from "./ui.js";
 import { getWalletAddress, getTonConnect, openConnectModal } from "./tonconnect.js";
@@ -92,21 +92,6 @@ export async function showDebugJettonInfo() {
     console.log(`USDT balance (user): ${human}`);
   } catch (e) {
     console.warn("Не вдалось прочитати баланс USDT у користувача:", e?.message || e);
-  }
-}
-
-/* ===== бекенд-пінг покупки ===== */
-export async function postPurchaseToApi({ usd, tokens, address, ref }) {
-  const url = api(CONFIG.ENDPOINTS?.purchase);
-  if (!url) return;
-  try {
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usd, tokens, address, ref })
-    });
-  } catch (e) {
-    console.warn("purchase POST failed:", e);
   }
 }
 
@@ -205,8 +190,8 @@ export async function onBuyClick() {
       }));
     }
 
-    // бекенд (не блокує)
-    postPurchaseToApi({ usd, tokens: tokensBought, address: walletAddress, ref });
+    // ✅ бекенд (не блокує UI): через безпечну утиліту ton.js
+    pushPurchaseToBackend({ usd, tokens: tokensBought, address: walletAddress, ref });
 
     // оновити форму
     ui.usdtIn.value = "";
