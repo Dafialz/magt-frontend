@@ -168,8 +168,9 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   cell.bits.writeUint(0, 32);         // opcode=0 => "text comment"
   cell.bits.writeString(note);        // гарантовано ≤ ліміту
 
-  const forwardTon = TonWeb.utils.toNano(String(Number(CONFIG.FORWARD_TON ?? 0)));          // для контракту пресейлу
-  const openTon    = TonWeb.utils.toNano(String(Number(CONFIG.JETTON_WALLET_TON ?? 0.15))); // на виконання tx
+  // ⚠️ ВАЖЛИВО: у toNano завжди передаємо РЯДОК
+  const forwardTon = TonWeb.utils.toNano(String(CONFIG.FORWARD_TON ?? "0"));       // для контракту пресейлу
+  const openTon    = TonWeb.utils.toNano(String(CONFIG.JETTON_WALLET_TON ?? "0.15")); // на виконання tx
 
   const body = await userJettonWallet.createTransferBody({
     queryId: BigInt(ts),
@@ -217,6 +218,7 @@ export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts
   const contract = (claimContractAddr || CONFIG.CLAIM_CONTRACT || "").trim();
   if (!contract) throw new Error("Не задано адресу контракту клейму (CONFIG.CLAIM_CONTRACT)");
 
+  // amountTon лишаємо числом для перевірок, але в toNano передаємо РЯДОК
   const amountTon = Number(opts.amountTon ?? 0.05);
   if (!Number.isFinite(amountTon) || !(amountTon > 0)) throw new Error("Некоректна сума TON для клейму");
 
