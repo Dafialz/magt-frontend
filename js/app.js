@@ -14,7 +14,7 @@ import {
 import { initTonConnect, getWalletAddress, getTonConnect, mountTonButtons } from "./tonconnect.js";
 import { onBuyClick, getUserUsdtBalance, showDebugJettonInfo } from "./buy.js";
 import { refreshClaimSection, startClaimPolling, stopClaimPolling } from "./claim.js";
-import { api } from "./utils.js";   // ✅ додано
+import { api } from "./utils.js";
 
 /* ================= Balance fallback (якщо claim.js недоступний) ================= */
 const $ = (s) => document.querySelector(s);
@@ -36,7 +36,7 @@ function renderBalance(amount) {
 async function fetchBalance(addr) {
   if (!addr) return;
   try {
-    const url = api(`/api/balance?wallet=${encodeURIComponent(addr)}`); // ✅ через utils.api
+    const url = api(`/api/balance?wallet=${encodeURIComponent(addr)}`);
     if (!url) return;
     const res = await fetch(url, { cache: "no-store" });
     const data = await res.json().catch(() => null);
@@ -150,6 +150,13 @@ async function reinitAfterPartials() {
   try {
     refreshUiRefs();
     await mountTonButtons().catch(()=>{});
+    // 🔧 ГОЛОВНЕ: перев’язуємо обробники після інʼєкції HTML
+    bindEvents({
+      onBuyClick,
+      onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick?.()),
+      getUserUsdtBalance,
+    });
+
     refreshReferralUi();
     recalc();
     refreshButtons();
@@ -211,7 +218,7 @@ async function bootOnce() {
 
   bindEvents({
     onBuyClick,
-    onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick()),
+    onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick?.()),
     getUserUsdtBalance,
   });
 
