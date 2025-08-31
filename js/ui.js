@@ -336,6 +336,14 @@ function loadManualAddressIfAny() {
 
 /* ====== Встановити власний реф-лінк за адресою гаманця (і закріпити назавжди) ====== */
 export async function setOwnRefLink(walletAddress) {
+  // якщо DOM-елементи ще не готові — зробимо м’який ретрай
+  const wrap0  = document.getElementById("ref-yourlink") || ui.refYourLink;
+  const input0 = document.getElementById("ref-link")      || ui.refLink;
+  if (!wrap0 || !input0) {
+    setTimeout(() => setOwnRefLink(walletAddress), 200);
+    return;
+  }
+
   const b64 = await ensureBase64Url(walletAddress); // ТІЛЬКИ EQ/UQ
   const has = !!b64;
 
@@ -385,10 +393,7 @@ export async function setOwnRefLink(walletAddress) {
 
     updateRefBonus();
 
-    /* === РЕФЕРАЛ «НАЗАВЖДИ» ===
-       1) GET — якщо сервер уже знає реферера, фіксуємо і ставимо locked.
-       2) Якщо ні — беремо pending/local і робимо одноразовий POST.
-    */
+    /* === РЕФЕРАЛ «НАЗАВЖДИ» === */
     (async () => {
       try {
         if (!REF_API_ON || !REF_API_PATH) return;
@@ -515,7 +520,7 @@ function startRefAutofillWatchdog() {
       const input = document.getElementById("ref-link") || ui.refLink;
       const wrap  = document.getElementById("ref-yourlink") || ui.refYourLink;
 
-      // ⚠️ нове: беремо адресу з __magtAddr або резервно з __rawAddr (може бути hex/0:)
+      // беремо адресу з __magtAddr або резервно з __rawAddr (може бути hex/0:)
       const rawCandidate =
         (typeof window.__magtAddr === "string" && window.__magtAddr.trim()) ?
           window.__magtAddr.trim() :
@@ -523,11 +528,12 @@ function startRefAutofillWatchdog() {
           window.__rawAddr.trim() : "";
 
       if (input && wrap && rawCandidate) {
-        await setOwnRefLink(rawCandidate); // ensureBase64Url зробить EQ/UQ або очистить
+        await setOwnRefLink(rawCandidate);
         clearInterval(window.__refWatchRunning);
         window.__refWatchRunning = null;
       }
-      if (ticks >= 40) {
+      // до ~30 секунд на повільні сценарії
+      if (ticks >= 200) {
         clearInterval(window.__refWatchRunning);
         window.__refWatchRunning = null;
       }
@@ -540,6 +546,11 @@ if (document.readyState === "loading") {
 } else {
   startRefAutofillWatchdog();
 }
+// страховка: якщо адреса вже є після повного завантаження
+window.addEventListener("load", () => {
+  const a = (window.__magtAddr || window.__rawAddr || "").trim?.() || "";
+  if (a) setOwnRefLink(a);
+});
 window.addEventListener("partials:main-ready", startRefAutofillWatchdog);
 
 // === debug helpers (не впливають на прод, лише полегшують діагностику) ===
