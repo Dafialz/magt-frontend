@@ -534,3 +534,12 @@ if (document.readyState === "loading") {
   startRefAutofillWatchdog();
 }
 window.addEventListener("partials:main-ready", startRefAutofillWatchdog);
+
+// === debug helpers (не впливають на прод, лише полегшують діагностику) ===
+try { window.setOwnRefLink = setOwnRefLink; } catch {}
+try {
+  window.magtSetAddr = (addr) => {
+    window.dispatchEvent(new CustomEvent("magt:address", { detail: { address: addr || null } }));
+  };
+} catch {}
+
