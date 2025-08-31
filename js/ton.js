@@ -96,7 +96,7 @@ function buildSafeComment({ buyerB64, refB64, ts, nonce }) {
   let note = `MAGT|r=${short(refB64)}|b=${short(buyerB64)}|t=${ts}|n=${nonce}`;
   if (note.length <= 120) return note;
   // ще компактніший фолбек
-  note = `MAGT|b=${short(buyerB64,4,4)}|n=${nonce}`;
+  note = `MAGT|b=${short(buyerB64, 4, 4)}|n=${nonce}`;
   if (note.length <= 120) return note;
   // мінімум-мініморум
   return `MAGT|n=${nonce}`;
@@ -165,10 +165,10 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   // ✅ безпечний короткий текстовий коментар
   const note = buildSafeComment({ buyerB64, refB64, ts, nonce });
   const cell = new TonWeb.boc.Cell();
-  cell.bits.writeUint(0, 32);         // opcode=0 => "text comment"
-  cell.bits.writeString(note);        // гарантовано ≤ ліміту
+  cell.bits.writeUint(0, 32); // opcode=0 => "text comment"
+  cell.bits.writeString(note); // гарантовано ≤ ліміту
 
-  // ⚠️ ВАЖЛИВО: у toNano завжди передаємо РЯДОК
+  // ⚠️ ВАЖЛИВО: у toNano завжди передаємо РЯДОК (щоб уникнути міксу Number/BigInt)
   const forwardTon = TonWeb.utils.toNano(String(CONFIG.FORWARD_TON ?? "0"));       // для контракту пресейлу
   const openTon    = TonWeb.utils.toNano(String(CONFIG.JETTON_WALLET_TON ?? "0.15")); // на виконання tx
 
