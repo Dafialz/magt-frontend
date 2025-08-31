@@ -315,8 +315,15 @@ if (document.readyState === "loading") {
   autoMount(); autoInit();
 }
 
+/* =============== debug helpers (корисно у дев-режимі) =============== */
 try { window.getWalletAddress = getWalletAddress; } catch {}
 try { window.getTonConnect   = getTonConnect;   } catch {}
+try {
+  window.magtSetAddr = (addr) => {
+    // ручний тригер (для діагностики): приймає EQ/UQ або hex — всередині буде нормалізація
+    dispatchAddress(addr || null);
+  };
+} catch {}
 setTimeout(() => {
   try {
     if (cachedBase64Addr) dispatchAddress(cachedBase64Addr);

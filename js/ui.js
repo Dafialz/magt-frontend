@@ -514,9 +514,16 @@ function startRefAutofillWatchdog() {
       ticks++;
       const input = document.getElementById("ref-link") || ui.refLink;
       const wrap  = document.getElementById("ref-yourlink") || ui.refYourLink;
-      const a = (window.__magtAddr || "").trim();
-      if (input && wrap && a) {
-        await setOwnRefLink(a);
+
+      // ⚠️ нове: беремо адресу з __magtAddr або резервно з __rawAddr (може бути hex/0:)
+      const rawCandidate =
+        (typeof window.__magtAddr === "string" && window.__magtAddr.trim()) ?
+          window.__magtAddr.trim() :
+        (typeof window.__rawAddr === "string" && window.__rawAddr.trim()) ?
+          window.__rawAddr.trim() : "";
+
+      if (input && wrap && rawCandidate) {
+        await setOwnRefLink(rawCandidate); // ensureBase64Url зробить EQ/UQ або очистить
         clearInterval(window.__refWatchRunning);
         window.__refWatchRunning = null;
       }
@@ -542,4 +549,3 @@ try {
     window.dispatchEvent(new CustomEvent("magt:address", { detail: { address: addr || null } }));
   };
 } catch {}
-
