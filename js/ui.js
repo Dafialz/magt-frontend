@@ -32,24 +32,46 @@ function isTonEqUq(addr) {
   if (!(a.startsWith("EQ") || a.startsWith("UQ"))) return false;
   return /^[A-Za-z0-9_-]{48,68}$/.test(a);
 }
+/** hex / 0: */
+function isHexLike(addr) {
+  if (typeof addr !== "string") return false;
+  const a = addr.trim();
+  return !!a && (a.startsWith("0:") || /^[0-9a-fA-F:]{48,90}$/.test(a));
+}
 
-/** поблажлива нормалізація адреси */
+/** синхронна спроба отримати EQ/UQ (лише якщо TonWeb вже є) */
 function normalizeToBase64Url(addr) {
   const a = (addr || "").trim();
   if (!a) return null;
   if (isTonEqUq(a)) return a;
-
   try {
     if (window.TonWeb?.utils?.Address) {
-      const TonWeb = window.TonWeb;
-      const parsed = new TonWeb.utils.Address(a);
-      return parsed.toString(true, true, true);
+      const A = window.TonWeb.utils.Address;
+      return new A(a).toString(true, true, true);
     }
   } catch {}
+  return null; // БІЛЬШЕ НЕ ПОВЕРТАЄМО HEX!
+}
 
-  // фолбек — «0:…»/hex
-  if (a.startsWith("0:") || /^[0-9a-fA-F:]{48,90}$/.test(a)) return a;
+/** гарантовано отримаємо EQ/UQ: при потребі підвантажимо TonWeb і сконвертуємо */
+async function ensureBase64Url(addr) {
+  const a = (addr || "").trim();
+  if (!a) return null;
+  if (isTonEqUq(a)) return a;
 
+  let b64 = normalizeToBase64Url(a);
+  if (b64) return b64;
+
+  if (isHexLike(a)) {
+    try {
+      if (!window.TonWeb) {
+        await import("https://unpkg.com/tonweb@0.0.66/dist/tonweb.min.js");
+      }
+      const A = window.TonWeb.utils.Address;
+      b64 = new A(a).toString(true, true, true);
+      if (isTonEqUq(b64)) return b64;
+    } catch {}
+  }
   return null;
 }
 
@@ -80,9 +102,9 @@ function hideRefUI(hide = true) {
   ui.refPayout?.classList[method]("hidden");
 }
 
-/* ==== Надійна побудова URL з рефом ==== */
-function buildCanonicalRefUrl(addr) {
-  const ref = normalizeToBase64Url(addr) || (addr || "").trim();
+/* ==== Надійна побудова URL з рефом (лише EQ/UQ) ==== */
+function buildCanonicalRefUrl(addrB64) {
+  const ref = isTonEqUq(addrB64) ? addrB64.trim() : null;
   try {
     const u = new URL(window.location.href);
     u.search = ""; u.hash = "";
@@ -98,29 +120,31 @@ function buildCanonicalRefUrl(addr) {
 }
 
 /* ===== HTTP helpers (м’які, не спамлять) ===== */
-async function apiPostReferral(wallet, ref) {
+async function apiPostReferral(walletB64, refB64) {
   if (!REF_API_ON || !REF_API_PATH) return null;
+  if (!isTonEqUq(walletB64) || !isTonEqUq(refB64)) return { ok:false, err:"bad-params" };
   try {
-    if (_lastPostWallet === wallet) return null; // антидубль
+    if (_lastPostWallet === walletB64) return null; // антидубль
     const res = await fetch(REF_API_PATH, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet, ref }),
+      body: JSON.stringify({ wallet: walletB64, ref: refB64 }),
     });
-    _lastPostWallet = wallet;
+    _lastPostWallet = walletB64;
     return await res.json().catch(() => ({}));
   } catch {
     REF_API_ON = false;
     return null;
   }
 }
-async function apiGetReferral(wallet) {
+async function apiGetReferral(walletB64) {
   if (!REF_API_ON || !REF_API_PATH) return null;
+  if (!isTonEqUq(walletB64)) return { ok:false, err:"bad-params" };
   try {
-    if (_lastProbeWallet === wallet) return null; // антидубль
-    const url = `${REF_API_PATH}?wallet=${encodeURIComponent(wallet)}`;
+    if (_lastProbeWallet === walletB64) return null; // антидубль
+    const url = `${REF_API_PATH}?wallet=${encodeURIComponent(walletB64)}`;
     const res = await fetch(url);
-    _lastProbeWallet = wallet;
+    _lastProbeWallet = walletB64;
     // сервер повертає 200 і {ok:false} якщо ще не закріплено
     return await res.json().catch(() => ({}));
   } catch {
@@ -129,10 +153,10 @@ async function apiGetReferral(wallet) {
   }
 }
 
-/* ===== state helpers for referrer ===== */
-function setReferrerInState(addr) {
-  const b64 = normalizeToBase64Url(addr) || (addr || "").trim();
-  if (!b64) return false;
+/* ===== state helpers for referrer (лише EQ/UQ) ===== */
+function setReferrerInState(addrB64) {
+  const b64 = normalizeToBase64Url(addrB64);
+  if (!isTonEqUq(b64 || "")) return false;
   state.referrer = b64;
   state.referrerShort = short(b64);
   try { localStorage.setItem("magt_ref", b64); } catch {}
@@ -209,7 +233,7 @@ export function detectRefInUrl() {
   const locked = localStorage.getItem("magt_ref_locked") === "1";
   const p = new URLSearchParams(location.search);
   const raw = (p.get("ref") || "").trim();
-  const candidate = normalizeToBase64Url(raw) || raw;
+  const candidate = normalizeToBase64Url(raw); // лише EQ/UQ (без hex)
 
   if (locked) { // якщо вже закріплено на бекенді — ігноруємо будь-які нові ?ref
     loadRefFromStorage();
@@ -220,9 +244,10 @@ export function detectRefInUrl() {
     setReferrerInState(candidate);
     try { window.__pendingRef = candidate; } catch {}
   } else {
+    // якщо в URL hex/0:, НЕ зберігаємо його; перевіримо локальне
     try {
       const savedRaw = localStorage.getItem("magt_ref");
-      const saved = normalizeToBase64Url(savedRaw) || savedRaw;
+      const saved = normalizeToBase64Url(savedRaw);
       if (saved) setReferrerInState(saved);
     } catch {}
   }
@@ -241,7 +266,7 @@ export function loadRefFromStorage() {
   if (state.referrer) return;
   try {
     const savedRaw = localStorage.getItem("magt_ref");
-    const saved = normalizeToBase64Url(savedRaw) || savedRaw;
+    const saved = normalizeToBase64Url(savedRaw);
     if (saved) setReferrerInState(saved);
   } catch {}
 }
@@ -261,7 +286,6 @@ export function updateRefBonus() {
     try {
       const amtId = ui.refBonusUsd?.id || "ref-bonus-usd";
       const toId  = ui.refBonusTo?.id  || "ref-bonus-to";
-      // ✅ динамічний відсоток із CONFIG.REF_BONUS_PCT
       const pct = Number(CONFIG.REF_BONUS_PCT || 5);
       ui.refPayout.innerHTML = `${pct}% реф-винагорода: <span id="${amtId}">0</span> MAGT → <span id="${toId}">—</span>`;
       ui.refBonusUsd = document.getElementById(amtId);
@@ -294,12 +318,8 @@ export function initRefBonusHandlers() {
 function promptForManualAddress() {
   let raw = "";
   try { raw = prompt("Встав свою TON-адресу (формат EQ… або стандартний формат).") || ""; } catch {}
-  const addr = normalizeToBase64Url(raw) || raw;
-  if (!addr) { alert("Адреса некоректна. Перевір і спробуй ще раз."); return; }
-  try { localStorage.setItem("magt_owner_manual", addr); } catch {}
-  try { window.__magtAddr = addr; } catch {}
-  try { window.dispatchEvent(new CustomEvent("magt:address", { detail: { address: addr } })); } catch {}
-  setOwnRefLink(addr);
+  // не приймаємо hex одразу; спробуємо конвертувати згодом у setOwnRefLink
+  setOwnRefLink(raw);
 }
 function resetManualAddress() {
   try { localStorage.removeItem("magt_owner_manual"); } catch {}
@@ -310,18 +330,13 @@ function resetManualAddress() {
 function loadManualAddressIfAny() {
   try {
     const a = localStorage.getItem("magt_owner_manual") || "";
-    const b = normalizeToBase64Url(a) || a;
-    if (b) {
-      try { window.__magtAddr = b; } catch {}
-      try { window.dispatchEvent(new CustomEvent("magt:address", { detail: { address: b } })); } catch {}
-      setOwnRefLink(b);
-    }
+    if (a) setOwnRefLink(a);
   } catch {}
 }
 
 /* ====== Встановити власний реф-лінк за адресою гаманця (і закріпити назавжди) ====== */
 export async function setOwnRefLink(walletAddress) {
-  const b64 = normalizeToBase64Url(walletAddress) || (walletAddress || "").trim();
+  const b64 = await ensureBase64Url(walletAddress); // ТІЛЬКИ EQ/UQ
   const has = !!b64;
 
   const wrap  = document.getElementById("ref-yourlink") || ui.refYourLink;
@@ -339,6 +354,8 @@ export async function setOwnRefLink(walletAddress) {
     const urlStr = buildCanonicalRefUrl(b64);
     state.owner = b64;
     state.ownerShort = short(b64);
+    try { localStorage.setItem("magt_owner_manual", b64); } catch {}
+    try { window.__magtAddr = b64; } catch {}
 
     if (state.referrer && ui.refDetected) {
       ui.refDetected.classList.remove("hidden");
@@ -386,11 +403,9 @@ export async function setOwnRefLink(walletAddress) {
         let pendingRef = null;
         try { pendingRef = window.__pendingRef || null; } catch {}
         const knownRef =
-          state.referrer ||
-          pendingRef ||
-          normalizeToBase64Url(localStorage.getItem("magt_ref") || "") ||
-          localStorage.getItem("magt_ref") ||
-          "";
+          (pendingRef && isTonEqUq(pendingRef) ? pendingRef : null) ||
+          (state.referrer && isTonEqUq(state.referrer) ? state.referrer : null) ||
+          null;
 
         if (knownRef) {
           const resp = await apiPostReferral(b64, knownRef);
@@ -484,12 +499,9 @@ export function bindEvents({ onBuyClick, onClaimClick, getUserUsdtBalance }) {
 
 /* ===================== glue with TonConnect singleton ===================== */
 try {
-  window.addEventListener("magt:address", (ev) => {
+  window.addEventListener("magt:address", async (ev) => {
     const raw = ev?.detail?.address ?? null;
-    const addr = normalizeToBase64Url(raw) || raw;
-    if (!addr) { setOwnRefLink(""); return; }
-    try { localStorage.removeItem("magt_owner_manual"); } catch {}
-    setOwnRefLink(addr);
+    await setOwnRefLink(raw); // всередині примусово EQ/UQ або порожньо
   });
 } catch {}
 
@@ -498,15 +510,13 @@ function startRefAutofillWatchdog() {
   try {
     if (window.__refWatchRunning) return;
     let ticks = 0;
-    window.__refWatchRunning = setInterval(() => {
+    window.__refWatchRunning = setInterval(async () => {
       ticks++;
       const input = document.getElementById("ref-link") || ui.refLink;
       const wrap  = document.getElementById("ref-yourlink") || ui.refYourLink;
-      const a =
-        normalizeToBase64Url((window.__magtAddr || "").trim()) ||
-        window.__magtAddr || "";
+      const a = (window.__magtAddr || "").trim();
       if (input && wrap && a) {
-        setOwnRefLink(a);
+        await setOwnRefLink(a);
         clearInterval(window.__refWatchRunning);
         window.__refWatchRunning = null;
       }
