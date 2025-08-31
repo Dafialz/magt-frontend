@@ -87,6 +87,22 @@ function epUrl(key, qs = "") {
 }
 
 /* ============================================
+ * Внутрішній хелпер: короткий безпечний коментар
+ * (щоб не ловити BitString overflow — ≤ ~120 символів ASCII)
+ * ============================================ */
+function buildSafeComment({ buyerB64, refB64, ts, nonce }) {
+  const short = (s, L = 6, R = 6) => (s && s !== "-" ? `${s.slice(0, L)}..${s.slice(-R)}` : "-");
+  // компактний варіант (як правило < 120)
+  let note = `MAGT|r=${short(refB64)}|b=${short(buyerB64)}|t=${ts}|n=${nonce}`;
+  if (note.length <= 120) return note;
+  // ще компактніший фолбек
+  note = `MAGT|b=${short(buyerB64,4,4)}|n=${nonce}`;
+  if (note.length <= 120) return note;
+  // мінімум-мініморум
+  return `MAGT|n=${nonce}`;
+}
+
+/* ============================================
  * TonConnect: USDT transfer
  * ============================================ */
 
@@ -123,7 +139,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const JettonWallet = TonWeb.token.jetton.JettonWallet;
   const minter = new JettonMinter(tonweb.provider, { address: usdtMaster });
 
-  // ✅ ВАЖЛИВО: правильний метод SDK (помилка “getWalletAddress is not a function”)
+  // ✅ коректний метод SDK
   const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
   const presaleJettonWalletAddr = await minter.getJettonWalletAddress(presaleOwner);
   const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
@@ -146,11 +162,11 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const ts = Date.now();
   const nonce = Math.floor(Math.random() * 1e9) >>> 0;
 
-  // текстовий коментар у forward_payload (Jetton transfer)
-  const note = `MAGT|ref=${refB64}|buyer=${buyerB64}|ts=${ts}|nonce=${nonce}`;
+  // ✅ безпечний короткий текстовий коментар
+  const note = buildSafeComment({ buyerB64, refB64, ts, nonce });
   const cell = new TonWeb.boc.Cell();
-  cell.bits.writeUint(0, 32); // opcode=0 => "text comment" convention
-  cell.bits.writeString(note);
+  cell.bits.writeUint(0, 32);         // opcode=0 => "text comment"
+  cell.bits.writeString(note);        // гарантовано ≤ ліміту
 
   const forwardTon = TonWeb.utils.toNano(Number(CONFIG.FORWARD_TON || 0));          // для контракту пресейлу
   const openTon    = TonWeb.utils.toNano(Number(CONFIG.JETTON_WALLET_TON || 0.15)); // на виконання tx
