@@ -1,6 +1,6 @@
 // /js/buy.js
 import { CONFIG } from "./config.js";
-import { buildUsdtTransferTx } from "./ton.js";
+import { buildUsdtTransferTx, buildUsdtTxUsingConnected } from "./ton.js";
 import { api, cfgReady, setBtnLoading } from "./utils.js";
 import { ui, state } from "./state.js";
 import { toast, recalc, refreshButtons, updateRefBonus } from "./ui.js";
@@ -9,6 +9,7 @@ import { getWalletAddress, getTonConnect, openConnectModal } from "./tonconnect.
 /* ---------------- helpers ---------------- */
 export function mapTonConnectError(e) {
   const m = (e?.message || "").toLowerCase();
+  if (m.includes("wallet_not_connected") || m.includes("wallet not connected")) return "Підключи гаманець і спробуй ще раз.";
   if (m.includes("user reject") || m.includes("rejected")) return "Користувач скасував підпис.";
   if (m.includes("manifest")) return "Помилка маніфесту TonConnect. Перевір /tonconnect-manifest.json.";
   if (m.includes("network") || m.includes("rpc")) return "Мережна помилка RPC. Спробуй ще раз.";
@@ -126,24 +127,31 @@ function updateClaimUI(tokensAdded) {
 }
 
 /* ===== основний клік BUY ===== */
+let _buyInFlight = false;
+
 export async function onBuyClick() {
+  if (_buyInFlight) return; // антидубль
+  _buyInFlight = true;
+
   const walletAddress = getWalletAddress();
   const tonConnectUI = getTonConnect();
 
   if (!walletAddress || !tonConnectUI) {
     openConnectModal();
+    _buyInFlight = false;
     return toast("Підключи гаманець");
   }
 
-  if (!ui?.agree?.checked) return toast("Підтверди правила пресейлу");
+  if (!ui?.agree?.checked) { _buyInFlight = false; return toast("Підтверди правила пресейлу"); }
 
+  // нормалізуємо USD
   const usdRaw = ui.usdtIn?.value || 0;
-  const usd = Number(String(usdRaw).replace(",", "."));
+  const usd = Math.max(0, Math.round(Number(String(usdRaw).replace(",", ".")) * 100) / 100);
   const minBuy = Number(CONFIG.MIN_BUY_USDT || 0);
-  if (!(usd >= minBuy)) return toast(`Мінімум $${minBuy}`);
+  if (!(usd >= minBuy)) { _buyInFlight = false; return toast(`Мінімум $${minBuy}`); }
 
-  if (!cfgReady()) return toast("⚠️ Заповни USDT_MASTER і PRESALE_OWNER_ADDRESS у /js/config.js");
-  if (!window.TonWeb) return toast("TonWeb не завантажено (перевір <script src=tonweb...> у <head>)");
+  if (!cfgReady()) { _buyInFlight = false; return toast("⚠️ Заповни USDT_MASTER і PRESALE_OWNER_ADDRESS у /js/config.js"); }
+  if (!window.TonWeb) { _buyInFlight = false; return toast("TonWeb не завантажено (перевір <script src=tonweb...> у <head>)"); }
 
   // === реферал
   let ref = null;
@@ -167,7 +175,14 @@ export async function onBuyClick() {
 
     window.__referrer = ref || null;
 
-    const tx = await buildUsdtTransferTx(walletAddress, usd, ref);
+    // ✅ новий зручний виклик: адресу беремо з TonConnect автоматично
+    let tx;
+    try {
+      tx = await buildUsdtTxUsingConnected(usd, ref);
+    } catch {
+      // фолбек на старий підпис (на випадок кешованого ton.js)
+      tx = await buildUsdtTransferTx(walletAddress, usd, ref);
+    }
 
     toast("Підтверди платіж у гаманці…");
     const res = await tonConnectUI.sendTransaction(tx);
@@ -201,5 +216,6 @@ export async function onBuyClick() {
   } finally {
     setBtnLoading(ui.btnBuy, false);
     refreshButtons();
+    _buyInFlight = false;
   }
 }

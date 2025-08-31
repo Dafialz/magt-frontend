@@ -1,6 +1,8 @@
 // /js/ton.js
 import { CONFIG } from "./config.js";
 import { safeFetch } from "./utils.js";
+// ✅ беремо адресу безпосередньо з TonConnect singleton
+import { getWalletAddress } from "./tonconnect.js";
 
 /* ============================================
  * Helpers
@@ -88,9 +90,17 @@ function epUrl(key, qs = "") {
  * TonConnect: USDT transfer
  * ============================================ */
 
+/**
+ * Головний білдер переказу USDT (Jetton transfer).
+ * Якщо ownerUserAddr не передано — візьме адресу з TonConnect (getWalletAddress()).
+ */
 export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   if (!window.TonWeb) throw new Error("TonWeb не завантажено");
   const TonWeb = window.TonWeb;
+
+  // ✅ дозволяємо не передавати адресу явно
+  const resolvedOwner = (ownerUserAddr && String(ownerUserAddr).trim()) || getWalletAddress();
+  if (!resolvedOwner) throw new Error("WALLET_NOT_CONNECTED");
 
   const numAmount = Number(usdAmount);
   if (!Number.isFinite(numAmount) || numAmount <= 0) throw new Error("Некоректна сума");
@@ -102,7 +112,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
 
   let userAddr, usdtMaster, presaleOwner;
   try {
-    userAddr = new TonWeb.utils.Address(ownerUserAddr);
+    userAddr = new TonWeb.utils.Address(resolvedOwner);
     usdtMaster = new TonWeb.utils.Address(CONFIG.USDT_MASTER);
     presaleOwner = new TonWeb.utils.Address(CONFIG.PRESALE_OWNER_ADDRESS);
   } catch (e) {
@@ -113,6 +123,8 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const JettonWallet = TonWeb.token.jetton.JettonWallet;
   const minter = new JettonMinter(tonweb.provider, { address: usdtMaster });
 
+  // ⚠️ Раніше ця помилка зʼявлялась, коли хтось передавав «minter» ззовні.
+  // Тепер ми самі створюємо JettonMinter і викликаємо його методи тут.
   const userJettonWalletAddr = await minter.getWalletAddress(userAddr);
   const presaleJettonWalletAddr = await minter.getWalletAddress(presaleOwner);
   const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
@@ -141,7 +153,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   cell.bits.writeUint(0, 32); // opcode=0 => "text comment" convention
   cell.bits.writeString(note);
 
-  const forwardTon = TonWeb.utils.toNano(Number(CONFIG.FORWARD_TON || 0));       // для контракту пресейлу
+  const forwardTon = TonWeb.utils.toNano(Number(CONFIG.FORWARD_TON || 0));          // для контракту пресейлу
   const openTon    = TonWeb.utils.toNano(Number(CONFIG.JETTON_WALLET_TON || 0.15)); // на виконання tx
 
   const body = await userJettonWallet.createTransferBody({
@@ -167,6 +179,14 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   };
 }
 
+/**
+ * Зручний варіант виклику: бере адресу власника з TonConnect автоматично.
+ * Використання: await buildUsdtTxUsingConnected(usdAmount, refAddr)
+ */
+export async function buildUsdtTxUsingConnected(usdAmount, refAddr) {
+  return buildUsdtTransferTx(null, usdAmount, refAddr);
+}
+
 /* ============================================
  * CLAIM (он-чейн)
  * ============================================ */
@@ -174,6 +194,10 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
 export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts = {}) {
   if (!window.TonWeb) throw new Error("TonWeb не завантажено");
   const TonWeb = window.TonWeb;
+
+  // дозволяємо не передавати адресу явно
+  const resolvedOwner = (ownerUserAddr && String(ownerUserAddr).trim()) || getWalletAddress();
+  if (!resolvedOwner) throw new Error("WALLET_NOT_CONNECTED");
 
   const contract = (claimContractAddr || CONFIG.CLAIM_CONTRACT || "").trim();
   if (!contract) throw new Error("Не задано адресу контракту клейму (CONFIG.CLAIM_CONTRACT)");
@@ -186,7 +210,7 @@ export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts
 
   let userAddr, claimAddr;
   try {
-    userAddr = new TonWeb.utils.Address(ownerUserAddr);
+    userAddr = new TonWeb.utils.Address(resolvedOwner);
     claimAddr = new TonWeb.utils.Address(contract);
   } catch {
     throw new Error("Невірний формат TON-адреси для клейму");
