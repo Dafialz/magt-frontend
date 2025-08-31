@@ -182,7 +182,7 @@ export function sanitizeUsdInput() {
 
 export function refreshButtons() {
   const usd = Number(ui.usdtIn?.value || 0);
-  const ok = !!ui.agree?.checked && usd >= (CONFIG.MIN_BUY_USDT || 0);
+  const ok = !!ui.agree?.checked && usd >= (CONFIG.MIN_BUY_USDT || 1);
   if (ui.btnBuy) ui.btnBuy.disabled = !ok;
   if (ui.btnClaim) ui.btnClaim.disabled = true;
 }
