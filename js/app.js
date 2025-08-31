@@ -51,7 +51,7 @@ function startBalancePolling(addr) {
   stopBalancePolling();
   renderBalance(0);
   fetchBalance(addr);
-  _pollTimer = setInterval(() => fetchBalance(addr), 15000);
+  _pollTimer = setInterval(() => fetchBalance(addr), Number(CONFIG.CLAIM_POLL_INTERVAL_MS || 15000));
 }
 function stopBalancePolling() {
   if (_pollTimer) clearInterval(_pollTimer), (_pollTimer = null);
@@ -145,17 +145,24 @@ function afterDisconnected() {
   if (!usedClaimModule) stopBalancePolling();
 }
 
+/* ===== антидубль прив’язки подій після інʼєкції partials ===== */
+function bindRuntimeEventsOnce() {
+  if (window.__magtEventsBound) return;
+  bindEvents({
+    onBuyClick,
+    onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick?.()),
+    getUserUsdtBalance,
+  });
+  window.__magtEventsBound = true;
+}
+
 /* ================= Re-init after partials ================= */
 async function reinitAfterPartials() {
   try {
     refreshUiRefs();
     await mountTonButtons().catch(()=>{});
-    // 🔧 ГОЛОВНЕ: перев’язуємо обробники після інʼєкції HTML
-    bindEvents({
-      onBuyClick,
-      onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick?.()),
-      getUserUsdtBalance,
-    });
+    window.__magtEventsBound = false; // дозволимо перев’язати події для свіжого DOM
+    bindRuntimeEventsOnce();
 
     refreshReferralUi();
     recalc();
@@ -174,6 +181,7 @@ window.addEventListener("partials:main-ready", reinitAfterPartials);
 // Якщо змінився URL (наприклад, ref у query)
 window.addEventListener("popstate", () => {
   refreshReferralUi();
+  recalc();
 });
 
 /* ======= Головний хук: глобальна подія з tonconnect.js ======= */
@@ -216,11 +224,7 @@ async function bootOnce() {
   refreshUiRefs();
   initStaticUI();
 
-  bindEvents({
-    onBuyClick,
-    onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick?.()),
-    getUserUsdtBalance,
-  });
+  bindRuntimeEventsOnce();
 
   refreshReferralUi();
   recalc();

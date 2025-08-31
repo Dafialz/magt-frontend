@@ -24,7 +24,15 @@ function join(base, path) {
 export const CONFIG = {
   /* ===== Ціноутворення / капа ===== */
   PRICE_USD: 0.00383,
-  HARD_CAP: 20_000_000,
+
+  // НОВЕ: параметри прогресу збору
+  // Сума, з якої показуємо прогрес (офсет «вже зібрано»)
+  RAISED_OFFSET_USD: 5_900_000,
+  // Поточна ціль збору
+  GOAL_USD: 25_900_000,
+
+  // Якщо десь у фронті ще використовується стара «HARD_CAP» — хай співпадає з GOAL_USD
+  HARD_CAP: 25_900_000,
 
   /* ===== TON RPC / мережа ===== */
   TON_RPC: "https://toncenter.com/api/v2/jsonRPC",
@@ -54,7 +62,7 @@ export const CONFIG = {
   REF_DEBUG_DEMO: false,
 
   /* ===== Дані пресейлу / таймер ===== */
-  TOTAL_SUPPLY: 5_000_000_000,
+  TOTAL_SUPPLY: 1_500_000_000, // загальний обсяг MAGT у пресейлі (для "Залишок")
   ROUND_DEADLINE_TS: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
 
   LEVELS: [
@@ -105,7 +113,7 @@ export const CONFIG = {
 /* ===== Runtime-чек (для дебагу) ===== */
 if (CONFIG.MIN_BUY_USDT < 1) console.warn("⚠️ MIN_BUY_USDT занадто малий, перевір значення в config.js");
 if (!CONFIG.USDT_MASTER || !CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає ключових TON-адрес у config.js");
-if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BОНУС_PCT виглядає підозріло. Рекомендується 0..50%");
+if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BONUS_PCT виглядає підозріло. Рекомендується 0..50%");
 
 if (IS_BROWSER) {
   console.log(

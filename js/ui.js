@@ -2,6 +2,7 @@
 import { CONFIG } from "./config.js";
 import { ui, state } from "./state.js";
 import { fmt, clamp, setBtnLoading } from "./utils.js";
+import { getPresaleStats } from "./ton.js";
 
 /* ===== БАЗА ДЛЯ API =====
  * УВАГА: у проді CONFIG.API_BASE може бути "".
@@ -198,22 +199,70 @@ function updatePriceUnder(){
 /* ===================== core calc ===================== */
 export function recalc() {
   const usd = sanitizeUsdInput();
-  const tokens = usd > 0 ? usd / (CONFIG.PRICE_USD || 0.00383) : 0;
+  const price = Number(CONFIG.PRICE_USD || 0.00383);
+  const tokens = (usd > 0 && price > 0) ? Math.floor((usd / price)) : 0;
   if (ui.magOut) ui.magOut.textContent = fmt(tokens, 0);
   updateRefBonus();
   updatePriceUnder();
   refreshButtons();
 }
 
+/* ===== Прогрес/залишок ===== */
+function el(id){ return document.getElementById(id); }
+
+function applySaleUi({ raisedUsd, soldMag, totalMag }) {
+  // офсет і хардкапа
+  const offset = Number(CONFIG.RAISED_OFFSET_USD || 0);
+  const cap    = Number(CONFIG.HARD_CAP || 0) || null;
+  const raised = Math.max(0, Number(raisedUsd || 0)) + offset;
+
+  // Процент і смуга
+  let pct = 0;
+  if (cap && cap > 0) pct = Math.max(0, Math.min(100, (raised / cap) * 100));
+
+  // «Зібрано» + прогрес-бар у віджеті
+  const saleRaised = el("sale-raised");
+  const saleBar    = el("sale-bar");
+  const salePercent= el("sale-percent");
+  if (saleRaised) saleRaised.textContent = `$${(raised).toLocaleString(undefined,{maximumFractionDigits:0})}`;
+  if (saleBar)    saleBar.style.width = `${pct.toFixed(2)}%`;
+  if (salePercent) salePercent.textContent = `${pct.toFixed(2)}% продано`;
+
+  // залишок MAGT (і в картці, і у віджеті)
+  const remaining = Math.max(0, Number(totalMag || 0) - Number(soldMag || 0));
+  if (ui.left) ui.left.textContent = `${fmt(remaining, 0)} MAGT`;
+  const saleRemaining = el("sale-remaining");
+  if (saleRemaining) saleRemaining.textContent = fmt(remaining, 0);
+
+  // резервні поля старої верстки
+  if (ui.raised) ui.raised.textContent = `$${(raised).toLocaleString()}`;
+  if (ui.bar)    ui.bar.style.width = `${pct.toFixed(2)}%`;
+}
+
+let _saleTimer = null;
+async function refreshSaleStatsOnce() {
+  try {
+    const s = await getPresaleStats();
+    applySaleUi(s || {});
+  } catch {}
+}
+function startSalePolling() {
+  clearInterval(_saleTimer);
+  refreshSaleStatsOnce();
+  _saleTimer = setInterval(refreshSaleStatsOnce, 20000);
+}
+
 /* ===================== static UI on boot ===================== */
 export function initStaticUI() {
   const y = document.querySelector("#year");
   if (y) y.textContent = new Date().getFullYear();
+
   if (ui.price) ui.price.textContent = (CONFIG.PRICE_USD || 0).toFixed(6);
   if (ui.level) ui.level.textContent = "1";
-  if (ui.left) ui.left.textContent = "—";
-  if (ui.raised) ui.raised.textContent = "—";
-  if (ui.bar) ui.bar.style.width = "0%";
+
+  // Ініціальні значення до першого запиту
+  applySaleUi({ raisedUsd: 0, soldMag: 0, totalMag: CONFIG.TOTAL_SUPPLY });
+
   if (ui.claimWrap) ui.claimWrap.classList.toggle("hidden", !CONFIG.CLAIM_ENABLED);
 
   if (!REF_ON) hideRefUI(true);
@@ -225,7 +274,22 @@ export function initStaticUI() {
     if (ui.btnCopyRef) ui.btnCopyRef.disabled = false;
   }
 
+  // Приховати «Ціль збору: …», якщо так налаштовано
+  if (CONFIG.HIDE_GOAL_TEXT) {
+    try {
+      const root = document.getElementById("slot-main") || document.body;
+      const candidates = root.querySelectorAll("section, p, div, span");
+      candidates.forEach(n => {
+        if (n.childElementCount === 0 && /Ціль збору/i.test(n.textContent || "")) {
+          n.textContent = (n.textContent || "").replace(/Ціль збору.*$/i, "").trim();
+          if (!n.textContent) n.remove();
+        }
+      });
+    } catch {}
+  }
+
   updatePriceUnder();
+  startSalePolling();
 }
 
 /* ===================== referrals ===================== */
@@ -298,8 +362,8 @@ export function updateRefBonus() {
   const price = Number(CONFIG.PRICE_USD || 0.00383);
   if (!(price > 0)) return;
 
-  const tokens = usd / price;
-  const bonusTokens = tokens * (pct / 100);
+  const tokens = Math.floor((usd / price));
+  const bonusTokens = Math.floor(tokens * (pct / 100));
 
   if (ui.refBonusUsd) ui.refBonusUsd.textContent = fmt(bonusTokens, 0);
   if (ui.refBonusTo)  ui.refBonusTo.textContent  = state.referrerShort || short(state.referrer);

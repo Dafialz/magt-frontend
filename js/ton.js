@@ -123,7 +123,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const JettonWallet = TonWeb.token.jetton.JettonWallet;
   const minter = new JettonMinter(tonweb.provider, { address: usdtMaster });
 
-  // ✅ ВАЖЛИВО: використовуємо правильний метод SDK
+  // ✅ ВАЖЛИВО: правильний метод SDK (помилка “getWalletAddress is not a function”)
   const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
   const presaleJettonWalletAddr = await minter.getJettonWalletAddress(presaleOwner);
   const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
@@ -263,12 +263,14 @@ export async function getPresaleStats() {
     try {
       const res = await safeFetch(url, { cache: "no-cache" });
       if (res.ok) {
-        const { soldMag, totalMag, raisedUsd } = await res.json();
-        return {
-          soldMag: Number(soldMag) || 0,
-          totalMag: Number(totalMag) || CONFIG.TOTAL_SUPPLY,
-          raisedUsd: Number(raisedUsd) || 0,
-        };
+        const data = await res.json();
+        // підтримуємо як "плоску" відповідь, так і об’єкт з ok
+        const soldMag   = Number(data.soldMag   ?? data.sold_tokens ?? 0) || 0;
+        const totalMag  = Number(data.totalMag  ?? data.total_supply ?? CONFIG.TOTAL_SUPPLY) || CONFIG.TOTAL_SUPPLY;
+        const raisedRaw = Number(data.raisedUsd ?? data.raised_usd ?? 0) || 0;
+        // ✚ додаємо офсет, щоб прогрес стартував не з нуля
+        const raisedUsd = raisedRaw + (Number(CONFIG.RAISED_OFFSET_USD) || 0);
+        return { soldMag, totalMag, raisedUsd };
       }
     } catch (e) {
       console.warn("stats API fail:", e);
@@ -277,7 +279,8 @@ export async function getPresaleStats() {
   // DEMO: обчислюємо з локального фіда
   const feed = demoFeed();
   const soldMag = feed.reduce((s, it) => s + (Number(it.magt ?? it.tokens ?? 0) || 0), 0);
-  const raisedUsd = feed.reduce((s, it) => s + (Number(it.amountUsd ?? it.usd ?? 0) || 0), 0);
+  const raisedUsd = feed.reduce((s, it) => s + (Number(it.amountUsd ?? it.usd ?? 0) || 0), 0)
+                    + (Number(CONFIG.RAISED_OFFSET_USD) || 0);
   return { soldMag, totalMag: CONFIG.TOTAL_SUPPLY, raisedUsd };
 }
 
@@ -288,8 +291,9 @@ export async function getRecentPurchases(limit = 20) {
     try {
       const res = await safeFetch(url, { cache: "no-cache" });
       if (res.ok) {
-        const list = await res.json();
-        if (Array.isArray(list)) return list.slice(0, lim);
+        const payload = await res.json();
+        if (Array.isArray(payload?.items)) return payload.items.slice(0, lim);
+        if (Array.isArray(payload)) return payload.slice(0, lim);
       }
     } catch (e) {
       console.warn("feed API fail:", e);
@@ -306,8 +310,9 @@ export async function getReferralLeaders(limit = 10) {
     try {
       const res = await safeFetch(url, { cache: "no-cache" });
       if (res.ok) {
-        const list = await res.json();
-        if (Array.isArray(list)) return list.slice(0, lim);
+        const payload = await res.json();
+        if (Array.isArray(payload?.items)) return payload.items.slice(0, lim);
+        if (Array.isArray(payload)) return payload.slice(0, lim);
       }
     } catch (e) {
       console.warn("leaders API fail:", e);
