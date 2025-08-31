@@ -168,8 +168,8 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   cell.bits.writeUint(0, 32);         // opcode=0 => "text comment"
   cell.bits.writeString(note);        // гарантовано ≤ ліміту
 
-  const forwardTon = TonWeb.utils.toNano(Number(CONFIG.FORWARD_TON || 0));          // для контракту пресейлу
-  const openTon    = TonWeb.utils.toNano(Number(CONFIG.JETTON_WALLET_TON || 0.15)); // на виконання tx
+  const forwardTon = TonWeb.utils.toNano(String(Number(CONFIG.FORWARD_TON ?? 0)));          // для контракту пресейлу
+  const openTon    = TonWeb.utils.toNano(String(Number(CONFIG.JETTON_WALLET_TON ?? 0.15))); // на виконання tx
 
   const body = await userJettonWallet.createTransferBody({
     queryId: BigInt(ts),
@@ -246,7 +246,7 @@ export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts
     messages: [
       {
         address: claimAddr.toString(true, true, false),
-        amount: TonWeb.utils.toNano(amountTon).toString(),
+        amount: TonWeb.utils.toNano(String(amountTon)).toString(),
         payload: payloadB64,
       },
     ],
