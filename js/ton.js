@@ -16,18 +16,15 @@ export const RPC_URL = /toncenter\.com/i.test(_rpcFromConfig)
 
 /* ============================================
  * Кандидати майстрів USDT
- * - Перший елемент — поточний з config.js (як і було)
- * - Додай сюди майстер із Tonkeeper, якщо знаєш його адресу.
- *   (Tap по USDT → Info/Details → Contract / Address)
+ * - якщо є CONFIG.USDT_MASTERS (масив) — беремо його
+ * - інакшеfallback на CONFIG.USDT_MASTER (один)
  * ============================================ */
 const USDT_MASTERS = Array.from(
   new Set(
-    [
-      CONFIG.USDT_MASTER,
-      // 👉 При потребі додай альтернативні майстри USDT:
-      // "EQ.........................", // офіційний Tether
-      // "EQ.........................", // інший міст/версія
-    ]
+    (Array.isArray(CONFIG.USDT_MASTERS) && CONFIG.USDT_MASTERS.length
+      ? CONFIG.USDT_MASTERS
+      : [CONFIG.USDT_MASTER]
+    )
       .map(s => (s || "").trim())
       .filter(Boolean)
   )
@@ -159,10 +156,17 @@ async function pickUsdtMasterForAmount(usdAmount) {
   for (const master of USDT_MASTERS) {
     try {
       const info = await readJettonBalanceUnits(TonWeb, provider, master, userAddr);
+      // лог балансу по кожному master’у
+      try {
+        console.log("[USDT master] balance",
+          new TonWeb.utils.Address(master).toString(true, true, true),
+          "→", Number(info.units) / 10 ** dec);
+      } catch {}
       if (!best || info.units > best.units) best = { master, ...info };
       if (info.units >= needUnits) {
-        console.log("[USDT master] picked:", new TonWeb.utils.Address(master).toString(true, true, true),
-                    "balanceUnits:", info.units.toString());
+        console.log("[USDT master] picked:",
+          new TonWeb.utils.Address(master).toString(true, true, true),
+          "balanceUnits:", info.units.toString());
         return { master, ...info };
       }
     } catch (e) {
@@ -170,12 +174,13 @@ async function pickUsdtMasterForAmount(usdAmount) {
     }
   }
   if (best) {
-    console.warn("[USDT master] none has enough, using max balance:", new TonWeb.utils.Address(best.master).toString(true, true, true),
-                 "balanceUnits:", best.units.toString());
+    console.warn(
+      "[USDT master] none has enough, using max balance:",
+      new TonWeb.utils.Address(best.master).toString(true, true, true),
+      "balanceUnits:", best.units.toString()
+    );
   } else {
     console.warn("[USDT master] no readable masters, fallback to CONFIG.USDT_MASTER");
-    const TonWeb = window.TonWeb;
-    const provider = new TonWeb.HttpProvider(RPC_URL);
     const JettonMinter = TonWeb.token.jetton.JettonMinter;
     const JettonWallet = TonWeb.token.jetton.JettonWallet;
     const minter = new JettonMinter(provider, { address: new TonWeb.utils.Address(CONFIG.USDT_MASTER) });
@@ -212,8 +217,12 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   }
 
   // 🔎 Обираємо майстер із балансом
-  const { master: usdtMasterB64, units: balanceUnits, jwAddr: userJettonWalletAddr, jw: userJettonWallet } =
-    await pickUsdtMasterForAmount(numAmount);
+  const {
+    master: usdtMasterB64,
+    units: balanceUnits,
+    jwAddr: userJettonWalletAddr,
+    jw: userJettonWallet
+  } = await pickUsdtMasterForAmount(numAmount);
 
   // адреса отримувача (пресейл) завжди від поточного config
   let presaleOwner;
@@ -292,13 +301,12 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   } catch {}
 
   // повідомлення TonConnect → на джеттон-гаманець користувача
+  // Використовую non-bounceable (UQ…), щоб клієнти чіткіше розуміли це як jetton transfer.
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
       {
-        // Non-bounceable або bounceable — обидва працюють; залишаю bounceable (EQ…),
-        // бо деякі клієнти краще визначають джеттон-трансфер саме так.
-        address: userJettonWalletAddr.toString(true, true, true),
+        address: userJettonWalletAddr.toString(false, true, false), // UQ…, non-bounceable
         amount: openTon.toString(),
         payload: payloadB64,
         ...(stateInitB64 ? { stateInit: stateInitB64 } : {}),
