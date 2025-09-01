@@ -37,31 +37,56 @@ function isConnected(ui) {
 }
 
 /* ===== баланс USDT (довідково) ===== */
+/** Надійне читання балансу USDT: через runGetMethod(get_wallet_data) на /api/rpc */
 export async function getUserUsdtBalance() {
   try {
     const walletAddress = getWalletAddress();
     if (!window.TonWeb || !walletAddress || !cfgReady()) return null;
+
     const TonWeb = window.TonWeb;
-    // ⛳ лише через наш бекенд-проксі
-    const provider = new TonWeb.HttpProvider(RPC_URL);
+    const provider = new TonWeb.HttpProvider(RPC_URL); // наш проксі
     const tonweb = new TonWeb(provider);
 
     const userAddr   = new TonWeb.utils.Address(walletAddress);
     const masterAddr = new TonWeb.utils.Address(CONFIG.USDT_MASTER);
 
     const JettonMinter = TonWeb.token.jetton.JettonMinter;
-    const JettonWallet = TonWeb.token.jetton.JettonWallet;
-
     const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
-    // ✅ правильний метод SDK
+
+    // 1) адреса USDT-джеттон-гаманця користувача
     const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
-    const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
-    const data = await userJettonWallet.getData();
-    const raw = data.balance;
-    const dec = CONFIG.JETTON_DECIMALS ?? 6;
-    return Number(raw) / (10 ** dec);
+    const jw = userJettonWalletAddr.toString(true, true, false); // urlSafe, non-bounce
+
+    // 2) напряму викликаємо get_wallet_data
+    const res = await fetch(RPC_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        method: "runGetMethod",
+        params: { address: jw, method: "get_wallet_data", stack: [] }
+      })
+    });
+
+    const json = await res.json();
+    const stack =
+      json?.result?.stack ||
+      json?.result?.data?.stack ||
+      json?.stack ||
+      null;
+
+    if (!Array.isArray(stack) || stack.length === 0) throw new Error("Bad stack");
+
+    // balance очікується у першому елементі як uint256 у hex
+    const hexRaw =
+      (stack[0] && (stack[0][1] ?? stack[0].value ?? stack[0].number)) ?? "";
+    const hex = String(hexRaw).startsWith("0x") ? String(hexRaw) : "0x" + String(hexRaw);
+    const balanceUnits = BigInt(hex);
+    const dec = Number(CONFIG.JETTON_DECIMALS ?? 6);
+    const human = Number(balanceUnits) / 10 ** dec;
+
+    return human;
   } catch (e) {
-    console.warn("getUserUsdtBalance failed:", e?.message || e);
+    console.warn("getUserUsdtBalance failed (manual runGetMethod):", e?.message || e);
     return null;
   }
 }
@@ -97,15 +122,37 @@ export async function showDebugJettonInfo() {
   console.log("Presale USDT wallet:", presaleJettonWalletAddr.toString(true, true, true));
   console.groupEnd();
 
+  // Спроба зчитати баланс: спершу через наш ручний метод (щоб уникати parse errors)
   try {
-    const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
-    const data = await userJettonWallet.getData();
-    const raw = data.balance;
-    const dec = CONFIG.JETTON_DECIMALS ?? 6;
-    const human = Number(raw) / (10 ** dec);
+    const jw = userJettonWalletAddr.toString(true, true, false);
+    const res = await fetch(RPC_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        method: "runGetMethod",
+        params: { address: jw, method: "get_wallet_data", stack: [] }
+      })
+    });
+    const json = await res.json();
+    const stack = json?.result?.stack || json?.result?.data?.stack || json?.stack || [];
+    const hexRaw = (stack[0] && (stack[0][1] ?? stack[0].value ?? stack[0].number)) ?? "0x0";
+    const hex = String(hexRaw).startsWith("0x") ? String(hexRaw) : "0x" + String(hexRaw);
+    const balanceUnits = BigInt(hex);
+    const dec = Number(CONFIG.JETTON_DECIMALS ?? 6);
+    const human = Number(balanceUnits) / 10 ** dec;
     console.log(`USDT balance (user): ${human}`);
   } catch (e) {
-    console.warn("Не вдалось прочитати баланс USDT у користувача:", e?.message || e);
+    // як fallback — стара TonWeb-логіка (на випадок, якщо бекенд повернув інший формат)
+    try {
+      const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
+      const data = await userJettonWallet.getData();
+      const raw = data.balance;
+      const dec = CONFIG.JETTON_DECIMALS ?? 6;
+      const human = Number(raw) / (10 ** dec);
+      console.log(`USDT balance (user, fallback TonWeb): ${human}`);
+    } catch (e2) {
+      console.warn("Не вдалось прочитати баланс USDT у користувача:", e2?.message || e2);
+    }
   }
 }
 
