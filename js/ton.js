@@ -125,7 +125,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const numAmount = Number(usdAmount);
   if (!Number.isFinite(numAmount) || numAmount <= 0) throw new Error("Некоректна сума");
   if (CONFIG.MIN_BUY_USDT && numAmount < CONFIG.MIN_BUY_USDT)
-    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUЙ_USDT} USDT`);
+    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUY_USDT} USDT`);
 
   const provider = new TonWeb.HttpProvider(RPC_URL);
   const tonweb = new TonWeb(provider);
@@ -186,6 +186,15 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     forwardPayload: cell,
   });
 
+  // ⛳ ДОДАЄМО stateInit, щоб JettonWallet користувача розгорнувся при першому трансфері
+  let stateInitB64 = null;
+  try {
+    const stateInitCell = await userJettonWallet.createStateInit();
+    stateInitB64 = u8ToBase64(await stateInitCell.toBoc(false));
+  } catch {
+    stateInitB64 = null; // якщо у старій TonWeb методу нема — відправимо без stateInit
+  }
+
   const payloadB64 = u8ToBase64(await body.toBoc(false));
 
   // debug
@@ -199,14 +208,15 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     console.warn("[MAGT TX] debug print failed:", e);
   }
 
-  // ВАЖЛИВО: тут використовуємо **bounceable** адресу (EQ...), інакше деякі гаманці ігнорують payload.
+  // ВАЖЛИВО: використовуємо адресу JettonWallet; додаємо stateInit якщо змогли зібрати
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
       {
-        address: userJettonWalletAddr.toString(true, true, true), // <-- EQ..., bounceable
+        address: userJettonWalletAddr.toString(true, true, true), // EQ..., bounceable
         amount: openTon.toString(),
         payload: payloadB64,
+        ...(stateInitB64 ? { stateInit: stateInitB64 } : {}),
       },
     ],
   };
