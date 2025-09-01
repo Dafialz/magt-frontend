@@ -6,7 +6,6 @@ import { getWalletAddress } from "./tonconnect.js";
 /* ============================================
  * RPC: завжди через наш бекенд-проксі /api/rpc
  * ============================================ */
-
 const _rpcFromConfig =
   (CONFIG.TON_RPC && String(CONFIG.TON_RPC).trim()) ||
   "https://toncenter.com/api/v2/jsonRPC";
@@ -18,7 +17,6 @@ export const RPC_URL = /toncenter\.com/i.test(_rpcFromConfig)
 /* ============================================
  * Helpers
  * ============================================ */
-
 function isTonAddress(addr) {
   if (typeof addr !== "string") return false;
   const a = addr.trim();
@@ -72,7 +70,6 @@ export const fmt = {
 /* ============================================
  * Абсолютні ендпоінти
  * ============================================ */
-
 function epUrl(key, qs = "") {
   const abs = CONFIG?.ENDPOINTS?.[key];
   if (abs && typeof abs === "string" && abs.startsWith("http")) {
@@ -97,7 +94,6 @@ function epUrl(key, qs = "") {
 /* ============================================
  * Короткий безпечний текстовий коментар
  * ============================================ */
-
 function buildSafeComment({ buyerB64, refB64, ts, nonce }) {
   const short = (s, L = 6, R = 6) => (s && s !== "-" ? `${s.slice(0, L)}..${s.slice(-R)}` : "-");
   let note = `MAGT|r=${short(refB64)}|b=${short(buyerB64)}|t=${ts}|n=${nonce}`;
@@ -110,7 +106,6 @@ function buildSafeComment({ buyerB64, refB64, ts, nonce }) {
 /* ============================================
  * USDT (Jetton) transfer через TonConnect
  * ============================================ */
-
 /**
  * Побудова Jetton transfer для USDT.
  * Якщо ownerUserAddr не передано — бере адресу з TonConnect (getWalletAddress()).
@@ -161,7 +156,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     if (buyerBase64 === cleanRef) cleanRef = null;
   }
 
-  // короткий коментар-пейлоад
+  // короткий коментар-пейлоад (полетить у presaleJettonWallet через forward)
   const buyerB64 = toBase64Url(userAddr);
   const refB64 = cleanRef ? toBase64Url(cleanRef) : "-";
   const ts = Date.now();
@@ -186,14 +181,14 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     forwardPayload: cell,
   });
 
-  // ⛳ ДОДАЄМО stateInit, щоб JettonWallet користувача розгорнувся при першому трансфері
+  // спробуємо підкласти stateInit, якщо гаманець джеттона ще не розгорнутий
   let stateInitB64 = null;
   try {
-    const stateInitCell = await userJettonWallet.createStateInit();
-    stateInitB64 = u8ToBase64(await stateInitCell.toBoc(false));
-  } catch {
-    stateInitB64 = null; // якщо у старій TonWeb методу нема — відправимо без stateInit
-  }
+    if (typeof userJettonWallet.createStateInit === "function") {
+      const stateInitCell = await userJettonWallet.createStateInit();
+      stateInitB64 = u8ToBase64(await stateInitCell.toBoc(false));
+    }
+  } catch { /* ignore */ }
 
   const payloadB64 = u8ToBase64(await body.toBoc(false));
 
@@ -208,12 +203,13 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     console.warn("[MAGT TX] debug print failed:", e);
   }
 
-  // ВАЖЛИВО: використовуємо адресу JettonWallet; додаємо stateInit якщо змогли зібрати
+  // ✅ КЛЮЧОВЕ: адреса у TonConnect-повідомленні — NON-BOUNCEABLE (UQ…),
+  // інакше деякі гаманці показують це як звичайний TON-переказ.
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
       {
-        address: userJettonWalletAddr.toString(true, true, true), // EQ..., bounceable
+        address: userJettonWalletAddr.toString(false, true, false), // UQ…, non-bounceable
         amount: openTon.toString(),
         payload: payloadB64,
         ...(stateInitB64 ? { stateInit: stateInitB64 } : {}),
@@ -232,7 +228,6 @@ export async function buildUsdtTxUsingConnected(usdAmount, refAddr) {
 /* ============================================
  * CLAIM (он-чейн)
  * ============================================ */
-
 export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts = {}) {
   if (!window.TonWeb) throw new Error("TonWeb не завантажено");
   const TonWeb = window.TonWeb;
@@ -282,7 +277,6 @@ export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts
 /* ============================================
  * Віджети: дані (API або DEMO)
  * ============================================ */
-
 function demoFeed() {
   try { return JSON.parse(localStorage.getItem("demo.feed") || "[]"); }
   catch { return []; }
@@ -387,7 +381,6 @@ export async function pushPurchaseToBackend({ usd, tokens, address, ref }) {
 /* ============================================
  * DEMO запис покупок (без бекенду)
  * ============================================ */
-
 function pushDemoPurchase({ usd, tokens, address, ref }) {
   const feed = demoFeed();
   feed.unshift({
