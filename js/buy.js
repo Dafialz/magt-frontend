@@ -174,6 +174,54 @@ function updateClaimUI(tokensAdded) {
   if (info)  info.classList.remove("hidden");
 }
 
+/* ===== warmup: ініціалізація JettonWallet простим TON-переказом ===== */
+async function buildWarmupTxToUserJettonWallet() {
+  if (!window.TonWeb) throw new Error("TonWeb не завантажено");
+  const TonWeb = window.TonWeb;
+
+  const walletAddress = getWalletAddress();
+  if (!walletAddress) throw new Error("WALLET_NOT_CONNECTED");
+  if (!cfgReady()) throw new Error("CONFIG_NOT_READY");
+
+  const provider = new TonWeb.HttpProvider(RPC_URL);
+  const tonweb = new TonWeb(provider);
+
+  const userAddr   = new TonWeb.utils.Address(walletAddress);
+  const masterAddr = new TonWeb.utils.Address(CONFIG.USDT_MASTER);
+  const JettonMinter = TonWeb.token.jetton.JettonMinter;
+  const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
+
+  const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
+
+  const openTon = TonWeb.utils.toNano(String(CONFIG.JETTON_WALLET_TON ?? 0.25));
+  // порожній payload: просто ініціалізаційний переказ
+  return {
+    validUntil: Math.floor(Date.now() / 1000) + 300,
+    messages: [
+      {
+        address: userJettonWalletAddr.toString(true, true, false),
+        amount: openTon.toString(),
+      },
+    ],
+  };
+}
+
+/* ===== очікування підтвердження списання USDT ===== */
+function toUnits(usd, dec = Number(CONFIG.USDT_DECIMALS ?? 6)) {
+  const s = String(usd).replace(",", ".");
+  const n = Math.round(Number(s) * 10 ** dec);
+  return BigInt(Number.isFinite(n) ? n : 0);
+}
+async function pollUntil(fn, { timeoutMs = 60000, everyMs = 2000 } = {}) {
+  const t0 = Date.now();
+  while (true) {
+    const ok = await fn();
+    if (ok) return true;
+    if (Date.now() - t0 > timeoutMs) return false;
+    await new Promise(r => setTimeout(r, everyMs));
+  }
+}
+
 /* ===== основний клік BUY ===== */
 let _buyInFlight = false;
 
@@ -222,6 +270,21 @@ export async function onBuyClick() {
     setBtnLoading(ui.btnBuy, true, "Підпис…");
     toast("Готуємо транзакцію…");
 
+    // === PRE-FLIGHT: чи готовий USDT JettonWallet
+    let usdtBalBefore = await getUserUsdtBalance(); // null => не ініціалізований/не читається
+    if (usdtBalBefore === null) {
+      // виконуємо теплий переказ для ініціалізації
+      toast("Спершу активуємо USDT-гаманець (одноразово 0.25 TON)…");
+      const warmupTx = await buildWarmupTxToUserJettonWallet();
+      await tonConnectUI.sendTransaction(warmupTx);
+      toast("USDT-гаманець активовано. Повтори покупку.");
+      // прибираємо лоадер і просимо повторити дію — зараз JettonTransfer не відправляємо
+      setBtnLoading(ui.btnBuy, false);
+      refreshButtons();
+      _buyInFlight = false;
+      return;
+    }
+
     window.__referrer = ref || null;
 
     // ✅ новий зручний виклик: адресу беремо з TonConnect автоматично
@@ -236,29 +299,43 @@ export async function onBuyClick() {
     toast("Підтверди платіж у гаманці…");
     const res = await tonConnectUI.sendTransaction(tx);
     console.log("USDT transfer sent:", res);
-    toast("Успіх! Платіж відправлено.");
+    toast("Платіж відправлено в мережу. Чекаємо підтвердження…");
 
-    // ДИНАМІЧНА ціна від рівня (якщо задано у вікні) або конфіг
+    // ===== ПІДТВЕРДЖЕННЯ СПИСАННЯ USDT (до 60с) =====
+    const expectedUnits = toUnits(usd);
+    const ok = await pollUntil(async () => {
+      const now = await getUserUsdtBalance();
+      if (now === null) return false; // ще не читається
+      const beforeUnits = toUnits(usdtBalBefore);
+      const nowUnits = toUnits(now);
+      // очікуємо, що баланс зменшився щонайменше на очікувану кількість юнітів
+      return beforeUnits - nowUnits >= expectedUnits;
+    }, { timeoutMs: 60000, everyMs: 2000 });
+
+    if (!ok) {
+      toast("Не бачу списання USDT поки що. Якщо кошти спишуться пізніше — токени нарахуються автоматично.");
+      // без оновлення бейджа/бекенду
+      return;
+    }
+
+    // ===== СПИСАННЯ ПІДТВЕРДЖЕНО — оновлюємо локальний бейдж і пушимо бекенд =====
     const dynPrice = Number(window.__magtPriceUsd || CONFIG.PRICE_USD || 0.00383);
     const tokensBought = dynPrice > 0 ? Math.floor(usd / dynPrice) : 0;
 
-    // миттєво показуємо у UI «Доступно: N MAGT»
     updateClaimUI(tokensBought);
 
-    // подія для маскота/фідів
     if (CONFIG.REF_DEBUG_DEMO !== false) {
       window.dispatchEvent(new CustomEvent("magt:purchase", {
         detail: { usd, tokens: tokensBought, address: walletAddress, ref: ref || null }
       }));
     }
 
-    // ✅ бекенд (не блокує UI): через безпечну утиліту ton.js
     pushPurchaseToBackend({ usd, tokens: tokensBought, address: walletAddress, ref });
 
-    // оновити форму
     ui.usdtIn.value = "";
     recalc();
     updateRefBonus?.();
+    toast("Готово. MAGT нараховано.");
   } catch (e) {
     console.error(e);
     toast(mapTonConnectError(e));
