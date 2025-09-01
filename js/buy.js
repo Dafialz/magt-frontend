@@ -1,6 +1,11 @@
 // /js/buy.js
 import { CONFIG } from "./config.js";
-import { buildUsdtTransferTx, buildUsdtTxUsingConnected, pushPurchaseToBackend, RPC_URL } from "./ton.js";
+import {
+  buildUsdtTransferTx,
+  buildUsdtTxUsingConnected,
+  pushPurchaseToBackend,
+  RPC_URL
+} from "./ton.js";
 import { cfgReady, setBtnLoading } from "./utils.js";
 import { ui, state } from "./state.js";
 import { toast, recalc, refreshButtons, updateRefBonus } from "./ui.js";
@@ -8,11 +13,12 @@ import { getWalletAddress, getTonConnect, openConnectModal } from "./tonconnect.
 
 /* ---------------- helpers ---------------- */
 export function mapTonConnectError(e) {
-  const msg = (e?.message || String(e) || "").toLowerCase();
+  const raw = e?.message || String(e) || "";
+  const msg = raw.toLowerCase();
   if (msg.includes("wallet_not_connected") || msg.includes("wallet not connected")) return "Підключи гаманець і спробуй ще раз.";
   if (msg.includes("user reject") || msg.includes("rejected")) return "Користувач скасував підпис.";
   if (msg.includes("manifest")) return "Помилка маніфесту TonConnect. Перевір /tonconnect-manifest.json.";
-  if (msg.includes("network") || msg.includes("rpc")) return "Мережна помилка RPC. Спробуй ще раз.";
+  if (msg.includes("network") || msg.includes("rpc") || msg.includes("failed to fetch")) return "Мережна помилка RPC. Спробуй ще раз.";
   return "Скасовано або помилка відправки.";
 }
 
@@ -107,7 +113,6 @@ export async function showDebugJettonInfo() {
   const presaleOwner = new TonWeb.utils.Address(CONFIG.PRESALE_OWNER_ADDRESS);
 
   const JettonMinter  = TonWeb.token.jetton.JettonMinter;
-  const JettonWallet  = TonWeb.token.jetton.JettonWallet;
   const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
 
   const userJettonWalletAddr    = await minter.getJettonWalletAddress(userAddr);
@@ -228,6 +233,7 @@ export async function onBuyClick() {
 
     // баланс ДО — для перевірки списання
     const usdtBalBefore = await getUserUsdtBalance();
+    console.log("[BUY] usdt balance before =", usdtBalBefore);
 
     window.__referrer = ref || null;
 
@@ -239,15 +245,17 @@ export async function onBuyClick() {
       tx = await buildUsdtTransferTx(walletAddress, usd, ref);
     }
 
+    console.log("[BUY] TonConnect tx =", tx);
     toast("Підтверди платіж у гаманці…");
     const res = await tonConnectUI.sendTransaction(tx);
-    console.log("USDT transfer sent:", res);
+    console.log("[BUY] USDT transfer sent →", res);
     toast("Платіж відправлено в мережу. Чекаємо підтвердження…");
 
     // ===== ПІДТВЕРДЖЕННЯ СПИСАННЯ USDT (до 60с) =====
     const expectedUnits = toUnits(usd);
     const ok = await pollUntil(async () => {
       const now = await getUserUsdtBalance();
+      console.log("[BUY] poll balance:", now, "(before:", usdtBalBefore, ")");
       if (now === null || usdtBalBefore === null) return false;
       const beforeUnits = toUnits(usdtBalBefore);
       const nowUnits = toUnits(now);

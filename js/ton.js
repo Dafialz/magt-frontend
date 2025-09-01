@@ -1,14 +1,12 @@
 // /js/ton.js
 import { CONFIG } from "./config.js";
 import { safeFetch } from "./utils.js";
-// ✅ беремо адресу безпосередньо з TonConnect singleton
 import { getWalletAddress } from "./tonconnect.js";
 
 /* ============================================
- * Helpers
+ * RPC: завжди через наш бекенд-проксі /api/rpc
  * ============================================ */
 
-// ⛳ Анти-401: якщо в конфігу/кеші лишився прямий toncenter — примусово використовуємо наш бекенд-проксі /api/rpc.
 const _rpcFromConfig =
   (CONFIG.TON_RPC && String(CONFIG.TON_RPC).trim()) ||
   "https://toncenter.com/api/v2/jsonRPC";
@@ -17,7 +15,10 @@ export const RPC_URL = /toncenter\.com/i.test(_rpcFromConfig)
   ? (CONFIG.ENDPOINTS?.rpc || "https://api.magtcoin.com/api/rpc")
   : _rpcFromConfig;
 
-// проста перевірка TON-адреси (EQ/UQ, base64url)
+/* ============================================
+ * Helpers
+ * ============================================ */
+
 function isTonAddress(addr) {
   if (typeof addr !== "string") return false;
   const a = addr.trim();
@@ -25,17 +26,15 @@ function isTonAddress(addr) {
   return /^[A-Za-z0-9_-]{48,68}$/.test(a);
 }
 
-// friendly нормалізація у base64url (EQ/UQ); fallback — повертаємо оригінал
 function toBase64Url(addr) {
   try {
     const A = window.TonWeb?.utils?.Address;
     if (!A) return typeof addr === "string" ? addr : String(addr);
-    // якщо вже Address — не створюємо заново
     const inst =
       addr && typeof addr === "object" && typeof addr.toString === "function"
         ? addr
         : new A(addr);
-    return inst.toString(true, true, true); // bounceable, urlSafe, testOnly(auto)
+    return inst.toString(true, true, true); // bounceable, urlSafe, auto test flag
   } catch {
     return typeof addr === "string" ? addr : String(addr);
   }
@@ -71,7 +70,7 @@ export const fmt = {
 };
 
 /* ============================================
- * Абсолютні ендпоінти (безпечний билдер)
+ * Абсолютні ендпоінти
  * ============================================ */
 
 function epUrl(key, qs = "") {
@@ -79,7 +78,6 @@ function epUrl(key, qs = "") {
   if (abs && typeof abs === "string" && abs.startsWith("http")) {
     return abs + qs;
   }
-  // фолбек: якщо з якоїсь причини ENDPOINTS немає (не повинно статись у проді)
   const base = (CONFIG.API_BASE || "").replace(/\/+$/g, "");
   if (!base) return null;
   const paths = {
@@ -97,41 +95,37 @@ function epUrl(key, qs = "") {
 }
 
 /* ============================================
- * Внутрішній хелпер: короткий безпечний коментар
- * (щоб не ловити BitString overflow — ≤ ~120 символів ASCII)
+ * Короткий безпечний текстовий коментар
  * ============================================ */
+
 function buildSafeComment({ buyerB64, refB64, ts, nonce }) {
   const short = (s, L = 6, R = 6) => (s && s !== "-" ? `${s.slice(0, L)}..${s.slice(-R)}` : "-");
-  // компактний варіант (як правило < 120)
   let note = `MAGT|r=${short(refB64)}|b=${short(buyerB64)}|t=${ts}|n=${nonce}`;
   if (note.length <= 120) return note;
-  // ще компактніший фолбек
   note = `MAGT|b=${short(buyerB64, 4, 4)}|n=${nonce}`;
   if (note.length <= 120) return note;
-  // мінімум-мініморум
   return `MAGT|n=${nonce}`;
 }
 
 /* ============================================
- * TonConnect: USDT transfer
+ * USDT (Jetton) transfer через TonConnect
  * ============================================ */
 
 /**
- * Головний білдер переказу USDT (Jetton transfer).
- * Якщо ownerUserAddr не передано — візьме адресу з TonConnect (getWalletAddress()).
+ * Побудова Jetton transfer для USDT.
+ * Якщо ownerUserAddr не передано — бере адресу з TonConnect (getWalletAddress()).
  */
 export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   if (!window.TonWeb) throw new Error("TonWeb не завантажено");
   const TonWeb = window.TonWeb;
 
-  // ✅ дозволяємо не передавати адресу явно
   const resolvedOwner = (ownerUserAddr && String(ownerUserAddr).trim()) || getWalletAddress();
   if (!resolvedOwner) throw new Error("WALLET_NOT_CONNECTED");
 
   const numAmount = Number(usdAmount);
   if (!Number.isFinite(numAmount) || numAmount <= 0) throw new Error("Некоректна сума");
   if (CONFIG.MIN_BUY_USDT && numAmount < CONFIG.MIN_BUY_USDT)
-    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUЙ_USDT} USDT`);
+    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUY_USDT} USDT`);
 
   const provider = new TonWeb.HttpProvider(RPC_URL);
   const tonweb = new TonWeb(provider);
@@ -141,7 +135,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     userAddr = new TonWeb.utils.Address(resolvedOwner);
     usdtMaster = new TonWeb.utils.Address(CONFIG.USDT_MASTER);
     presaleOwner = new TonWeb.utils.Address(CONFIG.PRESALE_OWNER_ADDRESS);
-  } catch (e) {
+  } catch {
     throw new Error("Невірний формат TON-адреси у config.js або wallet");
   }
 
@@ -149,44 +143,43 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const JettonWallet = TonWeb.token.jetton.JettonWallet;
   const minter = new JettonMinter(tonweb.provider, { address: usdtMaster });
 
-  // ✅ коректний метод SDK
+  // адреси JettonWallet юзера та пресейлу
   const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
   const presaleJettonWalletAddr = await minter.getJettonWalletAddress(presaleOwner);
   const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
 
+  // сума у найменших юнітах
   const dec = Number(CONFIG.JETTON_DECIMALS ?? 6);
-  // BigInt → BN для TonWeb
   const jetAmountBig = decimalToUnitsBigInt(numAmount, dec);
   const amountBN = new TonWeb.utils.BN(jetAmountBig.toString());
 
-  // --- sanitize ref ---
+  // реферал (санітизація + self-ban)
   let cleanRef = null;
   if (typeof refAddr === "string" && isTonAddress(refAddr)) cleanRef = refAddr.trim();
-
-  // дублюємо self-ref бан на стороні генерації трансакції
   if (cleanRef && CONFIG.REF_SELF_BAN === true) {
     const buyerBase64 = userAddr.toString(true, true, true);
     if (buyerBase64 === cleanRef) cleanRef = null;
   }
 
+  // короткий коментар-пейлоад
   const buyerB64 = toBase64Url(userAddr);
   const refB64 = cleanRef ? toBase64Url(cleanRef) : "-";
   const ts = Date.now();
   const nonce = Math.floor(Math.random() * 1e9) >>> 0;
 
-  // ✅ безпечний короткий текстовий коментар
   const note = buildSafeComment({ buyerB64, refB64, ts, nonce });
   const cell = new TonWeb.boc.Cell();
-  cell.bits.writeUint(0, 32); // opcode=0 => "text comment"
-  cell.bits.writeString(note); // гарантовано ≤ ліміту
+  cell.bits.writeUint(0, 32);   // opcode 0 -> текстовий коментар
+  cell.bits.writeString(note);  // короткий текст
 
-  // ⚠️ ВАЖЛИВО: у toNano завжди передаємо РЯДОК (щоб уникнути міксу Number/BigInt)
-  const forwardTon = TonWeb.utils.toNano(String(CONFIG.FORWARD_TON ?? "0"));          // для контракту пресейлу
-  const openTon    = TonWeb.utils.toNano(String(CONFIG.JETTON_WALLET_TON ?? "0.15")); // на виконання tx
+  // TON для виконання (відправка у власний JettonWallet) і для forward payload
+  const forwardTon = TonWeb.utils.toNano(String(CONFIG.FORWARD_TON ?? "0"));          // → контракт пресейлу
+  const openTon    = TonWeb.utils.toNano(String(CONFIG.JETTON_WALLET_TON ?? "0.25")); // газ корист. JettonWallet
 
+  // тіло transfer
   const body = await userJettonWallet.createTransferBody({
-    queryId: new TonWeb.utils.BN(ts), // число → BN
-    amount: amountBN,                  // BN.js
+    queryId: new TonWeb.utils.BN(ts),
+    amount: amountBN,
     toAddress: presaleJettonWalletAddr,
     responseAddress: userAddr,
     forwardAmount: forwardTon,
@@ -195,24 +188,23 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
 
   const payloadB64 = u8ToBase64(await body.toBoc(false));
 
-  // === DEBUG LOGS (як у твоєму чек-листі) ===
-  const jetAmount = jetAmountBig; // щоб лог співпав з назвою "jetAmount"
+  // debug
   try {
     console.log("[MAGT TX] userJettonWallet:", userJettonWalletAddr.toString(true, true, false));
     console.log("[MAGT TX] presaleJettonWallet:", presaleJettonWalletAddr.toString(true, true, false));
-    console.log("[MAGT TX] jetAmount (USDT units):", jetAmount.toString());
+    console.log("[MAGT TX] jetAmount (USDT units):", jetAmountBig.toString());
     console.log("[MAGT TX] openTon:", openTon.toString(), "forwardTon:", forwardTon.toString());
     console.log("[MAGT TX] note:", note);
   } catch (e) {
     console.warn("[MAGT TX] debug print failed:", e);
   }
 
+  // формуємо TonConnect tx
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
       {
-        // надсилаємо повідомлення ВЛАСНОМУ Jetton Wallet юзера
-        address: userJettonWalletAddr.toString(true, true, false),
+        address: userJettonWalletAddr.toString(true, true, false), // саме JettonWallet користувача
         amount: openTon.toString(),
         payload: payloadB64,
       },
@@ -221,8 +213,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
 }
 
 /**
- * Зручний варіант виклику: бере адресу власника з TonConnect автоматично.
- * Використання: await buildUsdtTxUsingConnected(usdAmount, refAddr)
+ * Зручний варіант: бере адресу з TonConnect.
  */
 export async function buildUsdtTxUsingConnected(usdAmount, refAddr) {
   return buildUsdtTransferTx(null, usdAmount, refAddr);
@@ -236,14 +227,12 @@ export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts
   if (!window.TonWeb) throw new Error("TonWeb не завантажено");
   const TonWeb = window.TonWeb;
 
-  // дозволяємо не передавати адресу явно
   const resolvedOwner = (ownerUserAddr && String(ownerUserAddr).trim()) || getWalletAddress();
   if (!resolvedOwner) throw new Error("WALLET_NOT_CONNECTED");
 
   const contract = (claimContractAddr || CONFIG.CLAIM_CONTRACT || "").trim();
   if (!contract) throw new Error("Не задано адресу контракту клейму (CONFIG.CLAIM_CONTRACT)");
 
-  // amountTon лишаємо числом для перевірок, але в toNano передаємо РЯДОК
   const amountTon = Number(opts.amountTon ?? 0.05);
   if (!Number.isFinite(amountTon) || !(amountTon > 0)) throw new Error("Некоректна сума TON для клейму");
 
@@ -284,7 +273,6 @@ export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts
  * Віджети: дані (API або DEMO)
  * ============================================ */
 
-// DEMO helpers
 function demoFeed() {
   try { return JSON.parse(localStorage.getItem("demo.feed") || "[]"); }
   catch { return []; }
@@ -307,11 +295,9 @@ export async function getPresaleStats() {
       const res = await safeFetch(url, { cache: "no-cache" });
       if (res.ok) {
         const data = await res.json();
-        // підтримуємо як "плоску" відповідь, так і об’єкт з ok
         const soldMag   = Number(data.soldMag   ?? data.sold_tokens ?? 0) || 0;
         const totalMag  = Number(data.totalMag  ?? data.total_supply ?? CONFIG.TOTAL_SUPPLY) || CONFIG.TOTAL_SUPPLY;
         const raisedRaw = Number(data.raisedUsd ?? data.raised_usd ?? 0) || 0;
-        // ✚ додаємо офсет, щоб прогрес стартував не з нуля
         const raisedUsd = raisedRaw + (Number(CONFIG.RAISED_OFFSET_USD) || 0);
         return { soldMag, totalMag, raisedUsd };
       }
@@ -319,7 +305,6 @@ export async function getPresaleStats() {
       console.warn("stats API fail:", e);
     }
   }
-  // DEMO: обчислюємо з локального фіда
   const feed = demoFeed();
   const soldMag = feed.reduce((s, it) => s + (Number(it.magt ?? it.tokens ?? 0) || 0), 0);
   const raisedUsd = feed.reduce((s, it) => s + (Number(it.amountUsd ?? it.usd ?? 0) || 0), 0)
@@ -361,7 +346,6 @@ export async function getReferralLeaders(limit = 10) {
       console.warn("leaders API fail:", e);
     }
   }
-  // DEMО: перетворюємо об'єкт {refAddr: usdTotal} у масив
   const obj = demoLeadersObj();
   const arr = Object.entries(obj)
     .filter(([addr]) => addr && addr !== "-")
@@ -404,7 +388,6 @@ function pushDemoPurchase({ usd, tokens, address, ref }) {
     ref: (ref && String(ref)) || null,
     ts: Date.now(),
   });
-  // обрізаємо, щоб не роздувати LS
   if (feed.length > 200) feed.length = 200;
   saveDemoFeed(feed);
 
@@ -415,7 +398,6 @@ function pushDemoPurchase({ usd, tokens, address, ref }) {
   }
 }
 
-// Слухаємо подію з /js/buy.js, щоб у DEMO режимі оновлювати фіди/лідерів
 try {
   if (CONFIG.REF_DEBUG_DEMO !== false) {
     window.addEventListener("magt:purchase", (ev) => {
