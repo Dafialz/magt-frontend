@@ -36,8 +36,8 @@ function isConnected(ui) {
   );
 }
 
-/* ===== баланс USDT (довідково) ===== */
-/** Надійне читання балансу USDT: через runGetMethod(get_wallet_data) на /api/rpc */
+/* ===== баланс USDT (через бекенд-проксі /api/rpc) ===== */
+/** Надійне читання балансу USDT: runGetMethod(get_wallet_data) */
 export async function getUserUsdtBalance() {
   try {
     const walletAddress = getWalletAddress();
@@ -53,11 +53,11 @@ export async function getUserUsdtBalance() {
     const JettonMinter = TonWeb.token.jetton.JettonMinter;
     const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
 
-    // 1) адреса USDT-джеттон-гаманця користувача
+    // адреса USDT-джеттон-гаманця користувача
     const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
     const jw = userJettonWalletAddr.toString(true, true, false); // urlSafe, non-bounce
 
-    // 2) напряму викликаємо get_wallet_data
+    // runGetMethod(get_wallet_data)
     const res = await fetch(RPC_URL, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -99,7 +99,6 @@ export async function showDebugJettonInfo() {
   if (!walletAddress) return;
 
   const TonWeb = window.TonWeb;
-  // ⛳ лише через наш бекенд-проксі
   const provider = new TonWeb.HttpProvider(RPC_URL);
   const tonweb = new TonWeb(provider);
 
@@ -108,10 +107,8 @@ export async function showDebugJettonInfo() {
   const presaleOwner = new TonWeb.utils.Address(CONFIG.PRESALE_OWNER_ADDRESS);
 
   const JettonMinter  = TonWeb.token.jetton.JettonMinter;
-  const JettonWallet  = TonWeb.token.jetton.JettonWallet;
   const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
 
-  // ✅ правильний метод SDK
   const userJettonWalletAddr    = await minter.getJettonWalletAddress(userAddr);
   const presaleJettonWalletAddr = await minter.getJettonWalletAddress(presaleOwner);
 
@@ -123,7 +120,6 @@ export async function showDebugJettonInfo() {
   console.log("Presale USDT wallet:", presaleJettonWalletAddr.toString(true, true, true));
   console.groupEnd();
 
-  // Спроба зчитати баланс: спершу через наш ручний метод (щоб уникати parse errors)
   try {
     const jw = userJettonWalletAddr.toString(true, true, false);
     const res = await fetch(RPC_URL, {
@@ -142,18 +138,8 @@ export async function showDebugJettonInfo() {
     const dec = Number(CONFIG.JETTON_DECIMALS ?? 6);
     const human = Number(balanceUnits) / 10 ** dec;
     console.log(`USDT balance (user): ${human}`);
-  } catch (e) {
-    // як fallback — стара TonWeb-логіка (на випадок, якщо бекенд повернув інший формат)
-    try {
-      const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
-      const data = await userJettonWallet.getData();
-      const raw = data.balance;
-      const dec = CONFIG.JETTON_DECIMALS ?? 6;
-      const human = Number(raw) / (10 ** dec);
-      console.log(`USDT balance (user, fallback TonWeb): ${human}`);
-    } catch (e2) {
-      console.warn("Не вдалось прочитати баланс USDT у користувача:", e2?.message || e2);
-    }
+  } catch (e2) {
+    console.warn("Не вдалось прочитати баланс USDT у користувача:", e2?.message || e2);
   }
 }
 
@@ -175,38 +161,6 @@ function updateClaimUI(tokensAdded) {
   if (info)  info.classList.remove("hidden");
 }
 
-/* ===== warmup: ініціалізація JettonWallet простим TON-переказом ===== */
-async function buildWarmupTxToUserJettonWallet() {
-  if (!window.TonWeb) throw new Error("TonWeb не завантажено");
-  const TonWeb = window.TonWeb;
-
-  const walletAddress = getWalletAddress();
-  if (!walletAddress) throw new Error("WALLET_NOT_CONNECTED");
-  if (!cfgReady()) throw new Error("CONFIG_NOT_READY");
-
-  const provider = new TonWeb.HttpProvider(RPC_URL);
-  const tonweb = new TonWeb(provider);
-
-  const userAddr   = new TonWeb.utils.Address(walletAddress);
-  const masterAddr = new TonWeb.utils.Address(CONFIG.USDT_MASTER);
-  const JettonMinter = TonWeb.token.jetton.JettonMinter;
-  const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
-
-  const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
-
-  const openTon = TonWeb.utils.toNano(String(CONFIG.JETTON_WALLET_TON ?? 0.25));
-  // порожній payload: просто ініціалізаційний переказ
-  return {
-    validUntil: Math.floor(Date.now() / 1000) + 300,
-    messages: [
-      {
-        address: userJettonWalletAddr.toString(true, true, false),
-        amount: openTon.toString(),
-      },
-    ],
-  };
-}
-
 /* ===== утиліти очікування/конвертації ===== */
 function toUnits(usd, dec = Number(CONFIG.USDT_DECIMALS ?? 6)) {
   const s = String(usd).replace(",", ".");
@@ -221,9 +175,6 @@ async function pollUntil(fn, { timeoutMs = 60000, everyMs = 2000 } = {}) {
     if (Date.now() - t0 > timeoutMs) return false;
     await new Promise(r => setTimeout(r, everyMs));
   }
-}
-async function waitUsdtWalletReady({ timeoutMs = 20000, everyMs = 1500 } = {}) {
-  return pollUntil(async () => (await getUserUsdtBalance()) !== null, { timeoutMs, everyMs });
 }
 
 /* ===== основний клік BUY ===== */
@@ -274,29 +225,12 @@ export async function onBuyClick() {
     setBtnLoading(ui.btnBuy, true, "Підпис…");
     toast("Готуємо транзакцію…");
 
-    // === PRE-FLIGHT: чи готовий USDT JettonWallet
-    let usdtBalBefore = await getUserUsdtBalance(); // null => не ініціалізований/не читається
-
-    // Одноразовий warm-up (0.25 TON) + очікування готовності, без потреби тиснути ще раз
-    if (usdtBalBefore === null) {
-      toast("Активуємо USDT-гаманець (одноразово 0.25 TON)…");
-      const warmupTx = await buildWarmupTxToUserJettonWallet();
-      await tonConnectUI.sendTransaction(warmupTx);
-      toast("Чекаємо підтвердження ініціалізації…");
-      const ready = await waitUsdtWalletReady({ timeoutMs: 20000, everyMs: 1500 });
-      if (!ready) {
-        setBtnLoading(ui.btnBuy, false);
-        refreshButtons();
-        _buyInFlight = false;
-        return toast("USDT-гаманець активовано, але мережа ще не підтвердила. Спробуй ще раз за хвилинку.");
-      }
-      // після warm-up перевіряємо баланс знов
-      usdtBalBefore = (await getUserUsdtBalance()) ?? 0;
-    }
+    // баланс ДО — для перевірки списання
+    const usdtBalBefore = await getUserUsdtBalance();
 
     window.__referrer = ref || null;
 
-    // ✅ будуємо Jetton transfer
+    // ✅ формуємо саме jetton transfer
     let tx;
     try {
       tx = await buildUsdtTxUsingConnected(usd, ref);
@@ -313,7 +247,7 @@ export async function onBuyClick() {
     const expectedUnits = toUnits(usd);
     const ok = await pollUntil(async () => {
       const now = await getUserUsdtBalance();
-      if (now === null) return false; // ще не читається
+      if (now === null || usdtBalBefore === null) return false;
       const beforeUnits = toUnits(usdtBalBefore);
       const nowUnits = toUnits(now);
       return beforeUnits - nowUnits >= expectedUnits;
@@ -321,7 +255,7 @@ export async function onBuyClick() {
 
     if (!ok) {
       toast("Не бачу списання USDT поки що. Якщо кошти спишуться пізніше — токени нарахуються автоматично.");
-      return; // не оновлюємо бейдж/бекенд поки не впевнилися
+      return; // не оновлюємо бейдж/бекенд без підтвердження
     }
 
     // ===== СПИСАННЯ ПІДТВЕРДЖЕНО — оновлюємо локальний бейдж і пушимо бекенд =====
