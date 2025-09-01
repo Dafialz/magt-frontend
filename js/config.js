@@ -26,18 +26,12 @@ export const CONFIG = {
   PRICE_USD: 0.00383,
 
   // НОВЕ: параметри прогресу збору
-  // Сума, з якої показуємо прогрес (офсет «вже зібрано»)
   RAISED_OFFSET_USD: 5_900_000,
-  // Поточна ціль збору
   GOAL_USD: 25_900_000,
-
-  // Якщо десь у фронті ще використовується стара «HARD_CAP» — хай співпадає з GOAL_USD
-  HARD_CAP: 25_900_000,
+  HARD_CAP: 25_900_000, // синхронізовано з GOAL_USD
 
   /* ===== TON RPC / мережа ===== */
-  // ⚠️ Ключ із фронта прибрано. Ходимо тільки через наш бекенд-проксі.
   TON_RPC: join(API_BASE_ABS, "/api/rpc"),
-  // (за бажання можна лишити резервний публічний вузол для локальних експериментів)
   TON_RPC_FALLBACK: "https://tonhubapi.com/jsonRPC",
 
   /* ===== USDT (Jetton) mainnet ===== */
@@ -61,34 +55,38 @@ export const CONFIG = {
   REF_BIND_ONCE: true,
   REF_DAILY_CAP_USD: 0,
   REF_TOTAL_CAP_USD: 0,
-  // у проді вимикаємо демо-емуляцію подій
+  // пул на реферальні виплати (зменшено до 25 млн)
+  REF_POOL_TOKENS: 25_000_000,
   REF_DEBUG_DEMO: false,
 
   /* ===== Дані пресейлу / таймер ===== */
-  TOTAL_SUPPLY: 1_500_000_000, // загальний обсяг MAGT у пресейлі (для "Залишок")
+  // зменшено до 500 млн
+  TOTAL_SUPPLY: 500_000_000,
   ROUND_DEADLINE_TS: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
 
+  // кожен рівень у 3 рази менший від початкового; перший підкориговано +179 944,
+  // щоб сума всіх рівнів дорівнювала рівно 500,000,000
   LEVELS: [
-    { tokens: 195_135_235, price: 0.003830 },
-    { tokens: 171_119_007, price: 0.004481 },
-    { tokens: 151_112_725, price: 0.005243 },
-    { tokens: 132_979_198, price: 0.006134 },
-    { tokens: 117_021_694, price: 0.007177 },
-    { tokens: 102_979_097, price: 0.008397 },
-    { tokens:  90_621_600, price: 0.009824 },
-    { tokens:  79_747_008, price: 0.011494 },
-    { tokens:  70_177_367, price: 0.013448 },
-    { tokens:  61_756_083, price: 0.015735 },
-    { tokens:  54_345_353, price: 0.018410 },
-    { tokens:  47_823_911, price: 0.021539 },
-    { tokens:  42_085_041, price: 0.025201 },
-    { tokens:  37_034_836, price: 0.029485 },
-    { tokens:  32_590_656, price: 0.034498 },
-    { tokens:  28_679_777, price: 0.040362 },
-    { tokens:  25_238_204, price: 0.047224 },
-    { tokens:  22_269_802, price: 0.055252 },
-    { tokens:  19_544_465, price: 0.064645 },
-    { tokens:  17_199_129, price: 0.075634 },
+    { tokens: 65_225_022, price: 0.003830 }, // 65,045,078 + 179,944
+    { tokens: 57_039_669, price: 0.004481 },
+    { tokens: 50_370_908, price: 0.005243 },
+    { tokens: 44_326_399, price: 0.006134 },
+    { tokens: 39_007_231, price: 0.007177 },
+    { tokens: 34_326_365, price: 0.008397 },
+    { tokens: 30_207_200, price: 0.009824 },
+    { tokens: 26_582_336, price: 0.011494 },
+    { tokens: 23_392_455, price: 0.013448 },
+    { tokens: 20_585_361, price: 0.015735 },
+    { tokens: 18_115_117, price: 0.018410 },
+    { tokens: 15_941_303, price: 0.021539 },
+    { tokens: 14_028_347, price: 0.025201 },
+    { tokens: 12_344_945, price: 0.029485 },
+    { tokens: 10_863_552, price: 0.034498 },
+    { tokens:  9_559_925, price: 0.040362 },
+    { tokens:  8_412_734, price: 0.047224 },
+    { tokens:  7_423_267, price: 0.055252 },
+    { tokens:  6_514_821, price: 0.064645 },
+    { tokens:  5_733_043, price: 0.075634 },
   ],
   FALLBACK_SOLD_TOKENS: 0,
 
@@ -98,8 +96,7 @@ export const CONFIG = {
   CLAIM_POLL_INTERVAL_MS: 30000,
 
   /* ===== API ===== */
-  // у проді тримаємо порожнім (використовуємо абсолютні ендпоінти нижче)
-  API_BASE: API_BASE_RUNTIME,
+  API_BASE: API_BASE_RUNTIME, // в проді порожньо — використовуємо абсолютні ендпоінти
   ENDPOINTS: {
     stats:    join(API_BASE_ABS, "/api/presale/stats"),
     feed:     join(API_BASE_ABS, "/api/presale/feed"),
@@ -108,7 +105,6 @@ export const CONFIG = {
     claim:    join(API_BASE_ABS, "/api/presale/claim"),
     order:    join(API_BASE_ABS, "/api/order"),
     referral: join(API_BASE_ABS, "/api/referral"),
-    // новий ендпоінт для RPC-проксі бекенда
     rpc:      join(API_BASE_ABS, "/api/rpc"),
   },
 
@@ -116,7 +112,7 @@ export const CONFIG = {
 };
 
 /* ===== Runtime-чек (для дебагу) ===== */
-if (CONFIG.MIN_BUY_USDT < 1) console.warn("⚠️ MIN_BUY_USDT занадто малий, перевір значення в config.js");
+if (CONFIG.MIN_BUY_USDT < 1) console.warn("⚠️ MIN_BUЙ_USDT занадто малий, перевір значення в config.js");
 if (!CONFIG.USDT_MASTER || !CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає ключових TON-адрес у config.js");
 if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BONUS_PCT виглядає підозріло. Рекомендується 0..50%");
 

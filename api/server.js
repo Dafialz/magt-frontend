@@ -9,9 +9,12 @@ import purchasesRouter from "./purchases.js"; // файловий кеш (fallba
 const PORT = process.env.PORT || 8787;
 
 // Показуємо капу пресейлу у віджеті
-const TOTAL_SUPPLY = Number(process.env.TOTAL_SUPPLY || 1_500_000_000);
+// 🔻 дефолт зменшено до 500,000,000
+const TOTAL_SUPPLY = Number(process.env.TOTAL_SUPPLY || 500_000_000);
+
 // Окремо віддаємо розмір реферального пулу (для UI, якщо треба показувати)
-const REF_POOL_TOKENS = Number(process.env.REF_POOL_TOKENS || 75_000_000);
+// 🔻 дефолт зменшено до 25,000,000
+const REF_POOL_TOKENS = Number(process.env.REF_POOL_TOKENS || 25_000_000);
 
 // межі суми покупки (додаткова валідація)
 const MIN_USD = Number(process.env.MIN_USD || 1);
