@@ -1,6 +1,6 @@
 // /js/buy.js
 import { CONFIG } from "./config.js";
-import { buildUsdtTransferTx, buildUsdtTxUsingConnected, pushPurchaseToBackend } from "./ton.js";
+import { buildUsdtTransferTx, buildUsdtTxUsingConnected, pushPurchaseToBackend, RPC_URL } from "./ton.js";
 import { cfgReady, setBtnLoading } from "./utils.js";
 import { ui, state } from "./state.js";
 import { toast, recalc, refreshButtons, updateRefBonus } from "./ui.js";
@@ -42,7 +42,8 @@ export async function getUserUsdtBalance() {
     const walletAddress = getWalletAddress();
     if (!window.TonWeb || !walletAddress || !cfgReady()) return null;
     const TonWeb = window.TonWeb;
-    const provider = new TonWeb.HttpProvider(CONFIG.TON_RPC || "https://toncenter.com/api/v2/jsonRPC");
+    // ⛳ лише через наш бекенд-проксі
+    const provider = new TonWeb.HttpProvider(RPC_URL);
     const tonweb = new TonWeb(provider);
 
     const userAddr   = new TonWeb.utils.Address(walletAddress);
@@ -72,7 +73,8 @@ export async function showDebugJettonInfo() {
   if (!walletAddress) return;
 
   const TonWeb = window.TonWeb;
-  const provider = new TonWeb.HttpProvider(CONFIG.TON_RPC || "https://toncenter.com/api/v2/jsonRPC");
+  // ⛳ лише через наш бекенд-проксі
+  const provider = new TonWeb.HttpProvider(RPC_URL);
   const tonweb = new TonWeb(provider);
 
   const userAddr     = new TonWeb.utils.Address(walletAddress);
