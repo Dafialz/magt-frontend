@@ -8,9 +8,14 @@ import { getWalletAddress } from "./tonconnect.js";
  * Helpers
  * ============================================ */
 
-export const RPC_URL =
+// ⛳ Анти-401: якщо в конфігу/кеші лишився прямий toncenter — примусово використовуємо наш бекенд-проксі /api/rpc.
+const _rpcFromConfig =
   (CONFIG.TON_RPC && String(CONFIG.TON_RPC).trim()) ||
   "https://toncenter.com/api/v2/jsonRPC";
+
+export const RPC_URL = /toncenter\.com/i.test(_rpcFromConfig)
+  ? (CONFIG.ENDPOINTS?.rpc || "https://api.magtcoin.com/api/rpc")
+  : _rpcFromConfig;
 
 // проста перевірка TON-адреси (EQ/UQ, base64url)
 function isTonAddress(addr) {
