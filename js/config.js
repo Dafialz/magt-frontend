@@ -25,10 +25,10 @@ export const CONFIG = {
   /* ===== Ціноутворення / капа ===== */
   PRICE_USD: 0.00383,
 
-  // НОВЕ: параметри прогресу збору
-  RAISED_OFFSET_USD: 5_900_000,
-  GOAL_USD: 25_900_000,
-  HARD_CAP: 25_900_000, // синхронізовано з GOAL_USD
+  // Параметри прогресу збору
+  RAISED_OFFSET_USD: 0,
+  GOAL_USD: 20_000_000,
+  HARD_CAP: 20_000_000, // синхронізовано з GOAL_USD
 
   /* ===== TON RPC / мережа ===== */
   TON_RPC: join(API_BASE_ABS, "/api/rpc"),
@@ -60,14 +60,13 @@ export const CONFIG = {
   REF_DEBUG_DEMO: false,
 
   /* ===== Дані пресейлу / таймер ===== */
-  // зменшено до 500 млн
-  TOTAL_SUPPLY: 500_000_000,
+  TOTAL_SUPPLY: 500_000_000, // зменшено до 500 млн
   ROUND_DEADLINE_TS: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
 
-  // кожен рівень у 3 рази менший від початкового; перший підкориговано +179 944,
+  // кожен рівень у 3 рази менший від початкового; перший підкориговано,
   // щоб сума всіх рівнів дорівнювала рівно 500,000,000
   LEVELS: [
-    { tokens: 65_225_022, price: 0.003830 }, // 65,045,078 + 179,944
+    { tokens: 65_225_022, price: 0.003830 },
     { tokens: 57_039_669, price: 0.004481 },
     { tokens: 50_370_908, price: 0.005243 },
     { tokens: 44_326_399, price: 0.006134 },
@@ -96,7 +95,8 @@ export const CONFIG = {
   CLAIM_POLL_INTERVAL_MS: 30000,
 
   /* ===== API ===== */
-  API_BASE: API_BASE_RUNTIME, // в проді порожньо — використовуємо абсолютні ендпоінти
+  // в проді порожньо — використовуємо абсолютні ендпоінти нижче
+  API_BASE: API_BASE_RUNTIME,
   ENDPOINTS: {
     stats:    join(API_BASE_ABS, "/api/presale/stats"),
     feed:     join(API_BASE_ABS, "/api/presale/feed"),
@@ -112,7 +112,7 @@ export const CONFIG = {
 };
 
 /* ===== Runtime-чек (для дебагу) ===== */
-if (CONFIG.MIN_BUY_USDT < 1) console.warn("⚠️ MIN_BUЙ_USDT занадто малий, перевір значення в config.js");
+if (CONFIG.MIN_BUY_USDT < 1) console.warn("⚠️ MIN_BUY_USDT занадто малий, перевір значення в config.js");
 if (!CONFIG.USDT_MASTER || !CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає ключових TON-адрес у config.js");
 if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BONUS_PCT виглядає підозріло. Рекомендується 0..50%");
 
