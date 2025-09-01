@@ -23,11 +23,16 @@ function isTonAddress(addr) {
 // friendly нормалізація у base64url (EQ/UQ); fallback — повертаємо оригінал
 function toBase64Url(addr) {
   try {
-    if (!window.TonWeb?.utils?.Address) return addr;
-    const A = new window.TonWeb.utils.Address(addr);
-    return A.toString(true, true, true); // bounceable, urlSafe, testOnly(auto)
+    const A = window.TonWeb?.utils?.Address;
+    if (!A) return typeof addr === "string" ? addr : String(addr);
+    // якщо вже Address — не створюємо заново
+    const inst =
+      addr && typeof addr === "object" && typeof addr.toString === "function"
+        ? addr
+        : new A(addr);
+    return inst.toString(true, true, true); // bounceable, urlSafe, testOnly(auto)
   } catch {
-    return addr;
+    return typeof addr === "string" ? addr : String(addr);
   }
 }
 
@@ -145,7 +150,9 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const userJettonWallet = new JettonWallet(tonweb.provider, { address: userJettonWalletAddr });
 
   const dec = Number(CONFIG.JETTON_DECIMALS ?? 6);
-  const jetAmount = decimalToUnitsBigInt(numAmount, dec);
+  // BigInt → BN для TonWeb
+  const jetAmountBig = decimalToUnitsBigInt(numAmount, dec);
+  const amountBN = new TonWeb.utils.BN(jetAmountBig.toString());
 
   // --- sanitize ref ---
   let cleanRef = null;
@@ -169,12 +176,12 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   cell.bits.writeString(note); // гарантовано ≤ ліміту
 
   // ⚠️ ВАЖЛИВО: у toNano завжди передаємо РЯДОК (щоб уникнути міксу Number/BigInt)
-  const forwardTon = TonWeb.utils.toNano(String(CONFIG.FORWARD_TON ?? "0"));       // для контракту пресейлу
+  const forwardTon = TonWeb.utils.toNano(String(CONFIG.FORWARD_TON ?? "0"));        // для контракту пресейлу
   const openTon    = TonWeb.utils.toNano(String(CONFIG.JETTON_WALLET_TON ?? "0.15")); // на виконання tx
 
   const body = await userJettonWallet.createTransferBody({
-    queryId: BigInt(ts),
-    amount: jetAmount,
+    queryId: new TonWeb.utils.BN(ts), // число → BN
+    amount: amountBN,                  // BN.js
     toAddress: presaleJettonWalletAddr,
     responseAddress: userAddr,
     forwardAmount: forwardTon,
