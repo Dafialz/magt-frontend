@@ -31,7 +31,9 @@ export const CONFIG = {
   HARD_CAP: 20_000_000,
 
   /* ===== TON RPC / мережа ===== */
-  TON_RPC: join(API_BASE_ABS, "/api/rpc"),
+  // Прямий Toncenter JSON-RPC з ключем (щоб TonWeb не впирався у 422/HTML від проксі)
+  TON_RPC: "https://toncenter.com/api/v2/jsonRPC?api_key=a593464fcf4bd07fbee166734a28434a0604fc0422fab4af9a2a347c99e387b5",
+  // Резервний провайдер (використовується вручну як fallback за потреби)
   TON_RPC_FALLBACK: "https://tonhubapi.com/jsonRPC",
 
   /* ===== USDT (Jetton) mainnet ===== */
