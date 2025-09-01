@@ -107,6 +107,7 @@ export async function showDebugJettonInfo() {
   const presaleOwner = new TonWeb.utils.Address(CONFIG.PRESALE_OWNER_ADDRESS);
 
   const JettonMinter  = TonWeb.token.jetton.JettonMinter;
+  const JettonWallet  = TonWeb.token.jetton.JettonWallet;
   const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
 
   const userJettonWalletAddr    = await minter.getJettonWalletAddress(userAddr);
@@ -230,7 +231,7 @@ export async function onBuyClick() {
 
     window.__referrer = ref || null;
 
-    // ✅ формуємо саме jetton transfer
+    // ✅ формуємо саме jetton transfer (жодних warm-up TON-переказів)
     let tx;
     try {
       tx = await buildUsdtTxUsingConnected(usd, ref);
