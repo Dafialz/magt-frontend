@@ -188,6 +188,18 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
 
   const payloadB64 = u8ToBase64(await body.toBoc(false));
 
+  // можливий stateInit для першого виклику (якщо JettonWallet ще не розгорнутий)
+  let stateInitB64 = null;
+  try {
+    if (typeof userJettonWallet.createStateInit === "function") {
+      const si = await userJettonWallet.createStateInit();
+      stateInitB64 = u8ToBase64(await si.toBoc(false));
+    }
+  } catch (e) {
+    // необов'язково; якщо метод недоступний у версії TonWeb — пропускаємо
+    console.warn("[MAGT TX] stateInit build skipped:", e?.message || e);
+  }
+
   // debug
   try {
     console.log("[MAGT TX] userJettonWallet:", userJettonWalletAddr.toString(true, true, false));
@@ -199,16 +211,17 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     console.warn("[MAGT TX] debug print failed:", e);
   }
 
-  // формуємо TonConnect tx
+  // формуємо TonConnect tx (з stateInit, якщо вдалося побудувати)
+  const msg = {
+    address: userJettonWalletAddr.toString(true, true, false), // саме JettonWallet користувача
+    amount: openTon.toString(),
+    payload: payloadB64,
+  };
+  if (stateInitB64) msg.stateInit = stateInitB64;
+
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
-    messages: [
-      {
-        address: userJettonWalletAddr.toString(true, true, false), // саме JettonWallet користувача
-        amount: openTon.toString(),
-        payload: payloadB64,
-      },
-    ],
+    messages: [msg],
   };
 }
 
@@ -343,7 +356,7 @@ export async function getReferralLeaders(limit = 10) {
         if (Array.isArray(payload)) return payload.slice(0, lim);
       }
     } catch (e) {
-      console.warn("leaders API fail:", e);
+        console.warn("leaders API fail:", e);
     }
   }
   const obj = demoLeadersObj();
