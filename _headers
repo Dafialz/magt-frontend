@@ -4,16 +4,4 @@
   Referrer-Policy: no-referrer
   Cache-Control: no-store
   Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
-
-  Content-Security-Policy: \
-    default-src 'self'; \
-    base-uri 'self'; \
-    frame-ancestors 'none'; \
-    form-action 'self'; \
-    script-src 'self' https://unpkg.com https://cdn.jsdelivr.net 'unsafe-inline'; \
-    style-src 'self' 'unsafe-inline'; \
-    img-src 'self' data: https:; \
-    font-src 'self' data: https:; \
-    connect-src 'self' https://api.magtcoin.com https://magt-api.onrender.com https://toncenter.com https://bridge.tonapi.io https://tonconnectbridge.mytonwallet.org https://unpkg.com https://cdn.jsdelivr.net https://raw.githubusercontent.com; \
-    object-src 'none'; \
-    worker-src 'none'
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://unpkg.com https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https://api.magtcoin.com https://magt-api.onrender.com https://toncenter.com https://bridge.tonapi.io https://tonconnectbridge.mytonwallet.org https://walletbot.me https://connect.tonhubapi.com https://cdn.jsdelivr.net https://unpkg.com https://raw.githubusercontent.com; object-src 'none'; worker-src 'none'
