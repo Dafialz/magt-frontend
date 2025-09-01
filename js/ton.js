@@ -126,7 +126,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const numAmount = Number(usdAmount);
   if (!Number.isFinite(numAmount) || numAmount <= 0) throw new Error("Некоректна сума");
   if (CONFIG.MIN_BUY_USDT && numAmount < CONFIG.MIN_BUY_USDT)
-    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUY_USDT} USDT`);
+    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUЙ_USDT} USDT`);
 
   const provider = new TonWeb.HttpProvider(RPC_URL);
   const tonweb = new TonWeb(provider);
@@ -176,7 +176,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   cell.bits.writeString(note); // гарантовано ≤ ліміту
 
   // ⚠️ ВАЖЛИВО: у toNano завжди передаємо РЯДОК (щоб уникнути міксу Number/BigInt)
-  const forwardTon = TonWeb.utils.toNano(String(CONFIG.FORWARD_TON ?? "0"));        // для контракту пресейлу
+  const forwardTon = TonWeb.utils.toNano(String(CONFIG.FORWARD_TON ?? "0"));          // для контракту пресейлу
   const openTon    = TonWeb.utils.toNano(String(CONFIG.JETTON_WALLET_TON ?? "0.15")); // на виконання tx
 
   const body = await userJettonWallet.createTransferBody({
@@ -189,6 +189,19 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   });
 
   const payloadB64 = u8ToBase64(await body.toBoc(false));
+
+  // === DEBUG LOGS (як у твоєму чек-листі) ===
+  const jetAmount = jetAmountBig; // щоб лог співпав з назвою "jetAmount"
+  try {
+    console.log("[MAGT TX] userJettonWallet:", userJettonWalletAddr.toString(true, true, false));
+    console.log("[MAGT TX] presaleJettonWallet:", presaleJettonWalletAddr.toString(true, true, false));
+    console.log("[MAGT TX] jetAmount (USDT units):", jetAmount.toString());
+    console.log("[MAGT TX] openTon:", openTon.toString(), "forwardTon:", forwardTon.toString());
+    console.log("[MAGT TX] note:", note);
+  } catch (e) {
+    console.warn("[MAGT TX] debug print failed:", e);
+  }
+
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
