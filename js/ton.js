@@ -109,6 +109,7 @@ function buildSafeComment({ buyerB64, refB64, ts, nonce }) {
 /**
  * Побудова Jetton transfer для USDT.
  * Якщо ownerUserAddr не передано — бере адресу з TonConnect (getWalletAddress()).
+ * ✔ Додає префлайт-перевірку балансу USDT та stateInit (за можливості).
  */
 export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   if (!window.TonWeb) throw new Error("TonWeb не завантажено");
@@ -148,6 +149,19 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const jetAmountBig = decimalToUnitsBigInt(numAmount, dec);
   const amountBN = new TonWeb.utils.BN(jetAmountBig.toString());
 
+  // === ПРЕФЛАЙТ: спробуємо прочитати баланс USDT у джеттон-гаманці
+  try {
+    const data = await userJettonWallet.getData(); // якщо гаманець ще не ініт, метод може кинути помилку
+    const balUnits = BigInt(String(data?.balance ?? "0"));
+    if (balUnits < jetAmountBig) {
+      const human = Number(balUnits) / 10 ** dec;
+      throw new Error(`Недостатньо USDT: на балансі ${human.toFixed(6)} USDT, потрібно ${numAmount}.`);
+    }
+  } catch (e) {
+    // якщо getData() недоступний/гаманець не ініт — не блокуємо, бо stateInit нижче розгорне його
+    if (String(e?.message || e).toLowerCase().startsWith("недостатньо usdt")) throw e;
+  }
+
   // реферал (санітизація + self-ban)
   let cleanRef = null;
   if (typeof refAddr === "string" && isTonAddress(refAddr)) cleanRef = refAddr.trim();
@@ -181,7 +195,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     forwardPayload: cell,
   });
 
-  // спробуємо підкласти stateInit, якщо гаманець джеттона ще не розгорнутий
+  // спробуємо підкласти stateInit, якщо джеттон-гаманець ще не розгорнутий
   let stateInitB64 = null;
   try {
     if (typeof userJettonWallet.createStateInit === "function") {
@@ -203,8 +217,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     console.warn("[MAGT TX] debug print failed:", e);
   }
 
-  // ✅ КЛЮЧОВЕ: адреса у TonConnect-повідомленні — NON-BOUNCEABLE (UQ…),
-  // інакше деякі гаманці показують це як звичайний TON-переказ.
+  // ✅ адреса у TonConnect-повідомленні — NON-BOUNCEABLE (UQ…), payload+stateInit додаємо
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
