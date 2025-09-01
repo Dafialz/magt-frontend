@@ -37,6 +37,12 @@ export const CONFIG = {
   TON_RPC_FALLBACK: "https://tonhubapi.com/jsonRPC",
 
   /* ===== USDT (Jetton) mainnet ===== */
+  // Декілька можливих майстрів USDT, щоб підхоплювати баланс незалежно від походження токена
+  USDT_MASTERS: [
+    "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx", // класичний USDT майстер
+    "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs", // твій майстер з tonviewer (де лежать $10.94)
+  ],
+  // Для зворотної сумісності: перший з масиву
   USDT_MASTER: "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
   USDT_JETTON: "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
 
@@ -114,7 +120,10 @@ export const CONFIG = {
 
 /* ===== Runtime-чек (для дебагу) ===== */
 if (CONFIG.MIN_BUY_USDT < 1) console.warn("⚠️ MIN_BUY_USDT занадто малий, перевір значення в config.js");
-if (!CONFIG.USDT_MASTER || !CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає ключових TON-адрес у config.js");
+if ((!CONFIG.USDT_MASTERS || CONFIG.USDT_MASTERS.length === 0) && !CONFIG.USDT_MASTER) {
+  console.error("❌ Немає адрес майстрів USDT у config.js");
+}
+if (!CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає PRESALE_OWNER_ADDRESS у config.js");
 if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BONUS_PCT виглядає підозріло. Рекомендується 0..50%");
 
 if (IS_BROWSER) {
@@ -122,6 +131,7 @@ if (IS_BROWSER) {
     "[MAGT CONFIG] API_BASE:", CONFIG.API_BASE || "(empty, use absolute endpoints)",
     "API_BASE_ABS:", CONFIG.__DEBUG.API_BASE_ABS,
     "override:", CONFIG.__DEBUG.OVERRIDE || "(none)",
-    "is_local:", CONFIG.__DEBUG.IS_LOCAL
+    "is_local:", CONFIG.__DEBUG.IS_LOCAL,
+    "usdt_masters:", (CONFIG.USDT_MASTERS || []).length
   );
 }
