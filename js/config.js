@@ -31,8 +31,8 @@ export const CONFIG = {
   HARD_CAP: 20_000_000,
 
   /* ===== TON RPC / мережа ===== */
-  // Прямий Toncenter JSON-RPC з ключем (щоб TonWeb не впирався у 422/HTML від проксі)
-  TON_RPC: "https://toncenter.com/api/v2/jsonRPC?api_key=a593464fcf4bd07fbee166734a28434a0604fc0422fab4af9a2a347c99e387b5",
+  // ВСІ запити лише через наш бекенд-проксі
+  TON_RPC: join(API_BASE_ABS, "/api/rpc"),
   // Резервний провайдер (використовується вручну як fallback за потреби)
   TON_RPC_FALLBACK: "https://tonhubapi.com/jsonRPC",
 
@@ -45,8 +45,9 @@ export const CONFIG = {
 
   JETTON_DECIMALS: 6,
   USDT_DECIMALS:   6,
-  JETTON_WALLET_TON: 0.15,
-  FORWARD_TON: 0.02,
+  // оптимальні TON для виконання tx
+  JETTON_WALLET_TON: 0.25,
+  FORWARD_TON: 0.05,
 
   /* ===== Обмеження / рефералка ===== */
   MIN_BUY_USDT: 1,
@@ -113,7 +114,7 @@ export const CONFIG = {
 /* ===== Runtime-чек (для дебагу) ===== */
 if (CONFIG.MIN_BUY_USDT < 1) console.warn("⚠️ MIN_BUY_USDT занадто малий, перевір значення в config.js");
 if (!CONFIG.USDT_MASTER || !CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає ключових TON-адрес у config.js");
-if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BONUS_PCT виглядає підозріло. Рекомендується 0..50%");
+if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BОНУС_PCT виглядає підозріло. Рекомендується 0..50%");
 
 if (IS_BROWSER) {
   console.log(
