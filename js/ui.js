@@ -1,7 +1,7 @@
 // /js/ui.js
 import { CONFIG } from "./config.js";
 import { ui, state } from "./state.js";
-import { fmt, clamp, setBtnLoading } from "./utils.js";
+import { fmt as utilFmt, clamp, setBtnLoading } from "./utils.js";
 import { getPresaleStats } from "./ton.js";
 
 /* ===== БАЗА ДЛЯ API =====
@@ -14,6 +14,16 @@ const API_BASE =
   (IS_LOCAL ? "http://127.0.0.1:8787" : "");
 
 /* ===================== helpers ===================== */
+
+// універсальні форматери — не покладаємось на сигнатуру utils.fmt
+const nf0 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+const nf2 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+
+const fmt = {
+  tokens(n) { return nf0.format(Number(n) || 0); },
+  usd(n, fd = 2) { return (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: fd }); },
+};
+
 export function toast(msg) {
   if (!ui.status) return;
   ui.status.textContent = msg;
@@ -193,15 +203,34 @@ function updatePriceUnder(){
   const pn = document.getElementById('price-now');
   const ln = document.getElementById('level-now');
   if (pn) pn.textContent = (CONFIG.PRICE_USD || 0).toFixed(6);
-  if (ln) ln.textContent = ui.level?.textContent || "—";
+  if (ln) ln.textContent = ui.level?.textContent || "1";
 }
 
 /* ===================== core calc ===================== */
+/** безпечне обчислення кількості MAGT з округленням вниз */
+function calcTokensFromUsd(usdRaw, priceRaw) {
+  const usd = Number(usdRaw);
+  const price = Number(priceRaw);
+  if (!(usd > 0) || !(price > 0)) return 0;
+  // лише цілі MAGT
+  return Math.floor(usd / price);
+}
+
+/** відмальовка блоку “Отримаєш … MAGT” */
+function renderTokensOut(tokens) {
+  if (!ui.magOut) return;
+  ui.magOut.textContent = fmt.tokens(tokens);
+}
+
+/** головний перерахунок */
 export function recalc() {
   const usd = sanitizeUsdInput();
   const price = Number(CONFIG.PRICE_USD || 0.00383);
-  const tokens = (usd > 0 && price > 0) ? Math.floor((usd / price)) : 0;
-  if (ui.magOut) ui.magOut.textContent = fmt(tokens, 0);
+
+  const tokens = calcTokensFromUsd(usd, price);
+  renderTokensOut(tokens);
+
+  // реф-бонус залежить від кількості токенів (через usd/price)
   updateRefBonus();
   updatePriceUnder();
   refreshButtons();
@@ -224,15 +253,15 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   const saleRaised = el("sale-raised");
   const saleBar    = el("sale-bar");
   const salePercent= el("sale-percent");
-  if (saleRaised) saleRaised.textContent = `$${(raised).toLocaleString(undefined,{maximumFractionDigits:0})}`;
+  if (saleRaised) saleRaised.textContent = `$${fmt.usd(raised, 0)}`;
   if (saleBar)    saleBar.style.width = `${pct.toFixed(2)}%`;
   if (salePercent) salePercent.textContent = `${pct.toFixed(2)}% продано`;
 
   // залишок MAGT (і в картці, і у віджеті)
   const remaining = Math.max(0, Number(totalMag || 0) - Number(soldMag || 0));
-  if (ui.left) ui.left.textContent = `${fmt(remaining, 0)} MAGT`;
+  if (ui.left) ui.left.textContent = `${fmt.tokens(remaining)} MAGT`;
   const saleRemaining = el("sale-remaining");
-  if (saleRemaining) saleRemaining.textContent = fmt(remaining, 0);
+  if (saleRemaining) saleRemaining.textContent = fmt.tokens(remaining);
 
   // резервні поля старої верстки
   if (ui.raised) ui.raised.textContent = `$${(raised).toLocaleString()}`;
@@ -346,6 +375,7 @@ export function updateRefBonus() {
     return;
   }
 
+  // один раз — підмінити шаблон на статичний, щоб уникнути «залипань»
   if (!ui.refPayout.__magTplFixed) {
     try {
       const amtId = ui.refBonusUsd?.id || "ref-bonus-usd";
@@ -362,10 +392,10 @@ export function updateRefBonus() {
   const price = Number(CONFIG.PRICE_USD || 0.00383);
   if (!(price > 0)) return;
 
-  const tokens = Math.floor((usd / price));
+  const tokens = calcTokensFromUsd(usd, price);
   const bonusTokens = Math.floor(tokens * (pct / 100));
 
-  if (ui.refBonusUsd) ui.refBonusUsd.textContent = fmt(bonusTokens, 0);
+  if (ui.refBonusUsd) ui.refBonusUsd.textContent = fmt.tokens(bonusTokens);
   if (ui.refBonusTo)  ui.refBonusTo.textContent  = state.referrerShort || short(state.referrer);
   ui.refPayout.classList.remove("hidden");
 }
