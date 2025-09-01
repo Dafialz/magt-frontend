@@ -17,7 +17,7 @@ export const RPC_URL = /toncenter\.com/i.test(_rpcFromConfig)
 /* ============================================
  * Кандидати майстрів USDT
  * - якщо є CONFIG.USDT_MASTERS (масив) — беремо його
- * - інакшеfallback на CONFIG.USDT_MASTER (один)
+ * - інакше fallback на CONFIG.USDT_MASTER (один)
  * ============================================ */
 const USDT_MASTERS = Array.from(
   new Set(
@@ -301,12 +301,12 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   } catch {}
 
   // повідомлення TonConnect → на джеттон-гаманець користувача
-  // Використовую non-bounceable (UQ…), щоб клієнти чіткіше розуміли це як jetton transfer.
+  // ТУТ ЗМІНЕНО: використовуємо bounceable (EQ…)
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
       {
-        address: userJettonWalletAddr.toString(false, true, false), // UQ…, non-bounceable
+        address: userJettonWalletAddr.toString(true, true, true), // EQ…, bounceable
         amount: openTon.toString(),
         payload: payloadB64,
         ...(stateInitB64 ? { stateInit: stateInitB64 } : {}),
@@ -370,7 +370,7 @@ export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts
 }
 
 /* ============================================
- * Віджети: дані (API або DEMO)
+ * Віджити: дані (API або DEMO)
  * ============================================ */
 function demoFeed() {
   try { return JSON.parse(localStorage.getItem("demo.feed") || "[]"); }
