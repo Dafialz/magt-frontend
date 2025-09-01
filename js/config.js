@@ -45,7 +45,8 @@ export const CONFIG = {
 
   JETTON_DECIMALS: 6,
   USDT_DECIMALS:   6,
-  // оптимальні TON для виконання tx
+
+  // Оптимальні TON для виконання init/transfer
   JETTON_WALLET_TON: 0.25,
   FORWARD_TON: 0.05,
 
@@ -114,7 +115,7 @@ export const CONFIG = {
 /* ===== Runtime-чек (для дебагу) ===== */
 if (CONFIG.MIN_BUY_USDT < 1) console.warn("⚠️ MIN_BUY_USDT занадто малий, перевір значення в config.js");
 if (!CONFIG.USDT_MASTER || !CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає ключових TON-адрес у config.js");
-if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BОНУС_PCT виглядає підозріло. Рекомендується 0..50%");
+if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BONUS_PCT виглядає підозріло. Рекомендується 0..50%");
 
 if (IS_BROWSER) {
   console.log(
