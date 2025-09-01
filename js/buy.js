@@ -74,11 +74,12 @@ export async function getUserUsdtBalance() {
       json?.stack ||
       null;
 
-    if (!Array.isArray(stack) || stack.length === 0) throw new Error("Bad stack");
+    if (!Array.isArray(stack) || stack.length === 0) return null;
 
-    // balance очікується у першому елементі як uint256 у hex
-    const hexRaw =
-      (stack[0] && (stack[0][1] ?? stack[0].value ?? stack[0].number)) ?? "";
+    // balance може бути як hex/uint256, так і числом
+    const raw0 = stack[0];
+    let hexRaw = (raw0 && (raw0[1] ?? raw0.value ?? raw0.number)) ?? "";
+    if (typeof hexRaw === "number") hexRaw = "0x" + hexRaw.toString(16);
     const hex = String(hexRaw).startsWith("0x") ? String(hexRaw) : "0x" + String(hexRaw);
     const balanceUnits = BigInt(hex);
     const dec = Number(CONFIG.JETTON_DECIMALS ?? 6);
@@ -206,7 +207,7 @@ async function buildWarmupTxToUserJettonWallet() {
   };
 }
 
-/* ===== очікування підтвердження списання USDT ===== */
+/* ===== утиліти очікування/конвертації ===== */
 function toUnits(usd, dec = Number(CONFIG.USDT_DECIMALS ?? 6)) {
   const s = String(usd).replace(",", ".");
   const n = Math.round(Number(s) * 10 ** dec);
@@ -220,6 +221,9 @@ async function pollUntil(fn, { timeoutMs = 60000, everyMs = 2000 } = {}) {
     if (Date.now() - t0 > timeoutMs) return false;
     await new Promise(r => setTimeout(r, everyMs));
   }
+}
+async function waitUsdtWalletReady({ timeoutMs = 20000, everyMs = 1500 } = {}) {
+  return pollUntil(async () => (await getUserUsdtBalance()) !== null, { timeoutMs, everyMs });
 }
 
 /* ===== основний клік BUY ===== */
@@ -272,27 +276,31 @@ export async function onBuyClick() {
 
     // === PRE-FLIGHT: чи готовий USDT JettonWallet
     let usdtBalBefore = await getUserUsdtBalance(); // null => не ініціалізований/не читається
+
+    // Одноразовий warm-up (0.25 TON) + очікування готовності, без потреби тиснути ще раз
     if (usdtBalBefore === null) {
-      // виконуємо теплий переказ для ініціалізації
-      toast("Спершу активуємо USDT-гаманець (одноразово 0.25 TON)…");
+      toast("Активуємо USDT-гаманець (одноразово 0.25 TON)…");
       const warmupTx = await buildWarmupTxToUserJettonWallet();
       await tonConnectUI.sendTransaction(warmupTx);
-      toast("USDT-гаманець активовано. Повтори покупку.");
-      // прибираємо лоадер і просимо повторити дію — зараз JettonTransfer не відправляємо
-      setBtnLoading(ui.btnBuy, false);
-      refreshButtons();
-      _buyInFlight = false;
-      return;
+      toast("Чекаємо підтвердження ініціалізації…");
+      const ready = await waitUsdtWalletReady({ timeoutMs: 20000, everyMs: 1500 });
+      if (!ready) {
+        setBtnLoading(ui.btnBuy, false);
+        refreshButtons();
+        _buyInFlight = false;
+        return toast("USDT-гаманець активовано, але мережа ще не підтвердила. Спробуй ще раз за хвилинку.");
+      }
+      // після warm-up перевіряємо баланс знов
+      usdtBalBefore = (await getUserUsdtBalance()) ?? 0;
     }
 
     window.__referrer = ref || null;
 
-    // ✅ новий зручний виклик: адресу беремо з TonConnect автоматично
+    // ✅ будуємо Jetton transfer
     let tx;
     try {
       tx = await buildUsdtTxUsingConnected(usd, ref);
     } catch {
-      // фолбек на старий підпис (на випадок кешованого ton.js)
       tx = await buildUsdtTransferTx(walletAddress, usd, ref);
     }
 
@@ -308,14 +316,12 @@ export async function onBuyClick() {
       if (now === null) return false; // ще не читається
       const beforeUnits = toUnits(usdtBalBefore);
       const nowUnits = toUnits(now);
-      // очікуємо, що баланс зменшився щонайменше на очікувану кількість юнітів
       return beforeUnits - nowUnits >= expectedUnits;
     }, { timeoutMs: 60000, everyMs: 2000 });
 
     if (!ok) {
       toast("Не бачу списання USDT поки що. Якщо кошти спишуться пізніше — токени нарахуються автоматично.");
-      // без оновлення бейджа/бекенду
-      return;
+      return; // не оновлюємо бейдж/бекенд поки не впевнилися
     }
 
     // ===== СПИСАННЯ ПІДТВЕРДЖЕНО — оновлюємо локальний бейдж і пушимо бекенд =====
