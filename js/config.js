@@ -33,8 +33,8 @@ export const CONFIG = {
   /* ===== TON RPC / мережа ===== */
   // ВСІ запити лише через наш бекенд-проксі
   TON_RPC: join(API_BASE_ABS, "/api/rpc"),
-  // Резервний провайдер (використовується вручну як fallback за потреби)
-  TON_RPC_FALLBACK: "https://tonhubapi.com/jsonRPC",
+  // ⚠️ Вимкнено зовнішній фолбек, щоб не ламати CSP (раніше: https://tonhubapi.com/jsonRPC)
+  TON_RPC_FALLBACK: "",
 
   /* ===== USDT (Jetton) mainnet ===== */
   // Декілька можливих майстрів USDT, щоб підхоплювати баланс незалежно від походження токена
@@ -124,7 +124,7 @@ if ((!CONFIG.USDT_MASTERS || CONFIG.USDT_MASTERS.length === 0) && !CONFIG.USDT_M
   console.error("❌ Немає адрес майстрів USDT у config.js");
 }
 if (!CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає PRESALE_OWNER_ADDRESS у config.js");
-if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BONUS_PCT виглядає підозріло. Рекомендується 0..50%");
+if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BОНУС_PCT виглядає підозріло. Рекомендується 0..50%");
 
 if (IS_BROWSER) {
   console.log(
