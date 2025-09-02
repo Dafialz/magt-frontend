@@ -14,8 +14,8 @@
       <div class="hidden lg:block"></div>
     </div>
 
-    <!-- 3 рівні колонки на desktop -->
-    <div class="mt-8 grid lg:grid-cols-3 gap-6 items-start" id="buy">
+    <!-- 2 колонки на desktop: справа блок купівлі займає 2 рядки -->
+    <div class="mt-8 grid lg:grid-cols-2 gap-6 items-start" id="buy">
       <!-- Параметри -->
       <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" aria-labelledby="presale-params">
         <h2 id="presale-params" class="text-lg font-semibold" data-i18n="hero.params">Параметри пресейлу</h2>
@@ -54,8 +54,8 @@
         </div>
       </section>
 
-      <!-- Купівля -->
-      <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" aria-labelledby="buy-title">
+      <!-- Купівля: займає праву колонку і два рядки -->
+      <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft lg:row-span-2 lg:col-start-2" aria-labelledby="buy-title">
         <h2 id="buy-title" class="text-lg font-semibold" data-i18n="hero.buytitle">Купити MAGT за USDT</h2>
 
         <!-- Реферальна програма -->
@@ -174,8 +174,8 @@
         <div id="status" class="mt-4 text-sm text-neutral-300" role="status" aria-live="polite"></div>
       </section>
 
-      <!-- Мої баланси (MAGT) -->
-      <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" aria-labelledby="balances-title">
+      <!-- Мої баланси (MAGT) — під параметрами зліва -->
+      <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft lg:col-start-1" aria-labelledby="balances-title">
         <h2 id="balances-title" class="text-lg font-semibold">Мої баланси</h2>
 
         <div class="mt-4 grid sm:grid-cols-2 gap-4">
