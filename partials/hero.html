@@ -172,35 +172,34 @@
 
         <div id="status" class="mt-4 text-sm text-neutral-300" role="status" aria-live="polite"></div>
       </section>
+
+      <!-- Мої баланси (MAGT) — зʼявляється під блоком Параметри пресейлу (зліва) -->
+      <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" aria-labelledby="balances-title">
+        <h2 id="balances-title" class="text-lg font-semibold">Мої баланси</h2>
+
+        <div class="mt-4 grid sm:grid-cols-2 gap-4">
+          <!-- Куплено мною -->
+          <div class="rounded-2xl border border-white/10 p-4">
+            <div class="text-sm text-neutral-400">Куплено мною</div>
+            <div class="mt-1 text-xl font-semibold tabular-nums">
+              <span id="my-bought-magt">0</span> <span class="text-sm text-neutral-400">MAGT</span>
+            </div>
+          </div>
+
+          <!-- Принесли реферали -->
+          <div class="rounded-2xl border border-white/10 p-4">
+            <div class="text-sm text-neutral-400">Принесли реферали</div>
+            <div class="mt-1 text-xl font-semibold tabular-nums">
+              <span id="my-ref-magt">0</span> <span class="text-sm text-neutral-400">MAGT</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-2 text-xs text-neutral-400">
+          Оновлено: <span id="my-stats-upd">—</span>
+        </div>
+      </section>
+      <!-- /Мої баланси -->
     </div>
-  </div>
-</section>
-
-<!-- Мої баланси (під "Параметри пресейлу") -->
-<section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" aria-labelledby="balances-title">
-  <h2 id="balances-title" class="text-lg font-semibold">Мої баланси</h2>
-
-  <div class="mt-4 grid sm:grid-cols-2 gap-4">
-    <!-- Куплено мною -->
-    <div class="rounded-2xl border border-white/10 p-4">
-      <div class="text-sm text-neutral-400">баланс покупки</div>
-      <div class="mt-1 text-xl font-semibold tabular-nums">
-        $<span id="my-bought-usd">0</span>
-        <span class="ml-2 text-sm text-neutral-400">(<span id="my-bought-magt">0</span> MAGT)</span>
-      </div>
-    </div>
-
-    <!-- Принесли реферали -->
-    <div class="rounded-2xl border border-white/10 p-4">
-      <div class="text-sm text-neutral-400">баланс реф-системи</div>
-      <div class="mt-1 text-xl font-semibold tabular-nums">
-        $<span id="my-ref-usd">0</span>
-        <span class="ml-2 text-sm text-neutral-400">(<span id="my-ref-magt">0</span> MAGT)</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="mt-2 text-xs text-neutral-400">
-    Оновлено: <span id="my-stats-upd">—</span>
   </div>
 </section>
