@@ -21,6 +21,20 @@ function ensureWidgetsInjected() {
   return true;
 }
 
+/* === Перемістити FAQ у самий низ === */
+function moveFaqToBottom() {
+  try {
+    const host = document.getElementById("slot-main");
+    const faq  = document.getElementById("faq");
+    if (host && faq && faq.parentElement !== host) {
+      host.appendChild(faq); // пересунути в кінець контейнера
+    } else if (host && faq) {
+      // якщо вже в slot-main — просто прибрати і додати знову, щоб встало останнім
+      host.appendChild(faq);
+    }
+  } catch {}
+}
+
 /* =========================
  * Утиліти
  * ========================= */
@@ -82,38 +96,6 @@ function tiersTotalSupply() {
   return tiers.reduce((s, t) => s + (Number(t.qty) || 0), 0);
 }
 
-// допоміжне: інфо по поточному рівню
-function getCurrentTierInfo(sold) {
-  const tiers = Array.isArray(CONFIG.SALE_TIERS) ? CONFIG.SALE_TIERS : [];
-  let level = 1;
-  let price = Number(CONFIG.PRICE_USD || 0);
-  let remainingInTier = 0;
-
-  if (!tiers.length) {
-    // без рівнів — залишок і ціна з конфіга/загального пулу
-    return { level, price, remainingInTier: 0 };
-  }
-
-  let cum = 0;
-  for (let i = 0; i < tiers.length; i++) {
-    const qty = Number(tiers[i]?.qty ?? 0);
-    const p   = Number(tiers[i]?.price ?? tiers[i]?.usd ?? tiers[i]?.priceUsd ?? 0);
-    const end = cum + (qty > 0 ? qty : 0);
-    if (sold < end) {
-      level = i + 1;
-      price = p > 0 ? p : price;
-      remainingInTier = Math.max(0, end - sold);
-      return { level, price, remainingInTier };
-    }
-    cum = end;
-  }
-  // усе розкуплено — останній рівень, залишок 0
-  const last = tiers[tiers.length - 1];
-  const pLast = Number(last?.price ?? last?.usd ?? last?.priceUsd ?? 0);
-  if (pLast > 0) price = pLast;
-  return { level: tiers.length, price, remainingInTier: 0 };
-}
-
 let lastPct = 0;
 async function refreshProgress() {
   if (!hasProgressUI()) return;
@@ -137,19 +119,37 @@ async function refreshProgress() {
   const sold = Number.isFinite(Number(soldMag)) ? Number(soldMag) : 0;
   const raised = Number.isFinite(Number(raisedUsd)) ? Number(raisedUsd) : 0;
 
-  // Загальний відсоток прогресу: по всьому пулу
   const pct = total > 0 ? Math.max(0, Math.min(100, (sold / total) * 100)) : 0;
 
-  // ===== ключові зміни: залишок та поточна ціна по активному рівню =====
+  // ==== головне: залишок активного рівня + зберегти поточну ціну ====
   let remaining = Math.max(0, total - sold); // фолбек
   try {
-    const tier = getCurrentTierInfo(sold);
-    if (tier) {
-      remaining = Number(tier.remainingInTier || 0);
-      // зробимо доступною поточну ціну для інших модулів (калькулятор, buy)
-      window.__CURRENT_PRICE_USD = Number(tier.price || CONFIG.PRICE_USD || 0);
+    const tiers = Array.isArray(CONFIG.SALE_TIERS) ? CONFIG.SALE_TIERS : [];
+    if (tiers.length) {
+      let cum = 0, found = false, price = Number(CONFIG.PRICE_USD || 0);
+      for (let i = 0; i < tiers.length; i++) {
+        const qty = Number(tiers[i]?.qty ?? tiers[i]?.tokens ?? 0);
+        const p   = Number(tiers[i]?.price ?? tiers[i]?.usd ?? tiers[i]?.priceUsd ?? 0);
+        const end = cum + (qty > 0 ? qty : 0);
+        if (sold < end) {
+          remaining = Math.max(0, end - sold);
+          if (p > 0) price = p;
+          found = true;
+          try { window.__CURRENT_PRICE_USD = price; } catch {}
+          break;
+        }
+        cum = end;
+      }
+      if (!found && tiers.length) {
+        const last = tiers[tiers.length - 1];
+        const pLast = Number(last?.price ?? last?.usd ?? last?.priceUsd ?? 0);
+        try { window.__CURRENT_PRICE_USD = (pLast > 0 ? pLast : (CONFIG.PRICE_USD || 0)); } catch {}
+        remaining = 0;
+      }
+    } else {
+      try { window.__CURRENT_PRICE_USD = Number(CONFIG.PRICE_USD || 0); } catch {}
     }
-  } catch { /* ignore */ }
+  } catch {}
 
   // локалізована мітка — як у index.html
   ui.pct.textContent = `${fmtNum(pct, 2)}% продано`;
@@ -198,7 +198,6 @@ function initCalc() {
 
   function recalc() {
     const usd = Number($usd.value || 0);
-    // ВАЖЛИВО: використовуємо поточну ціну рівня, якщо вже визначена
     const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
     const tokens = usd > 0 && price > 0 ? usd / price : 0;
     $tok.textContent = `${fmtNum(tokens, 0)} MAGT`;
@@ -415,7 +414,7 @@ window.addEventListener("magt:purchase", async (e) => {
   while (arr.length > 50) arr.pop();
   localStorage.setItem("demo.feed", JSON.stringify(arr));
 
-  // DEMO: реф-лідери
+  // DEMО: реф-лідери
   demoUpdateLeaders(ref || window.__referrer || null, Number(usd) || 0);
 
   await Promise.all([loadFeed(), refreshProgress(), renderLeaders()]);
@@ -451,6 +450,9 @@ function stopIntervals() {
 function init() {
   // гарантуємо, що DOM для віджетів присутній
   if (!ensureWidgetsInjected()) return;
+
+  // ПЕРЕМІСТИТИ FAQ у самий низ після інжекту віджетів
+  moveFaqToBottom();
 
   resolveProgressUi();
   initRoundTimer();
