@@ -14,7 +14,8 @@
       <div class="hidden lg:block"></div>
     </div>
 
-    <div class="mt-8 grid lg:grid-cols-2 gap-6 items-start" id="buy">
+    <!-- 3 рівні колонки на desktop -->
+    <div class="mt-8 grid lg:grid-cols-3 gap-6 items-start" id="buy">
       <!-- Параметри -->
       <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" aria-labelledby="presale-params">
         <h2 id="presale-params" class="text-lg font-semibold" data-i18n="hero.params">Параметри пресейлу</h2>
@@ -173,12 +174,11 @@
         <div id="status" class="mt-4 text-sm text-neutral-300" role="status" aria-live="polite"></div>
       </section>
 
-      <!-- Мої баланси (MAGT) — зʼявляється під блоком Параметри пресейлу (зліва) -->
+      <!-- Мої баланси (MAGT) -->
       <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" aria-labelledby="balances-title">
         <h2 id="balances-title" class="text-lg font-semibold">Мої баланси</h2>
 
         <div class="mt-4 grid sm:grid-cols-2 gap-4">
-          <!-- Куплено мною -->
           <div class="rounded-2xl border border-white/10 p-4">
             <div class="text-sm text-neutral-400">Куплено мною</div>
             <div class="mt-1 text-xl font-semibold tabular-nums">
@@ -186,7 +186,6 @@
             </div>
           </div>
 
-          <!-- Принесли реферали -->
           <div class="rounded-2xl border border-white/10 p-4">
             <div class="text-sm text-neutral-400">Принесли реферали</div>
             <div class="mt-1 text-xl font-semibold tabular-nums">
