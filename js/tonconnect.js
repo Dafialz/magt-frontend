@@ -1,4 +1,4 @@
-// Один-єдиний інстанс офіційної TonConnectUI-кнопки у HERO.
+// Один-єдиний інстанс офіційної TonConnectUI-кнопки у NAV (пріоритет).
 // Публічне API: initTonConnect({ onConnect, onDisconnect }), mountTonButtons(),
 // getWalletAddress(), getTonConnect(), openConnectModal()
 
@@ -196,10 +196,24 @@ function extractFromLocalStorage() {
 }
 
 /* =============== кнопка (рівно одна) =============== */
+/**
+ * Пріоритет місця монтування:
+ * 1) NAV: #tonconnect або #tonconnect-mobile
+ * 2) Будь-який інший [data-ton-root], КРІМ #tonconnect-hero
+ * 3) Fallback: #tonconnect-hero (якщо інших коренів немає)
+ */
 function findRootOnce() {
-  const prefer = document.querySelector("#tonconnect-hero") || document.querySelector("[data-ton-root]");
-  if (prefer) return prefer;
-  return document.querySelector("#tonconnect") || document.querySelector("#tonconnect-mobile") || null;
+  const navRoot = document.querySelector("#tonconnect") || document.querySelector("#tonconnect-mobile");
+  if (navRoot) return navRoot;
+
+  const anyNonHero = document.querySelector("[data-ton-root]:not(#tonconnect-hero)");
+  if (anyNonHero) return anyNonHero;
+
+  // Fallback лише якщо зовсім немає інших контейнерів
+  const hero = document.querySelector("#tonconnect-hero");
+  if (hero) return hero;
+
+  return document.querySelector("[data-ton-root]") || null;
 }
 
 async function mountPrimaryAt(root) {
@@ -229,6 +243,11 @@ export async function mountTonButtons() {
     const ui = await mountPrimaryAt(root).catch(()=>null);
     if (ui) created.push(ui);
   }
+  // Якщо обрано NAV, а в херо є контейнер — сховаємо його, щоб не було «порожньої» зони
+  try {
+    const hero = document.querySelector("#tonconnect-hero");
+    if (hero && hero !== root) hero.style.display = "none";
+  } catch {}
   return created;
 }
 
