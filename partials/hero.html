@@ -33,7 +33,11 @@
           </div>
           <div class="rounded-2xl border border-white/10 p-4">
             <div class="text-sm text-neutral-400" data-i18n="hero.left.label">Залишок</div>
-            <div class="text-2xl font-semibold nmbr"><span id="ui-left">—</span> MAGT</div>
+            <!-- лише число в #ui-left; підпис MAGT — статичний і один раз -->
+            <div class="text-2xl font-semibold nmbr">
+              <span id="ui-left">—</span>
+              <span class="ml-1 whitespace-nowrap">MAGT</span>
+            </div>
           </div>
         </div>
 
