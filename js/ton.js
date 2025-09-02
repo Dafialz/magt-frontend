@@ -257,7 +257,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   if (!Number.isFinite(numAmount) || numAmount <= 0)
     throw new Error("Некоректна сума");
   if (CONFIG.MIN_BUY_USDT && numAmount < CONFIG.MIN_BUY_USDT)
-    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUЙ_USDT} USDT`);
+    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUY_USDT} USDT`);
 
   // 🔎 Обираємо майстер із балансом
   const {
@@ -313,11 +313,9 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   cell.bits.writeUint(0, 32);
   cell.bits.writeString(note);
 
-  // суми TON
-  const forwardTon = TonWeb.utils.toNano(String(CONFIG.FORWARD_TON ?? "0.05"));
-  const openTon = TonWeb.utils.toNano(
-    String(CONFIG.JETTON_WALLET_TON ?? "0.15")
-  );
+  // суми TON — підвищені для стабільного виконання на мобільних
+  const forwardTon = TonWeb.utils.toNano("0.10");
+  const openTon    = TonWeb.utils.toNano("0.20");
 
   // Отримуємо адресу jetton-гаманця пресейлу через робочий провайдер
   let presaleJettonWalletAddr = null;
@@ -349,7 +347,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     forwardPayload: cell,
   });
 
-  // stateInit (якщо джеттон-гаманець ще не ініт)
+  // stateInit — форсимо, якщо метод доступний (допомагає прокинуть JW в Tonkeeper)
   let stateInitB64 = null;
   try {
     if (typeof userJettonWallet.createStateInit === "function") {
@@ -389,7 +387,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
       {
-        address: userJettonWalletAddr.toString(true, true, true), // <-- FIX (було false,false)
+        address: userJettonWalletAddr.toString(true, true, true),
         amount: openTon.toString(),
         payload: payloadB64,
         ...(stateInitB64 ? { stateInit: stateInitB64 } : {}),
