@@ -257,7 +257,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   if (!Number.isFinite(numAmount) || numAmount <= 0)
     throw new Error("Некоректна сума");
   if (CONFIG.MIN_BUY_USDT && numAmount < CONFIG.MIN_BUY_USDT)
-    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUY_USDT} USDT`);
+    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUЙ_USDT} USDT`);
 
   // 🔎 Обираємо майстер із балансом
   const {
@@ -384,12 +384,12 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     console.log("[MAGT TX] note:", note);
   } catch {}
 
-  // TonConnect повідомлення → на джеттон-гаманець користувача (UQ…, non-bounceable)
+  // ВАЖЛИВО: адреса одержувача → EQ (bounceable), щоб Tonkeeper сприймав як jetton-transfer
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
       {
-        address: userJettonWalletAddr.toString(false, true, false),
+        address: userJettonWalletAddr.toString(true, true, true), // <-- FIX (було false,false)
         amount: openTon.toString(),
         payload: payloadB64,
         ...(stateInitB64 ? { stateInit: stateInitB64 } : {}),
