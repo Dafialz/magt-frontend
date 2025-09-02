@@ -1,24 +1,26 @@
-// server.js
+// server.js (PostgreSQL)
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
-import Database from "better-sqlite3";
-import purchasesRouter from "./purchases.js"; // файловий кеш (fallback)
+import purchasesRouter from "./purchases.js"; // історичний файловий кеш (можна прибрати)
+import pkg from "pg";
+const { Pool } = pkg;
 
 /* ---------- ENV / конфіг ---------- */
 const PORT = process.env.PORT || 8787;
 
 // Показуємо капу пресейлу у віджеті
-// 🔻 дефолт зменшено до 500,000,000
 const TOTAL_SUPPLY = Number(process.env.TOTAL_SUPPLY || 500_000_000);
 
 // Окремо віддаємо розмір реферального пулу (для UI, якщо треба показувати)
-// 🔻 дефолт зменшено до 25,000,000
 const REF_POOL_TOKENS = Number(process.env.REF_POOL_TOKENS || 25_000_000);
 
 // межі суми покупки (додаткова валідація)
 const MIN_USD = Number(process.env.MIN_USD || 1);
 const MAX_USD = Number(process.env.MAX_USD || 10000);
+
+// Відсоток реферального бонусу (для розрахунку referrals_magt)
+const REF_BONUS_PCT = Math.max(0, Math.min(100, Number(process.env.REF_BONUS_PCT ?? 5)));
 
 // Toncenter RPC (ключ більше НЕ у фронті)
 const TONCENTER_API_KEY = (process.env.TONCENTER_API_KEY || "").trim();
@@ -26,75 +28,58 @@ const TON_RPC_BASE =
   (process.env.TON_RPC_BASE && process.env.TON_RPC_BASE.trim()) ||
   "https://toncenter.com/api/v2/jsonRPC";
 
-/* ---------- БД ---------- */
-const db = new Database("magt.db");
-db.pragma("journal_mode = WAL");
+/* ---------- Postgres ---------- */
+const DATABASE_URL = process.env.DATABASE_URL || "";
+if (!DATABASE_URL) {
+  console.warn("⚠️ DATABASE_URL is empty — please set a Postgres connection string.");
+}
 
-// Користувачі + рефералка
-db.exec(`
-CREATE TABLE IF NOT EXISTS users (
-  wallet     TEXT PRIMARY KEY,
-  referrer   TEXT,
-  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
-);
-`);
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  max: 10,
+  ssl:
+    DATABASE_URL.includes("localhost") || DATABASE_URL.includes("127.0.0.1")
+      ? false
+      : { rejectUnauthorized: false },
+});
 
-// Факти покупок (для stats/feed/leaders)
-db.exec(`
-CREATE TABLE IF NOT EXISTS purchases (
-  id        INTEGER PRIMARY KEY AUTOINCREMENT,
-  ts        INTEGER NOT NULL,          -- msec timestamp
-  address   TEXT,                      -- TON buyer (EQ../UQ..)
-  usd       REAL NOT NULL,             -- сума в USD
-  tokens    REAL NOT NULL,             -- кількість MAGT
-  ref       TEXT                       -- зафіксований реферер (base64url)
-);
-CREATE INDEX IF NOT EXISTS idx_purchases_ts   ON purchases (ts DESC);
-CREATE INDEX IF NOT EXISTS idx_purchases_ref  ON purchases (ref);
-`);
+async function q(text, params) {
+  const res = await pool.query(text, params);
+  return res;
+}
 
-const upsertUser = db.prepare(`
-  INSERT INTO users (wallet) VALUES (?)
-  ON CONFLICT(wallet) DO NOTHING
-`);
-const setReferrerOnce = db.prepare(`
-  UPDATE users
-  SET referrer = COALESCE(referrer, ?)
-  WHERE wallet = ? AND (referrer IS NULL)
-`);
-const getRef = db.prepare(`SELECT referrer FROM users WHERE wallet = ?`);
+async function initDb() {
+  await q(`
+    CREATE TABLE IF NOT EXISTS users (
+      wallet     TEXT PRIMARY KEY,
+      referrer   TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
 
-const insertPurchase = db.prepare(`
-  INSERT INTO purchases (ts, address, usd, tokens, ref)
-  VALUES (:ts, :address, :usd, :tokens, :ref)
-`);
-const sumStats = db.prepare(`
-  SELECT
-    COALESCE(SUM(tokens),0)  AS soldMag,
-    COALESCE(SUM(usd),0)     AS raisedUsd,
-    COUNT(DISTINCT address)  AS buyers
-  FROM purchases
-`);
-const selectFeed = db.prepare(`
-  SELECT ts, address AS addr, usd AS amountUsd, tokens AS magt
-  FROM purchases
-  ORDER BY ts DESC
-  LIMIT ?
-`);
-const selectLeaders = db.prepare(`
-  SELECT ref AS address, COALESCE(SUM(usd),0) AS usd
-  FROM purchases
-  WHERE ref IS NOT NULL AND ref <> '-'
-  GROUP BY ref
-  ORDER BY usd DESC
-  LIMIT ?
-`);
+  await q(`
+    CREATE TABLE IF NOT EXISTS purchases (
+      id        BIGSERIAL PRIMARY KEY,
+      ts        BIGINT NOT NULL,           -- msec timestamp
+      address   TEXT,                      -- TON buyer (EQ../UQ..)
+      usd       DOUBLE PRECISION NOT NULL, -- сума в USD
+      tokens    DOUBLE PRECISION NOT NULL, -- кількість MAGT
+      ref       TEXT                       -- зафіксований реферер (base64url)
+    );
+  `);
+
+  await q(`CREATE INDEX IF NOT EXISTS idx_purchases_ts   ON purchases (ts DESC);`);
+  await q(`CREATE INDEX IF NOT EXISTS idx_purchases_ref  ON purchases (ref);`);
+  await q(`CREATE INDEX IF NOT EXISTS idx_purchases_addr ON purchases (address);`);
+
+  console.log("✅ Postgres schema ready");
+}
+await initDb();
 
 /* ---------- утиліти ---------- */
 // Валідна TON-адреса у base64url (EQ.../UQ..., 48–68 символів)
 const isAddr = (a) =>
-  typeof a === "string" &&
-  /^[EU]Q[A-Za-z0-9_-]{46,66}$/.test(a.trim());
+  typeof a === "string" && /^[EU]Q[A-Za-z0-9_-]{46,66}$/.test(a.trim());
 
 /* ---------- сервер ---------- */
 const app = express();
@@ -218,16 +203,10 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 app.get("/", (req, res) =>
   res
     .type("text/plain")
-    .send("Magt API is up. See /api/referral, /api/presale/* and /api/rpc")
+    .send("Magt API is up. See /api/referral, /api/presale/*, /api/my-stats and /api/rpc")
 );
 
 /* ---------- RPC-проксі до Toncenter ---------- */
-/**
- * POST /api/rpc
- * body: { method: string, params?: any[] | object }
- * Білий список методів (для TonWeb/тонких викликів). Відправляємо як JSON-RPC 2.0.
- * Ключ береться з ENV TONCENTER_API_KEY (НЕ з фронта).
- */
 const RPC_WHITELIST = new Set([
   // загальні
   "getMasterchainInfo",
@@ -288,13 +267,12 @@ app.post("/api/rpc", rpcLimiter, async (req, res) => {
   }
 });
 
-/* ---------- файловий кеш покупок (fallback) ---------- */
-// POST/GET /api/purchase (історичний; можна прибрати пізніше)
+/* ---------- історичний файловий кеш покупок ---------- */
 app.use("/api/purchase", purchasesRouter);
 
 /* ---------- РЕФЕРАЛКА ---------- */
 // POST /api/referral — прив’язати реферера (одноразово)
-app.post("/api/referral", (req, res) => {
+app.post("/api/referral", async (req, res) => {
   const { wallet, ref } = req.body || {};
   if (!isAddr(wallet) || !isAddr(ref) || wallet.trim() === ref.trim()) {
     return res.status(400).json({ ok: false, err: "bad-params" });
@@ -302,29 +280,38 @@ app.post("/api/referral", (req, res) => {
   const W = wallet.trim();
   const R = ref.trim();
 
-  const tx = db.transaction(() => {
-    upsertUser.run(W);
-    upsertUser.run(R);
-    const before = getRef.get(W)?.referrer || null;
-    setReferrerOnce.run(R, W);
-    const after = getRef.get(W)?.referrer || null;
-    return { locked: !!after, changed: before !== after };
-  });
-
-  const out = tx();
-  res.json({ ok: true, locked: out.locked });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`INSERT INTO users (wallet) VALUES ($1) ON CONFLICT DO NOTHING`, [W]);
+    await client.query(`INSERT INTO users (wallet) VALUES ($1) ON CONFLICT DO NOTHING`, [R]);
+    await client.query(
+      `UPDATE users SET referrer = COALESCE(referrer, $1)
+       WHERE wallet = $2 AND referrer IS NULL`,
+      [R, W]
+    );
+    const after = await client.query(`SELECT referrer FROM users WHERE wallet=$1`, [W]);
+    await client.query("COMMIT");
+    res.json({ ok: true, locked: !!after.rows?.[0]?.referrer });
+  } catch (e) {
+    await client.query("ROLLBACK");
+    res.status(500).json({ ok: false, err: "db-failed" });
+  } finally {
+    client.release();
+  }
 });
 
 // GET /api/referral?wallet=EQ...
-app.get("/api/referral", (req, res) => {
+app.get("/api/referral", async (req, res) => {
   const wallet = String(req.query.wallet || "").trim();
   if (!isAddr(wallet)) {
     return res.status(400).json({ ok: false, err: "bad-params" });
   }
-  upsertUser.run(wallet);
-  const r = getRef.get(wallet);
-  if (!r || !r.referrer) return res.json({ ok: false });
-  res.json({ ok: true, referrer: r.referrer, locked: true });
+  await q(`INSERT INTO users (wallet) VALUES ($1) ON CONFLICT DO NOTHING`, [wallet]);
+  const r = await q(`SELECT referrer FROM users WHERE wallet=$1`, [wallet]);
+  const ref = r.rows?.[0]?.referrer || null;
+  if (!ref) return res.json({ ok: false });
+  res.json({ ok: true, referrer: ref, locked: true });
 });
 
 /* ---------- ПРЕСЕЙЛ (для віджетів) ---------- */
@@ -333,7 +320,7 @@ app.get("/api/referral", (req, res) => {
  * body: { usd:number, tokens:number, address?:string, ref?:string }
  * ref пріоритезуємо з users.referrer, якщо є.
  */
-app.post("/api/presale/purchase", (req, res) => {
+app.post("/api/presale/purchase", async (req, res) => {
   const usd = Number(req.body?.usd ?? 0);
   const tokens = Number(req.body?.tokens ?? 0);
   const addressRaw = String(req.body?.address || "").trim();
@@ -353,27 +340,33 @@ app.post("/api/presale/purchase", (req, res) => {
 
   let ref = null;
   if (address && isAddr(address)) {
-    upsertUser.run(address);
-    const locked = getRef.get(address)?.referrer || null;
-    ref = locked || (isAddr(refRaw) && refRaw !== address ? refRaw : null);
+    await q(`INSERT INTO users (wallet) VALUES ($1) ON CONFLICT DO NOTHING`, [address]);
+    const locked = await q(`SELECT referrer FROM users WHERE wallet=$1`, [address]);
+    const lockedRef = locked.rows?.[0]?.referrer || null;
+    ref = lockedRef || (isAddr(refRaw) && refRaw !== address ? refRaw : null);
   } else {
     ref = isAddr(refRaw) ? refRaw : null;
   }
 
-  insertPurchase.run({
-    ts: Date.now(),
-    address: address || null,
-    usd,
-    tokens,
-    ref: ref || null,
-  });
+  await q(
+    `INSERT INTO purchases (ts, address, usd, tokens, ref)
+     VALUES ($1,$2,$3,$4,$5)`,
+    [Date.now(), address || null, usd, tokens, ref || null]
+  );
 
   res.json({ ok: true });
 });
 
 // GET /api/presale/stats -> { ok, soldMag, totalMag, raisedUsd, buyers, ...aliases }
-app.get("/api/presale/stats", (req, res) => {
-  const row = sumStats.get() || { soldMag: 0, raisedUsd: 0, buyers: 0 };
+app.get("/api/presale/stats", async (req, res) => {
+  const r = await q(
+    `SELECT
+       COALESCE(SUM(tokens),0)::float8  AS "soldMag",
+       COALESCE(SUM(usd),0)::float8     AS "raisedUsd",
+       COUNT(DISTINCT address)          AS "buyers"
+     FROM purchases`
+  );
+  const row = r.rows?.[0] || { soldMag: 0, raisedUsd: 0, buyers: 0 };
   const soldMag = Number(row.soldMag) || 0;
   const raisedUsd = Number(row.raisedUsd) || 0;
   const buyers = Number(row.buyers) || 0;
@@ -395,28 +388,74 @@ app.get("/api/presale/stats", (req, res) => {
 });
 
 // GET /api/presale/feed?limit=20
-app.get("/api/presale/feed", (req, res) => {
+app.get("/api/presale/feed", async (req, res) => {
   const lim = Math.max(1, Math.min(100, Number(req.query.limit || 20)));
-  const rows = selectFeed.all(lim);
-  const items = rows.map((r) => ({
+  const r = await q(
+    `SELECT ts, address AS addr, usd AS "amountUsd", tokens AS magt
+     FROM purchases
+     ORDER BY ts DESC
+     LIMIT $1`,
+    [lim]
+  );
+  const items = (r.rows || []).map((row) => ({
     asset: "USDT",
-    amountUsd: Number(r.amountUsd) || 0,
-    magt: Number(r.magt) || 0,
-    addr: r.addr || "",
-    ts: Number(r.ts) || Date.now(),
-    ts_s: Math.floor((Number(r.ts) || Date.now()) / 1000),
+    amountUsd: Number(row.amountUsd) || 0,
+    magt: Number(row.magt) || 0,
+    addr: row.addr || "",
+    ts: Number(row.ts) || Date.now(),
+    ts_s: Math.floor((Number(row.ts) || Date.now()) / 1000),
   }));
   res.json({ ok: true, items, count: items.length });
 });
 
 // GET /api/presale/leaders?limit=10
-app.get("/api/presale/leaders", (req, res) => {
+app.get("/api/presale/leaders", async (req, res) => {
   const lim = Math.max(1, Math.min(100, Number(req.query.limit || 10)));
-  const items = selectLeaders.all(lim).map((r) => ({
-    address: r.address || "",
-    usd: Number(r.usd) || 0,
-  }));
-  res.json({ ok: true, items, count: items.length });
+  const r = await q(
+    `SELECT ref AS address, COALESCE(SUM(usd),0)::float8 AS usd
+     FROM purchases
+     WHERE ref IS NOT NULL AND ref <> '-'
+     GROUP BY ref
+     ORDER BY usd DESC
+     LIMIT $1`,
+    [lim]
+  );
+  res.json({ ok: true, items: r.rows || [], count: (r.rows || []).length });
+});
+
+/* ---------- МОЇ БАЛАНСИ (для фронта) ---------- */
+// GET /api/my-stats?wallet=EQ...
+// -> { ok:true, bought_magt: number, referrals_magt: number }
+app.get("/api/my-stats", async (req, res) => {
+  const wallet = String(req.query.wallet || "").trim();
+  if (!isAddr(wallet)) {
+    return res.status(400).json({ ok: false, err: "bad-params" });
+  }
+
+  // куплено самим користувачем
+  const bought = await q(
+    `SELECT COALESCE(SUM(tokens),0)::float8 AS mag
+     FROM purchases WHERE address = $1`,
+    [wallet]
+  );
+  const boughtTokens = Math.floor(Number(bought.rows?.[0]?.mag || 0));
+
+  // сума токенів, які купили реферали цього користувача
+  const refs = await q(
+    `SELECT COALESCE(SUM(tokens),0)::float8 AS mag
+     FROM purchases WHERE ref = $1`,
+    [wallet]
+  );
+  const refsTokens = Math.floor(Number(refs.rows?.[0]?.mag || 0));
+
+  // реферальний бонус у MAGT
+  const referralBonus = Math.floor(refsTokens * (REF_BONUS_PCT / 100));
+
+  res.json({
+    ok: true,
+    bought_magt: boughtTokens,
+    referrals_magt: referralBonus,
+  });
 });
 
 /* ---------- 404 ---------- */
@@ -431,4 +470,6 @@ app.listen(PORT, () => {
     TON_RPC_BASE,
     TONCENTER_API_KEY ? "(key loaded)" : "(no key)"
   );
+  console.log("Postgres:", DATABASE_URL ? "configured" : "NOT SET");
+  console.log("REF_BONUS_PCT:", REF_BONUS_PCT + "%");
 });
