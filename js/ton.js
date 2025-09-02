@@ -63,7 +63,8 @@ function toBase64Url(addr) {
       addr && typeof addr === "object" && typeof addr.toString === "function"
         ? addr
         : new A(addr);
-    return inst.toString(true, true, true); // bounceable, urlSafe, auto test flag
+    // MAINNET: testOnly = false
+    return inst.toString(true, true, false);
   } catch {
     return typeof addr === "string" ? addr : String(addr);
   }
@@ -185,14 +186,14 @@ async function pickUsdtMasterForAmount(usdAmount) {
 
     try {
       console.log("[USDT master] balance",
-        new TonWeb.utils.Address(master).toString(true, true, true),
+        new TonWeb.utils.Address(master).toString(true, true, false),
         "→", Number(info.units) / 10 ** dec);
     } catch {}
 
     if (!best || info.units > best.units) best = { master, ...info };
     if (info.units >= needUnits) {
       console.log("[USDT master] picked:",
-        new TonWeb.utils.Address(master).toString(true, true, true),
+        new TonWeb.utils.Address(master).toString(true, true, false),
         "balanceUnits:", info.units.toString());
       return { master, ...info };
     }
@@ -201,7 +202,7 @@ async function pickUsdtMasterForAmount(usdAmount) {
   if (best) {
     console.warn(
       "[USDT master] none has enough, using max balance:",
-      new window.TonWeb.utils.Address(best.master).toString(true, true, true),
+      new window.TonWeb.utils.Address(best.master).toString(true, true, false),
       "balanceUnits:", best.units.toString()
     );
     return best;
@@ -264,8 +265,8 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   let cleanRef = null;
   if (typeof refAddr === "string" && isTonAddress(refAddr)) cleanRef = refAddr.trim();
   if (cleanRef && CONFIG.REF_SELF_BAN === true) {
-    const buyerBase64 = userJettonWalletAddr?.toString(true, true, true) || "";
-    if (buyerBase64 === cleanRef) cleanRef = null;
+    const buyerB64 = toBase64Url(resolvedOwner);
+    if (buyerB64 === cleanRef) cleanRef = null;
   }
 
   // коментар (forward payload)
@@ -320,9 +321,9 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
 
   // логи
   try {
-    console.log("[MAGT TX] picked USDT master:", new TonWeb.utils.Address(usdtMasterB64).toString(true, true, true));
-    console.log("[MAGT TX] userJettonWallet:", userJettonWalletAddr.toString(true, true, true));
-    console.log("[MAGT TX] presaleJettonWallet:", presaleJettonWalletAddr.toString(true, true, true));
+    console.log("[MAGT TX] picked USDT master:", new TonWeb.utils.Address(usdtMasterB64).toString(true, true, false));
+    console.log("[MAGT TX] userJettonWallet:", userJettonWalletAddr.toString(true, true, false));
+    console.log("[MAGT TX] presaleJettonWallet:", presaleJettonWalletAddr.toString(true, true, false));
     console.log("[MAGT TX] jetAmount (USDT units):", jetAmountBig.toString());
     console.log("[MAGT TX] openTon:", openTon.toString(), "forwardTon:", forwardTon.toString());
     console.log("[MAGT TX] note:", note);
@@ -333,7 +334,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
       {
-        address: userJettonWalletAddr.toString(true, true, true),
+        address: userJettonWalletAddr.toString(true, true, false),
         amount: openTon.toString(),
         payload: payloadB64,
         ...(stateInitB64 ? { stateInit: stateInitB64 } : {}),
