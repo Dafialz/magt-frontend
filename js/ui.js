@@ -106,6 +106,41 @@ const REF_API_PATH = REF_ENDPOINT || (
   (API_BASE ? (API_BASE.replace(/\/+$/,"") + "/api/referral") : "/api/referral")
 );
 
+/* ====== Мої баланси (мій MAGT та від рефералів) ====== */
+const MY_STATS_ENDPOINT = (CONFIG?.ENDPOINTS?.myStats || "").trim() ||
+  (API_BASE ? (API_BASE.replace(/\/+$/,"") + "/api/my-stats") : "/api/my-stats");
+
+let _myStatsTimer = null;
+async function fetchMyStats(addrB64) {
+  if (!addrB64 || !MY_STATS_ENDPOINT) return null;
+  try {
+    const url = `${MY_STATS_ENDPOINT}?wallet=${encodeURIComponent(addrB64)}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
+  } catch { return null; }
+}
+function renderMyStats(stats) {
+  const bought = Number(stats?.bought_magt || 0);
+  const refs   = Number(stats?.referrals_magt || 0);
+  const eBought = document.getElementById("my-bought-magt");
+  const eRef   = document.getElementById("my-ref-magt");
+  const eUpd   = document.getElementById("my-stats-upd");
+  if (eBought) eBought.textContent = fmt.tokens(bought);
+  if (eRef)    eRef.textContent    = fmt.tokens(refs);
+  if (eUpd)    eUpd.textContent    = new Date().toLocaleTimeString();
+}
+async function refreshMyStats(addrB64) {
+  const j = await fetchMyStats(addrB64);
+  if (j) renderMyStats(j);
+}
+function startMyStatsPolling(addrB64) {
+  clearInterval(_myStatsTimer);
+  if (!addrB64) return;
+  refreshMyStats(addrB64);
+  _myStatsTimer = setInterval(() => refreshMyStats(addrB64), 20000);
+}
+
 function hideRefUI(hide = true) {
   const method = hide ? "add" : "remove";
   ui.refDetected?.classList[method]("hidden");
@@ -347,22 +382,14 @@ export function initStaticUI() {
     if (ui.btnCopyRef) ui.btnCopyRef.disabled = false;
   }
 
-  // Приховати «Ціль збору: …», якщо так налаштовано
-  if (CONFIG.HIDE_GOAL_TEXT) {
-    try {
-      const root = document.getElementById("slot-main") || document.body;
-      const candidates = root.querySelectorAll("section, p, div, span");
-      candidates.forEach(n => {
-        if (n.childElementCount === 0 && /Ціль збору/i.test(n.textContent || "")) {
-          n.textContent = (n.textContent || "").replace(/Ціль збору.*$/i, "").trim();
-          if (!n.textContent) n.remove();
-        }
-      });
-    } catch {}
-  }
+  // ⛔️ БЛОК приховування «Ціль збору…» видалено як зайвий
 
   updatePriceUnder();
   startSalePolling();
+
+  // Якщо адреса вже відома — стартуємо завантаження «Мої баланси»
+  const addr = (state.owner || window.__magtAddr || "").trim?.() || "";
+  if (isTonEqUq(addr)) startMyStatsPolling(addr);
 }
 
 /* ===================== referrals ===================== */
@@ -531,6 +558,9 @@ export async function setOwnRefLink(walletAddress) {
     }
 
     updateRefBonus();
+
+    // ► Стартуємо отримання «Мої баланси»
+    startMyStatsPolling(b64);
 
     /* === РЕФЕРАЛ «НАЗАВЖДИ» === */
     (async () => {
