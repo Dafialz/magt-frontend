@@ -82,6 +82,38 @@ function tiersTotalSupply() {
   return tiers.reduce((s, t) => s + (Number(t.qty) || 0), 0);
 }
 
+// допоміжне: інфо по поточному рівню
+function getCurrentTierInfo(sold) {
+  const tiers = Array.isArray(CONFIG.SALE_TIERS) ? CONFIG.SALE_TIERS : [];
+  let level = 1;
+  let price = Number(CONFIG.PRICE_USD || 0);
+  let remainingInTier = 0;
+
+  if (!tiers.length) {
+    // без рівнів — залишок і ціна з конфіга/загального пулу
+    return { level, price, remainingInTier: 0 };
+  }
+
+  let cum = 0;
+  for (let i = 0; i < tiers.length; i++) {
+    const qty = Number(tiers[i]?.qty ?? 0);
+    const p   = Number(tiers[i]?.price ?? tiers[i]?.usd ?? tiers[i]?.priceUsd ?? 0);
+    const end = cum + (qty > 0 ? qty : 0);
+    if (sold < end) {
+      level = i + 1;
+      price = p > 0 ? p : price;
+      remainingInTier = Math.max(0, end - sold);
+      return { level, price, remainingInTier };
+    }
+    cum = end;
+  }
+  // усе розкуплено — останній рівень, залишок 0
+  const last = tiers[tiers.length - 1];
+  const pLast = Number(last?.price ?? last?.usd ?? last?.priceUsd ?? 0);
+  if (pLast > 0) price = pLast;
+  return { level: tiers.length, price, remainingInTier: 0 };
+}
+
 let lastPct = 0;
 async function refreshProgress() {
   if (!hasProgressUI()) return;
@@ -105,8 +137,19 @@ async function refreshProgress() {
   const sold = Number.isFinite(Number(soldMag)) ? Number(soldMag) : 0;
   const raised = Number.isFinite(Number(raisedUsd)) ? Number(raisedUsd) : 0;
 
+  // Загальний відсоток прогресу: по всьому пулу
   const pct = total > 0 ? Math.max(0, Math.min(100, (sold / total) * 100)) : 0;
-  const remaining = Math.max(0, total - sold);
+
+  // ===== ключові зміни: залишок та поточна ціна по активному рівню =====
+  let remaining = Math.max(0, total - sold); // фолбек
+  try {
+    const tier = getCurrentTierInfo(sold);
+    if (tier) {
+      remaining = Number(tier.remainingInTier || 0);
+      // зробимо доступною поточну ціну для інших модулів (калькулятор, buy)
+      window.__CURRENT_PRICE_USD = Number(tier.price || CONFIG.PRICE_USD || 0);
+    }
+  } catch { /* ignore */ }
 
   // локалізована мітка — як у index.html
   ui.pct.textContent = `${fmtNum(pct, 2)}% продано`;
@@ -155,7 +198,8 @@ function initCalc() {
 
   function recalc() {
     const usd = Number($usd.value || 0);
-    const price = Number(CONFIG.PRICE_USD || 0.00383);
+    // ВАЖЛИВО: використовуємо поточну ціну рівня, якщо вже визначена
+    const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
     const tokens = usd > 0 && price > 0 ? usd / price : 0;
     $tok.textContent = `${fmtNum(tokens, 0)} MAGT`;
 

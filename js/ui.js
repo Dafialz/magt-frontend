@@ -202,7 +202,8 @@ export function refreshButtons() {
 function updatePriceUnder(){
   const pn = document.getElementById('price-now');
   const ln = document.getElementById('level-now');
-  if (pn) pn.textContent = (CONFIG.PRICE_USD || 0).toFixed(6);
+  // динамічна ціна поточного рівня (fallback на CONFIG)
+  if (pn) pn.textContent = (Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0)).toFixed(6);
   if (ln) ln.textContent = ui.level?.textContent || "1";
 }
 
@@ -225,7 +226,8 @@ function renderTokensOut(tokens) {
 /** головний перерахунок */
 export function recalc() {
   const usd = sanitizeUsdInput();
-  const price = Number(CONFIG.PRICE_USD || 0.00383);
+  // ВАЖЛИВО: беремо динамічну ціну поточного рівня
+  const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
 
   const tokens = calcTokensFromUsd(usd, price);
   renderTokensOut(tokens);
@@ -239,13 +241,42 @@ export function recalc() {
 /* ===== Прогрес/залишок ===== */
 function el(id){ return document.getElementById(id); }
 
+// допоміжне: отримати інфо активного рівня за soldMag
+function getCurrentTierInfo(sold) {
+  const tiers = Array.isArray(CONFIG.SALE_TIERS) ? CONFIG.SALE_TIERS : [];
+  let level = 1;
+  let price = Number(CONFIG.PRICE_USD || 0);
+  let remainingInTier = Math.max(0, Number(CONFIG.TOTAL_SUPPLY || 0) - Number(sold || 0));
+
+  if (!tiers.length) return { level, price, remainingInTier };
+
+  let cum = 0;
+  for (let i = 0; i < tiers.length; i++) {
+    const qty = Number(tiers[i]?.qty ?? tiers[i]?.tokens ?? 0);
+    const p   = Number(tiers[i]?.price ?? tiers[i]?.usd ?? tiers[i]?.priceUsd ?? 0);
+    const end = cum + (qty > 0 ? qty : 0);
+    if (sold < end) {
+      level = i + 1;
+      if (p > 0) price = p;
+      remainingInTier = Math.max(0, end - sold);
+      return { level, price, remainingInTier };
+    }
+    cum = end;
+  }
+  // усе розкуплено — показуємо останній рівень із нульовим залишком
+  const last = tiers[tiers.length - 1];
+  const pLast = Number(last?.price ?? last?.usd ?? last?.priceUsd ?? 0);
+  if (pLast > 0) price = pLast;
+  return { level: tiers.length, price, remainingInTier: 0 };
+}
+
 function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   // офсет і хардкапа
   const offset = Number(CONFIG.RAISED_OFFSET_USD || 0);
   const cap    = Number(CONFIG.HARD_CAP || 0) || null;
   const raised = Math.max(0, Number(raisedUsd || 0)) + offset;
 
-  // Процент і смуга
+  // Процент і смуга (за USD-хардкапо́ю)
   let pct = 0;
   if (cap && cap > 0) pct = Math.max(0, Math.min(100, (raised / cap) * 100));
 
@@ -253,15 +284,25 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   const saleRaised = el("sale-raised");
   const saleBar    = el("sale-bar");
   const salePercent= el("sale-percent");
-  if (saleRaised) saleRaised.textContent = `$${fmt.usd(raised, 0)}`;
-  if (saleBar)    saleBar.style.width = `${pct.toFixed(2)}%`;
+  if (saleRaised)  saleRaised.textContent = `$${fmt.usd(raised, 0)}`;
+  if (saleBar)     saleBar.style.width = `${pct.toFixed(2)}%`;
   if (salePercent) salePercent.textContent = `${pct.toFixed(2)}% продано`;
 
-  // залишок MAGT (і в картці, і у віджеті)
-  const remaining = Math.max(0, Number(totalMag || 0) - Number(soldMag || 0));
-  if (ui.left) ui.left.textContent = `${fmt.tokens(remaining)} MAGT`;
+  // ===== ключове: рівень / ціна / залишок у поточному рівні =====
+  const sold = Math.max(0, Number(soldMag || 0));
+  const info = getCurrentTierInfo(sold);
+
+  // оновлюємо картку параметрів
+  if (ui.price) ui.price.textContent = Number(info.price || 0).toFixed(6);
+  if (ui.level) ui.level.textContent = String(info.level);
+  if (ui.left)  ui.left.textContent  = `${fmt.tokens(info.remainingInTier)} MAGT`;
+
+  // оновлюємо виджет «Залишок»
   const saleRemaining = el("sale-remaining");
-  if (saleRemaining) saleRemaining.textContent = fmt.tokens(remaining);
+  if (saleRemaining) saleRemaining.textContent = fmt.tokens(info.remainingInTier);
+
+  // зберігаємо поточну ціну для інших модулів (калькулятор/покупка)
+  try { window.__CURRENT_PRICE_USD = Number(info.price || 0); } catch {}
 
   // резервні поля старої верстки
   if (ui.raised) ui.raised.textContent = `$${(raised).toLocaleString()}`;
@@ -286,6 +327,7 @@ export function initStaticUI() {
   const y = document.querySelector("#year");
   if (y) y.textContent = new Date().getFullYear();
 
+  // початкові плейсхолдери; реальні значення підставить applySaleUi()
   if (ui.price) ui.price.textContent = (CONFIG.PRICE_USD || 0).toFixed(6);
   if (ui.level) ui.level.textContent = "1";
 
@@ -389,7 +431,8 @@ export function updateRefBonus() {
   }
 
   const pct   = Number(CONFIG.REF_BONUS_PCT || 5);
-  const price = Number(CONFIG.PRICE_USD || 0.00383);
+  // Динамічна ціна поточного рівня
+  const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
   if (!(price > 0)) return;
 
   const tokens = calcTokensFromUsd(usd, price);
