@@ -337,10 +337,11 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     );
   }
 
-  // body transfer
+  // body transfer (компат: і amount, і jettonAmount)
   const body = await userJettonWallet.createTransferBody({
     queryId: new TonWeb.utils.BN(ts),
-    amount: amountBN,
+    jettonAmount: amountBN,                 // ← основне поле у новіших версіях
+    amount:       amountBN,                 // ← сумісність зі старими реалізаціями
     toAddress: presaleJettonWalletAddr,
     responseAddress: new TonWeb.utils.Address(resolvedOwner),
     forwardAmount: forwardTon,
@@ -382,7 +383,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     console.log("[MAGT TX] note:", note);
   } catch {}
 
-  // ВАЖЛИВО: адреса одержувача → EQ (bounceable), щоб Tonkeeper сприймав як jetton-transfer
+  // ВАЖЛИВО: адреса одержувача → EQ (bounceable), щоб Tonkeeper/MTW сприймали як jetton-transfer
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
