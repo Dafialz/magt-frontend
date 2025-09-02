@@ -105,14 +105,22 @@ export const CONFIG = {
   /* ===== API ===== */
   API_BASE: API_BASE_RUNTIME, // у проді порожньо — використовуємо абсолютні ендпоінти
   ENDPOINTS: {
-    stats:    join(API_BASE_ABS, "/api/presale/stats"),
-    feed:     join(API_BASE_ABS, "/api/presale/feed"),
-    leaders:  join(API_BASE_ABS, "/api/presale/leaders"),
-    purchase: join(API_BASE_ABS, "/api/presale/purchase"),
-    claim:    join(API_BASE_ABS, "/api/presale/claim"),
-    order:    join(API_BASE_ABS, "/api/order"),
-    referral: join(API_BASE_ABS, "/api/referral"),
-    rpc:      join(API_BASE_ABS, "/api/rpc"),
+    stats:       join(API_BASE_ABS, "/api/presale/stats"),
+    feed:        join(API_BASE_ABS, "/api/presale/feed"),
+    leaders:     join(API_BASE_ABS, "/api/presale/leaders"),
+    purchase:    join(API_BASE_ABS, "/api/presale/purchase"),
+    claim:       join(API_BASE_ABS, "/api/presale/claim"),
+    order:       join(API_BASE_ABS, "/api/order"),
+    referral:    join(API_BASE_ABS, "/api/referral"),
+    rpc:         join(API_BASE_ABS, "/api/rpc"),
+
+    // 🔹 Ендпоінт для блоку “Мої баланси”
+    // очікує JSON: { "bought_magt": number, "referrals_magt": number }
+    myBalances:  join(API_BASE_ABS, "/api/my-stats"),
+
+    // сумісні синоніми (на випадок, якщо бекенд уже має інші шляхи)
+    balances:    join(API_BASE_ABS, "/api/my-stats"),
+    myStats:     join(API_BASE_ABS, "/api/my-stats"),
   },
 
   __DEBUG: { API_BASE_RUNTIME, API_BASE_ABS, OVERRIDE, IS_LOCAL },
@@ -124,7 +132,7 @@ if ((!CONFIG.USDT_MASTERS || CONFIG.USDT_MASTERS.length === 0) && !CONFIG.USDT_M
   console.error("❌ Немає адрес майстрів USDT у config.js");
 }
 if (!CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає PRESALE_OWNER_ADDRESS у config.js");
-if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) console.warn("⚠️ REF_BОНУС_PCT виглядає підозріло. Рекомендується 0..50%");
+if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BОНУС_PCT <= 50)) console.warn("⚠️ REF_BОНУС_PCT виглядає підозріло. Рекомендується 0..50%");
 
 if (IS_BROWSER) {
   console.log(

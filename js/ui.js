@@ -107,8 +107,11 @@ const REF_API_PATH = REF_ENDPOINT || (
 );
 
 /* ====== Мої баланси (мій MAGT та від рефералів) ====== */
-const MY_STATS_ENDPOINT = (CONFIG?.ENDPOINTS?.myStats || "").trim() ||
-  (API_BASE ? (API_BASE.replace(/\/+$/,"") + "/api/my-stats") : "/api/my-stats");
+const MY_STATS_ENDPOINT =
+  (CONFIG?.ENDPOINTS?.myBalances ||
+   CONFIG?.ENDPOINTS?.balances ||
+   CONFIG?.ENDPOINTS?.myStats || "").trim()
+  || (API_BASE ? (API_BASE.replace(/\/+$/,"") + "/api/my-stats") : "/api/my-stats");
 
 let _myStatsTimer = null;
 async function fetchMyStats(addrB64) {
@@ -128,7 +131,10 @@ function renderMyStats(stats) {
   const eUpd   = document.getElementById("my-stats-upd");
   if (eBought) eBought.textContent = fmt.tokens(bought);
   if (eRef)    eRef.textContent    = fmt.tokens(refs);
-  if (eUpd)    eUpd.textContent    = new Date().toLocaleTimeString();
+  if (eUpd) {
+    const d = new Date();
+    eUpd.textContent = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  }
 }
 async function refreshMyStats(addrB64) {
   const j = await fetchMyStats(addrB64);
@@ -382,7 +388,7 @@ export function initStaticUI() {
     if (ui.btnCopyRef) ui.btnCopyRef.disabled = false;
   }
 
-  // ⛔️ БЛОК приховування «Ціль збору…» видалено як зайвий
+  // ⛔️ БЛОК приховування «Ціль збору…» вилучено як зайвий
 
   updatePriceUnder();
   startSalePolling();
