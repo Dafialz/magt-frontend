@@ -295,7 +295,8 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   // оновлюємо картку параметрів
   if (ui.price) ui.price.textContent = Number(info.price || 0).toFixed(6);
   if (ui.level) ui.level.textContent = String(info.level);
-  if (ui.left)  ui.left.textContent  = `${fmt.tokens(info.remainingInTier)} MAGT`;
+  // ТІЛЬКИ ЧИСЛО: підпис "MAGT" тепер статичний у hero.html
+  if (ui.left)  ui.left.textContent  = fmt.tokens(info.remainingInTier);
 
   // оновлюємо виджет «Залишок»
   const saleRemaining = el("sale-remaining");
