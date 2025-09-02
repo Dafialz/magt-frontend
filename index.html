@@ -167,9 +167,12 @@
     </div>
   </div>
 
-  <div class="nojs container-xl py-6 text-sm text-red-300">
-    Увімкніть JavaScript для повноцінної роботи сайту.
-  </div>
+  <!-- Показувати ПОВІДОМЛЕННЯ лише коли JS вимкнено -->
+  <noscript>
+    <div class="nojs container-xl py-6 text-sm text-red-300">
+      Увімкніть JavaScript для повноцінної роботи сайту.
+    </div>
+  </noscript>
 
   <!-- ===== Скрипти (весь runtime без інлайнів) ===== -->
   <script type="module" src="/js/partials.js?v=17"></script>
