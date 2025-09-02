@@ -4,7 +4,7 @@ import { safeFetch } from "./utils.js";
 import { getWalletAddress } from "./tonconnect.js";
 
 /* ============================================
- * RPC: тільки через наш бекенд-проксі
+ * RPC: тільки через наш бекенд-проксі (з фолбеком)
  * ============================================ */
 const _rpcFromConfig =
   (CONFIG.TON_RPC && String(CONFIG.TON_RPC).trim()) ||
@@ -13,6 +13,21 @@ const _rpcFromConfig =
 export const RPC_URL = /toncenter\.com/i.test(_rpcFromConfig)
   ? (CONFIG.ENDPOINTS?.rpc || "https://api.magtcoin.com/api/rpc")
   : _rpcFromConfig;
+
+const RPC_FALLBACK = (CONFIG.TON_RPC_FALLBACK || "").trim();
+
+/* послідовність провайдерів (основний → запасний) */
+function* providerSeq(TonWeb) {
+  const seen = new Set();
+  const list = [RPC_URL, RPC_FALLBACK].filter(Boolean);
+  for (const url of list) {
+    if (seen.has(url)) continue;
+    seen.add(url);
+    yield new TonWeb.HttpProvider(url);
+  }
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 /* ============================================
  * Кандидати майстрів USDT
@@ -120,23 +135,27 @@ function buildSafeComment({ buyerB64, refB64, ts, nonce }) {
 }
 
 /* ============================================
- * Читання балансу джеттон-гаманця (units)
+ * Читання балансу джеттон-гаманця (units) з ретраями та фолбек-RPC
  * ============================================ */
 async function readJettonBalanceUnits(TonWeb, provider, jettonMasterB64, userAddr) {
   const JettonMinter = TonWeb.token.jetton.JettonMinter;
   const JettonWallet = TonWeb.token.jetton.JettonWallet;
+
   const minter = new JettonMinter(provider, { address: new TonWeb.utils.Address(jettonMasterB64) });
   const jwAddr = await minter.getJettonWalletAddress(userAddr);
   const jw = new JettonWallet(provider, { address: jwAddr });
 
-  try {
-    const data = await jw.getData(); // { balance, owner, jetton, ... }
-    const units = BigInt(String(data?.balance ?? "0"));
-    return { units, jwAddr, jw };
-  } catch {
-    // якщо ще не ініт — вважаємо 0, але повернемо адресу/екземпляр
-    return { units: 0n, jwAddr, jw };
+  for (let i = 0; i < 3; i++) {
+    try {
+      const data = await jw.getData(); // { balance, owner, jetton, ... }
+      const units = BigInt(String(data?.balance ?? "0"));
+      return { units, jwAddr, jw };
+    } catch (e) {
+      if (i === 2) throw e;
+      await sleep(200 + i * 250);
+    }
   }
+  return { units: 0n, jwAddr, jw };
 }
 
 /* ============================================
@@ -145,7 +164,6 @@ async function readJettonBalanceUnits(TonWeb, provider, jettonMasterB64, userAdd
 async function pickUsdtMasterForAmount(usdAmount) {
   if (!window.TonWeb) throw new Error("TonWeb не завантажено");
   const TonWeb = window.TonWeb;
-  const provider = new TonWeb.HttpProvider(RPC_URL);
   const userAddress = getWalletAddress();
   const userAddr = new TonWeb.utils.Address(userAddress);
 
@@ -154,41 +172,51 @@ async function pickUsdtMasterForAmount(usdAmount) {
 
   let best = null; // {master, units, jwAddr, jw}
   for (const master of USDT_MASTERS) {
-    try {
-      const info = await readJettonBalanceUnits(TonWeb, provider, master, userAddr);
-      // лог балансу по кожному master’у
+    let info = null;
+    for (const prov of providerSeq(TonWeb)) {
       try {
-        console.log("[USDT master] balance",
-          new TonWeb.utils.Address(master).toString(true, true, true),
-          "→", Number(info.units) / 10 ** dec);
-      } catch {}
-      if (!best || info.units > best.units) best = { master, ...info };
-      if (info.units >= needUnits) {
-        console.log("[USDT master] picked:",
-          new TonWeb.utils.Address(master).toString(true, true, true),
-          "balanceUnits:", info.units.toString());
-        return { master, ...info };
+        info = await readJettonBalanceUnits(TonWeb, prov, master, userAddr);
+        break;
+      } catch (e) {
+        console.warn("[USDT master] read failed on provider:", master, e?.message || e);
       }
-    } catch (e) {
-      console.warn("[USDT master] read failed:", master, e?.message || e);
+    }
+    if (!info) continue;
+
+    try {
+      console.log("[USDT master] balance",
+        new TonWeb.utils.Address(master).toString(true, true, true),
+        "→", Number(info.units) / 10 ** dec);
+    } catch {}
+
+    if (!best || info.units > best.units) best = { master, ...info };
+    if (info.units >= needUnits) {
+      console.log("[USDT master] picked:",
+        new TonWeb.utils.Address(master).toString(true, true, true),
+        "balanceUnits:", info.units.toString());
+      return { master, ...info };
     }
   }
+
   if (best) {
     console.warn(
       "[USDT master] none has enough, using max balance:",
-      new TonWeb.utils.Address(best.master).toString(true, true, true),
+      new window.TonWeb.utils.Address(best.master).toString(true, true, true),
       "balanceUnits:", best.units.toString()
     );
-  } else {
-    console.warn("[USDT master] no readable masters, fallback to CONFIG.USDT_MASTER");
-    const JettonMinter = TonWeb.token.jetton.JettonMinter;
-    const JettonWallet = TonWeb.token.jetton.JettonWallet;
-    const minter = new JettonMinter(provider, { address: new TonWeb.utils.Address(CONFIG.USDT_MASTER) });
-    const jwAddr = await minter.getJettonWalletAddress(userAddr);
-    const jw = new JettonWallet(provider, { address: jwAddr });
-    best = { master: CONFIG.USDT_MASTER, units: 0n, jwAddr, jw };
+    return best;
   }
-  return best;
+
+  // якщо всі RPC упали — беремо перший майстер без префлайту, щоб не блокувати покупку
+  const fallbackMaster = USDT_MASTERS[0];
+  console.warn("[USDT master] RPC failed for all, fallback to first master:", fallbackMaster);
+  const prov = new TonWeb.HttpProvider(RPC_URL);
+  const JettonMinter = TonWeb.token.jetton.JettonMinter;
+  const JettonWallet = TonWeb.token.jetton.JettonWallet;
+  const minter = new JettonMinter(prov, { address: new TonWeb.utils.Address(fallbackMaster) });
+  const jwAddr = await minter.getJettonWalletAddress(userAddr);
+  const jw = new JettonWallet(prov, { address: jwAddr });
+  return { master: fallbackMaster, units: 0n, jwAddr, jw };
 }
 
 /* ============================================
@@ -204,19 +232,9 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const numAmount = Number(usdAmount);
   if (!Number.isFinite(numAmount) || numAmount <= 0) throw new Error("Некоректна сума");
   if (CONFIG.MIN_BUY_USDT && numAmount < CONFIG.MIN_BUY_USDT)
-    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUЙ_USDT} USDT`);
+    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUY_USDT} USDT`);
 
-  const provider = new TonWeb.HttpProvider(RPC_URL);
-  const tonweb = new TonWeb(provider);
-
-  let userAddr;
-  try {
-    userAddr = new TonWeb.utils.Address(resolvedOwner);
-  } catch {
-    throw new Error("Невірна адреса гаманця користувача");
-  }
-
-  // 🔎 Обираємо майстер із балансом
+  // 🔎 Обираємо майстер із балансом (з урахуванням RPC фолбеків)
   const {
     master: usdtMasterB64,
     units: balanceUnits,
@@ -224,24 +242,20 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     jw: userJettonWallet
   } = await pickUsdtMasterForAmount(numAmount);
 
-  // адреса отримувача (пресейл) завжди від поточного config
+  // адреса отримувача (пресейл)
   let presaleOwner;
   try {
     presaleOwner = new TonWeb.utils.Address(CONFIG.PRESALE_OWNER_ADDRESS);
   } catch {
     throw new Error("Невірний PRESALE_OWNER_ADDRESS у config.js");
   }
-  const JettonMinter = TonWeb.token.jetton.JettonMinter;
-  const minter = new JettonMinter(tonweb.provider, { address: new TonWeb.utils.Address(usdtMasterB64) });
-  const presaleJettonWalletAddr = await minter.getJettonWalletAddress(presaleOwner);
 
   // сума у units
   const dec = Number(CONFIG.JETTON_DECIMALS ?? 6);
   const jetAmountBig = decimalToUnitsBigInt(numAmount, dec);
   const amountBN = new TonWeb.utils.BN(jetAmountBig.toString());
 
-  // префлайт: баланс
-  if (balanceUnits < jetAmountBig) {
+  if (balanceUnits !== null && balanceUnits < jetAmountBig) {
     const human = Number(balanceUnits) / 10 ** dec;
     throw new Error(`Недостатньо USDT: на обраному майстрі ${human.toFixed(6)} USDT, потрібно ${numAmount}.`);
   }
@@ -250,12 +264,12 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   let cleanRef = null;
   if (typeof refAddr === "string" && isTonAddress(refAddr)) cleanRef = refAddr.trim();
   if (cleanRef && CONFIG.REF_SELF_BAN === true) {
-    const buyerBase64 = userAddr.toString(true, true, true);
+    const buyerBase64 = userJettonWalletAddr?.toString(true, true, true) || "";
     if (buyerBase64 === cleanRef) cleanRef = null;
   }
 
   // коментар (forward payload)
-  const buyerB64 = toBase64Url(userAddr);
+  const buyerB64 = toBase64Url(resolvedOwner);
   const refB64 = cleanRef ? toBase64Url(cleanRef) : "-";
   const ts = Date.now();
   const nonce = Math.floor(Math.random() * 1e9) >>> 0;
@@ -269,12 +283,26 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const forwardTon = TonWeb.utils.toNano(String(CONFIG.FORWARD_TON ?? "0"));
   const openTon    = TonWeb.utils.toNano(String(CONFIG.JETTON_WALLET_TON ?? "0.25"));
 
+  // presale jetton wallet — отримуємо на будь-якому робочому провайдері
+  let presaleJettonWalletAddr = null;
+  for (const prov of providerSeq(TonWeb)) {
+    try {
+      const JettonMinter = TonWeb.token.jetton.JettonMinter;
+      const minter = new JettonMinter(prov, { address: new TonWeb.utils.Address(usdtMasterB64) });
+      presaleJettonWalletAddr = await minter.getJettonWalletAddress(presaleOwner);
+      break;
+    } catch {}
+  }
+  if (!presaleJettonWalletAddr) {
+    throw new Error("Не вдалося отримати адресу JettonWallet пресейлу (усі RPC недоступні)");
+  }
+
   // тіло transfer
   const body = await userJettonWallet.createTransferBody({
     queryId: new TonWeb.utils.BN(ts),
     amount: amountBN,
     toAddress: presaleJettonWalletAddr,
-    responseAddress: userAddr,
+    responseAddress: new TonWeb.utils.Address(resolvedOwner),
     forwardAmount: forwardTon,
     forwardPayload: cell,
   });
@@ -300,13 +328,12 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     console.log("[MAGT TX] note:", note);
   } catch {}
 
-  // повідомлення TonConnect → на джеттон-гаманець користувача
-  // ТУТ ЗМІНЕНО: використовуємо bounceable (EQ…)
+  // повідомлення TonConnect → на джеттон-гаманець користувача (EQ…, bounceable)
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
       {
-        address: userJettonWalletAddr.toString(true, true, true), // EQ…, bounceable
+        address: userJettonWalletAddr.toString(true, true, true),
         amount: openTon.toString(),
         payload: payloadB64,
         ...(stateInitB64 ? { stateInit: stateInitB64 } : {}),
@@ -337,11 +364,9 @@ export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts
   if (!Number.isFinite(amountTon) || !(amountTon > 0)) throw new Error("Некоректна сума TON для клейму");
 
   const provider = new TonWeb.HttpProvider(RPC_URL);
-  const tonweb = new TonWeb(provider);
 
-  let userAddr, claimAddr;
+  let claimAddr;
   try {
-    userAddr = new TonWeb.utils.Address(resolvedOwner);
     claimAddr = new TonWeb.utils.Address(contract);
   } catch {
     throw new Error("Невірний формат TON-адреси для клейму");
@@ -349,7 +374,7 @@ export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts
 
   const note =
     String(opts.note ?? "").trim() ||
-    `MAGT CLAIM | user=${toBase64Url(userAddr)} | ts=${Date.now()}`;
+    `MAGT CLAIM | user=${toBase64Url(resolvedOwner)} | ts=${Date.now()}`;
 
   const cell = new TonWeb.boc.Cell();
   cell.bits.writeUint(0, 32);
