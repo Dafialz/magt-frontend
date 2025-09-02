@@ -204,7 +204,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   const numAmount = Number(usdAmount);
   if (!Number.isFinite(numAmount) || numAmount <= 0) throw new Error("Некоректна сума");
   if (CONFIG.MIN_BUY_USDT && numAmount < CONFIG.MIN_BUY_USDT)
-    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUY_USDT} USDT`);
+    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUЙ_USDT} USDT`);
 
   const provider = new TonWeb.HttpProvider(RPC_URL);
   const tonweb = new TonWeb(provider);
