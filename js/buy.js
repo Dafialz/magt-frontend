@@ -61,7 +61,7 @@ export async function getUserUsdtBalance() {
 
     // адреса USDT-джеттон-гаманця користувача
     const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
-    const jw = userJettonWalletAddr.toString(true, true, false); // urlSafe, non-bounce
+    const jw = userJettonWalletAddr.toString(true, true, false); // urlSafe
 
     // runGetMethod(get_wallet_data)
     const res = await fetch(RPC_URL, {
@@ -243,6 +243,23 @@ export async function onBuyClick() {
       tx = await buildUsdtTxUsingConnected(usd, ref);
     } catch {
       tx = await buildUsdtTransferTx(walletAddress, usd, ref);
+    }
+
+    // 🔧 ВАЖЛИВЕ: нормалізуємо адресу одержувача на bounceable (EQ)
+    try {
+      const TonWeb = window.TonWeb;
+      const A = TonWeb?.utils?.Address;
+      if (A && tx?.messages?.[0]?.address) {
+        const addrObj = new A(tx.messages[0].address);
+        tx.messages[0].address = addrObj.toString(true, true, false); // EQ, urlSafe
+      }
+    } catch (eAddr) {
+      console.warn("Address normalize warning:", eAddr?.message || eAddr);
+    }
+
+    // Перестраховка: перевіряємо наявність payload
+    if (!tx?.messages?.[0]?.payload) {
+      throw new Error("TX_WITHOUT_PAYLOAD");
     }
 
     console.log("[BUY] TonConnect tx =", tx);
