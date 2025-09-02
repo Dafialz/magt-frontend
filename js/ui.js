@@ -243,7 +243,8 @@ function el(id){ return document.getElementById(id); }
 
 // допоміжне: отримати інфо активного рівня за soldMag
 function getCurrentTierInfo(sold) {
-  const tiers = Array.isArray(CONFIG.SALE_TIERS) ? CONFIG.SALE_TIERS : [];
+  // 🔧 використовуємо CONFIG.LEVELS (а не SALE_TIERS)
+  const tiers = Array.isArray(CONFIG.LEVELS) ? CONFIG.LEVELS : [];
   let level = 1;
   let price = Number(CONFIG.PRICE_USD || 0);
   let remainingInTier = Math.max(0, Number(CONFIG.TOTAL_SUPPLY || 0) - Number(sold || 0));
@@ -295,7 +296,7 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   // оновлюємо картку параметрів
   if (ui.price) ui.price.textContent = Number(info.price || 0).toFixed(6);
   if (ui.level) ui.level.textContent = String(info.level);
-  // ТІЛЬКИ ЧИСЛО: підпис "MAGT" тепер статичний у hero.html
+  // лише число (MAGT вже в HTML поруч)
   if (ui.left)  ui.left.textContent  = fmt.tokens(info.remainingInTier);
 
   // оновлюємо виджет «Залишок»
