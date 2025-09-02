@@ -53,7 +53,7 @@ export const CONFIG = {
   USDT_DECIMALS:   6,
 
   // Оптимальні TON для виконання init/transfer
-  JETTON_WALLET_TON: 0.25,
+  JETTON_WALLET_TON: 0.15,
   FORWARD_TON: 0.05,
 
   /* ===== Обмеження / рефералка ===== */
