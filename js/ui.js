@@ -260,8 +260,10 @@ function calcTokensFromUsd(usdRaw, priceRaw) {
 
 /** відмальовка блоку “Отримаєш … MAGT” */
 function renderTokensOut(tokens) {
-  if (!ui.magOut) return;
-  ui.magOut.textContent = fmt.tokens(tokens);
+  // фолбек на прямий пошук елемента, якщо мапінг ui.magOut не спрацював
+  const outEl = ui.magOut || document.getElementById("magOut");
+  if (!outEl) return;
+  outEl.textContent = fmt.tokens(tokens);
 }
 
 /** головний перерахунок */
@@ -347,8 +349,8 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   // зберігаємо поточну ціну для інших модулів (калькулятор/покупка)
   try { window.__CURRENT_PRICE_USD = Number(info.price || 0); } catch {}
 
-  // резервні поля старої верстки
-  if (ui.raised) ui.raised.textContent = `$${(raised).toLocaleString()}`;
+  // резервні поля старої верстки — без другого долара (сам $ у HTML)
+  if (ui.raised) ui.raised.textContent = (raised).toLocaleString();
   if (ui.bar)    ui.bar.style.width = `${pct.toFixed(2)}%`;
 }
 
