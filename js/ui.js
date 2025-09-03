@@ -90,6 +90,15 @@ function short(addr) {
 const REF_ON  = (CONFIG.REF_ENABLED !== false);
 const REF_MIN = Number(CONFIG.REF_MIN_USDT || 0);
 
+/* ===== DOM getters (щоб не залежати від ui.*, коли refs ще не оновлені) ===== */
+function getUsdtInput() {
+  return ui.usdtIn || document.getElementById("usdtIn");
+}
+function getAgreeCheckbox() {
+  return ui.agree || document.getElementById("agree");
+}
+function el(id){ return document.getElementById(id); }
+
 /* ====== керування зверненнями до бекенду рефералок ====== */
 let REF_API_ON = true;               // вимикаємо лише при фатальних мережевих збоях
 let _lastProbeWallet = "";           // антидубль GET
@@ -220,18 +229,21 @@ function setReferrerInState(addrB64) {
 
 /* ===================== inputs & buttons ===================== */
 export function sanitizeUsdInput() {
-  if (!ui.usdtIn) return 0;
-  const val = String(ui.usdtIn.value || "").replace(",", ".").trim();
+  const input = getUsdtInput();
+  if (!input) return 0;
+  const val = String(input.value || "").replace(",", ".").trim();
   let usd = Number(val);
   if (!isFinite(usd) || usd < 0) usd = 0;
   usd = Math.round(usd * 100) / 100;
-  ui.usdtIn.value = usd ? usd : "";
+  input.value = usd ? usd : "";
   return usd;
 }
 
 export function refreshButtons() {
-  const usd = Number(ui.usdtIn?.value || 0);
-  const ok = !!ui.agree?.checked && usd >= (CONFIG.MIN_BUY_USDT || 1);
+  const input = getUsdtInput();
+  const agree = getAgreeCheckbox();
+  const usd = Number(input?.value || 0);
+  const ok = !!agree?.checked && usd >= (CONFIG.MIN_BUY_USDT || 1);
   if (ui.btnBuy) ui.btnBuy.disabled = !ok;
   if (ui.btnClaim) ui.btnClaim.disabled = true;
 }
@@ -279,7 +291,6 @@ export function recalc() {
 }
 
 /* ===== Прогрес/залишок ===== */
-function el(id){ return document.getElementById(id); }
 
 // допоміжне: отримати інфо активного рівня за soldMag
 function getCurrentTierInfo(sold) {
@@ -364,7 +375,7 @@ function startSalePolling() {
 
 /* ===== авто-підв’язка калькулятора, якщо bindEvents() не викликано ===== */
 function ensureCalcWires() {
-  const input = document.getElementById("usdtIn");
+  const input = getUsdtInput();
   if (input && !input._calcWired) {
     ["input","change","blur"].forEach(ev => input.addEventListener(ev, recalc));
     input._calcWired = true;
@@ -452,10 +463,11 @@ export function loadRefFromStorage() {
 
 /* ===== РЕФ-БОНУС у MAGT ===== */
 export function updateRefBonus() {
-  if (!ui.refPayout || !ui.usdtIn) return;
+  const input = getUsdtInput();
+  if (!ui.refPayout || !input) return;
   if (!REF_ON) { ui.refPayout.classList.add("hidden"); return; }
 
-  const usd = Number(ui.usdtIn.value || 0);
+  const usd = Number(input.value || 0);
   if (!state.referrer || !usd || usd <= 0 || (REF_MIN > 0 && usd < REF_MIN)) {
     ui.refPayout.classList.add("hidden");
     return;
@@ -488,9 +500,10 @@ export function updateRefBonus() {
 }
 
 export function initRefBonusHandlers() {
-  if (!ui.usdtIn) return;
+  const input = getUsdtInput();
+  if (!input) return;
   ["input", "change", "blur"].forEach((ev) =>
-    ui.usdtIn.addEventListener(ev, updateRefBonus)
+    input.addEventListener(ev, updateRefBonus)
   );
   updateRefBonus();
 }
@@ -609,8 +622,17 @@ export async function setOwnRefLink(walletAddress) {
 
 /* ===================== bind events ===================== */
 export function bindEvents({ onBuyClick, onClaimClick, getUserUsdtBalance }) {
-  ui.usdtIn && ui.usdtIn._bound !== true && (ui.usdtIn.addEventListener("input", recalc), (ui.usdtIn._bound = true));
-  ui.agree && ui.agree._bound !== true && (ui.agree.addEventListener("change", refreshButtons), (ui.agree._bound = true));
+  const input = getUsdtInput();
+  const agree = getAgreeCheckbox();
+
+  if (input && input._bound !== true) {
+    input.addEventListener("input", recalc);
+    input._bound = true;
+  }
+  if (agree && agree._bound !== true) {
+    agree.addEventListener("change", refreshButtons);
+    agree._bound = true;
+  }
 
   if (ui.btnMax && ui.btnMax._bound !== true) {
     ui.btnMax.addEventListener("click", async () => {
@@ -619,7 +641,8 @@ export function bindEvents({ onBuyClick, onClaimClick, getUserUsdtBalance }) {
       setBtnLoading(ui.btnMax, false);
       if (max == null || !isFinite(max)) max = 100;
       const capped = clamp(max, CONFIG.MIN_BUY_USDT || 0, 1_000_000);
-      ui.usdtIn.value = Math.floor(capped * 100) / 100;
+      const i = getUsdtInput();
+      if (i) i.value = Math.floor(capped * 100) / 100;
       recalc();
     });
     ui.btnMax._bound = true;
