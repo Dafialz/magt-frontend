@@ -122,6 +122,45 @@ function wireCalcInput() {
   }
 }
 
+/* ===== Mobile nav (burger) ===== */
+function initMobileNav() {
+  // шукаємо саме наш header-nav
+  const nav = document.querySelector('nav[data-nav]');
+  if (!nav || nav.__navBound) return;
+
+  const btn = nav.querySelector('label[for="nav-burger"], #nav-btn');
+  const panel = nav.querySelector('#mobile-panel');
+  const checkbox = nav.querySelector('#nav-burger');
+
+  if (!btn || !panel) return;
+
+  const setAria = () => btn.setAttribute('aria-expanded', panel.classList.contains('hidden') ? 'false' : 'true');
+  const open  = () => { panel.classList.remove('hidden'); if (checkbox) checkbox.checked = true;  setAria(); };
+  const close = () => { panel.classList.add('hidden');   if (checkbox) checkbox.checked = false; setAria(); };
+
+  const onBtn = (e) => { e.preventDefault(); panel.classList.contains('hidden') ? open() : close(); };
+  btn.addEventListener('click', onBtn);
+  btn.addEventListener('touchstart', onBtn, { passive:false });
+
+  // закриття при кліку по пункту меню
+  panel.addEventListener('click', (e) => {
+    if (e.target.closest('a,button,summary')) close();
+  });
+
+  // кліки поза панеллю — закривають
+  document.addEventListener('click', (e) => {
+    if (!nav.contains(e.target)) close();
+  });
+
+  // Esc / зміна якоря / ресайз на десктоп — закрити
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  window.addEventListener('hashchange', close);
+  window.addEventListener('resize', () => { if (window.innerWidth >= 768) close(); });
+
+  setAria();
+  nav.__navBound = true;
+}
+
 /* ================= Handlers ================= */
 function afterConnected(base64Addr) {
   try { setOwnRefLink(base64Addr); } catch {}
@@ -174,6 +213,9 @@ async function reinitAfterPartials() {
     await mountTonButtons().catch(()=>{});
     window.__magtEventsBound = false; // дозволимо перев’язати події для свіжого DOM
     bindRuntimeEventsOnce();
+
+    // ⬇️ мобільне меню після підвантаження partial'ів
+    initMobileNav();
 
     wireCalcInput();   // ← важливо: повторно страхуємо інпут
     refreshReferralUi();
@@ -238,6 +280,7 @@ async function bootOnce() {
 
   bindRuntimeEventsOnce();
   wireCalcInput(); // ← відразу після старту
+  initMobileNav(); // ⬅️ ініціалізуємо бургер одразу
 
   refreshReferralUi();
   recalc();
