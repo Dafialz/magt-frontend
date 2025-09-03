@@ -196,25 +196,42 @@ function extractFromLocalStorage() {
 }
 
 /* =============== кнопка (рівно одна) =============== */
+/** Перевіряємо реальну видимість елемента (display:none, розміри, батьківські display:none). */
+function isVisible(el) {
+  if (!el) return false;
+  const style = window.getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
+  if (el.getClientRects().length === 0) return false;
+  let p = el.parentElement;
+  while (p) {
+    const s = window.getComputedStyle(p);
+    if (s.display === "none" || s.visibility === "hidden") return false;
+    p = p.parentElement;
+  }
+  return true;
+}
+
 /**
- * Пріоритет місця монтування:
+ * Пріоритет місця монтування (серед ВИДИМИХ):
  * 1) NAV: #tonconnect → #tonconnect-mobile-inline → #tonconnect-mobile
- * 2) Будь-який інший [data-ton-root], КРІМ #tonconnect-hero
- * 3) Fallback: #tonconnect-hero (якщо інших коренів немає)
+ * 2) Будь-який інший видимий [data-ton-root]:not(#tonconnect-hero)
+ * 3) Fallback: видимий #tonconnect-hero
  */
 function findRootOnce() {
-  // пріоритетно шукаємо всі nav-контейнери
-  const navRoot = document.querySelector("#tonconnect, #tonconnect-mobile-inline, #tonconnect-mobile");
-  if (navRoot) return navRoot;
+  const preferIds = ["#tonconnect", "#tonconnect-mobile-inline", "#tonconnect-mobile"];
+  for (const sel of preferIds) {
+    const el = document.querySelector(sel);
+    if (el && isVisible(el)) return el;
+  }
 
-  const anyNonHero = document.querySelector("[data-ton-root]:not(#tonconnect-hero)");
+  const anyNonHero = Array.from(document.querySelectorAll("[data-ton-root]:not(#tonconnect-hero)"))
+    .find(isVisible);
   if (anyNonHero) return anyNonHero;
 
-  // Fallback лише якщо зовсім немає інших контейнерів
   const hero = document.querySelector("#tonconnect-hero");
-  if (hero) return hero;
+  if (hero && isVisible(hero)) return hero;
 
-  return document.querySelector("[data-ton-root]") || null;
+  return Array.from(document.querySelectorAll("[data-ton-root]")).find(isVisible) || null;
 }
 
 async function mountPrimaryAt(root) {
