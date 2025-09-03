@@ -59,7 +59,7 @@ html,body{
 /* — фіксований на html::before (стабільно на iOS Safari)               */
 /* =================================================================== */
 
-/* Прибрали будь-які інші body::before в проекті — уникаємо конфліктів */
+/* Один фіксований фон для всієї сторінки */
 html::before{
   content:"";
   position:fixed;
@@ -73,7 +73,7 @@ html::before{
     url("./bg.png") type("image/png") 1x
   );
   background-repeat:no-repeat;
-  background-size:cover;         /* не ріже боки, масштабується */
+  background-size:cover;         /* заповнює екран без “смужок” */
   background-position:center top;/* починається з самого верху */
   transform:translateZ(0);
   will-change:transform;
@@ -87,9 +87,13 @@ body::after{
   opacity:.45; pointer-events:none;
 }
 
-/* На вузьких екранах трохи піднімаємо композицію */
+/* 🔁 МОБІЛЬНИЙ ФОН: підміняємо картинку і фокус */
 @media (max-width:768px){
-  html::before{ background-position:center 18% }
+  html::before{
+    background-image: url("/assets/bg-mobile.png") !important;
+    background-size: cover !important;
+    background-position: center 18% !important;
+  }
 }
 
 /* iOS Safari: фон не «стрибає» при скролі */
