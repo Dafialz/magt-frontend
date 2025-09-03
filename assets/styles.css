@@ -85,3 +85,87 @@ html, body {
 .bg-white\/10{background:rgba(255,255,255,.10)}
 .border-white\/10{border-color:rgba(255,255,255,.10)}
 .backdrop-blur-xl{backdrop-filter:blur(18px)}
+
+/* =================================================================== */
+/* 📱 MOBILE-READY BACKGROUND                                           */
+/* — повноекранний фон через псевдо-елемент: працює і на iOS Safari     */
+/* =================================================================== */
+
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  /* кілька варіантів шляху — підхопиться той, що існує */
+  background-image:
+    url("/bg.png"),
+    url("/assets/bg.png"),
+    url("./bg.png");
+  background-repeat:no-repeat;
+  background-size:cover;
+  background-position:center center;
+  /* згладжує та прибирає ривки на мобільних */
+  transform:translateZ(0);
+}
+
+/* трохи сильніший оверлей — читаємий текст на світлих ділянках */
+body::after{
+  content:"";
+  position:fixed; inset:0; z-index:-1;
+  background: radial-gradient(120% 120% at 50% 10%, #0000 0%, #000 65%);
+  opacity:.45; pointer-events:none;
+}
+
+/* На вузьких екранах зміщуємо композицію вище (видно коло/хвилі) */
+@media (max-width: 768px){
+  body::before{ background-position: center 20%; }
+}
+
+/* =================================================================== */
+/* 🍔 MOBILE NAV DRAWER (бургер-меню)                                   */
+/* — JS має просто додавати/знімати .open або data-open="1" на елементи */
+/* =================================================================== */
+
+.touch-target{ min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; }
+
+.mobile-backdrop{
+  position:fixed; inset:0; z-index:40;
+  background:rgba(0,0,0,.45);
+  opacity:0; pointer-events:none;
+  transition:opacity .2s ease;
+}
+.mobile-backdrop.open,[data-open="1"].mobile-backdrop{
+  opacity:1; pointer-events:auto;
+}
+
+.mobile-drawer{
+  position:fixed; inset:0 0 0 auto; z-index:50;
+  width:320px; max-width:85vw;
+  background:rgba(12,12,16,.86);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-left:1px solid rgba(255,255,255,.12);
+  transform:translateX(100%);
+  transition:transform .25s ease;
+  display:flex; flex-direction:column;
+}
+.mobile-drawer.open,[data-open="1"].mobile-drawer{ transform:translateX(0); }
+
+.mobile-menu a{
+  display:flex; align-items:center; gap:.75rem;
+  padding:.875rem 1rem; color:#fff; text-decoration:none;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.mobile-menu a:hover{ background:rgba(255,255,255,.06); }
+
+/* елемент-хедер усередині дроуера */
+.mobile-drawer .drawer-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.75rem 1rem; border-bottom:1px solid rgba(255,255,255,.08);
+}
+
+/* на десктопі дроуер прихований незалежно від класів */
+@media (min-width: 1024px){
+  .mobile-backdrop{ display:none !important; }
+  .mobile-drawer{ display:none !important; }
+}
