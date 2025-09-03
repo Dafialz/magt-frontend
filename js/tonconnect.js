@@ -198,12 +198,13 @@ function extractFromLocalStorage() {
 /* =============== кнопка (рівно одна) =============== */
 /**
  * Пріоритет місця монтування:
- * 1) NAV: #tonconnect або #tonconnect-mobile
+ * 1) NAV: #tonconnect → #tonconnect-mobile-inline → #tonconnect-mobile
  * 2) Будь-який інший [data-ton-root], КРІМ #tonconnect-hero
  * 3) Fallback: #tonconnect-hero (якщо інших коренів немає)
  */
 function findRootOnce() {
-  const navRoot = document.querySelector("#tonconnect") || document.querySelector("#tonconnect-mobile");
+  // пріоритетно шукаємо всі nav-контейнери
+  const navRoot = document.querySelector("#tonconnect, #tonconnect-mobile-inline, #tonconnect-mobile");
   if (navRoot) return navRoot;
 
   const anyNonHero = document.querySelector("[data-ton-root]:not(#tonconnect-hero)");
