@@ -40,16 +40,22 @@
         </details>
       </li>
 
-      <!-- TonConnect кнопка (контейнер) -->
+      <!-- TonConnect кнопка (контейнер, тільки для десктопу) -->
       <li role="none">
         <div id="tonconnect" class="w-[180px] h-10"></div>
       </li>
     </ul>
 
-    <!-- Бургер (label керує #nav-burger) -->
-    <label for="nav-burger" class="md:hidden p-2 rounded-lg hover:bg-white/10 cursor-pointer" aria-label="Open menu" aria-controls="mobile-panel" aria-expanded="false">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-    </label>
+    <!-- Правий блок: мобільна TonConnect + бургер -->
+    <div class="flex items-center gap-3 md:hidden">
+      <!-- МОБІЛЬНА інлайн-кнопка (видна навіть коли бургер закритий) -->
+      <div id="tonconnect-mobile-inline" class="w-[150px] h-10"></div>
+
+      <!-- Бургер (label керує #nav-burger) -->
+      <label for="nav-burger" class="p-2 rounded-lg hover:bg-white/10 cursor-pointer" aria-label="Open menu" aria-controls="mobile-panel" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </label>
+    </div>
   </div>
 
   <!-- Мобільне меню -->
@@ -81,7 +87,7 @@
         </div>
       </details>
 
-      <!-- TonConnect кнопка (контейнер) -->
+      <!-- TonConnect кнопка (контейнер в дроуері) -->
       <div id="tonconnect-mobile" class="w-full h-10"></div>
     </div>
   </div>
