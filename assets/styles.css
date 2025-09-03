@@ -90,7 +90,7 @@ body::after{
 /* 🔁 МОБІЛЬНИЙ ФОН: підміняємо картинку і фокус */
 @media (max-width:768px){
   html::before{
-    background-image: url("/assets/bg-mobile.png") !important;
+    background-image: url("/assets/mobile.png") !important;
     background-size: cover !important;
     background-position: center 18% !important;
   }
