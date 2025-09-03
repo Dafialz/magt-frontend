@@ -1,5 +1,8 @@
 <!-- /partials/nav.html -->
 <nav class="sticky top-0 z-50 bg-neutral-900/70 backdrop-blur-xl border-b border-white/10" data-nav aria-label="Primary">
+  <!-- Важливо: чекбокс ПЕРЕД панеллю і на одному рівні з нею -->
+  <input type="checkbox" id="nav-burger" class="sr-only" aria-hidden="true" />
+
   <div class="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
     <!-- Лого -->
     <a href="#top" class="flex items-center gap-2" aria-label="Magic Time">
@@ -7,7 +10,7 @@
       <span class="font-semibold" data-i18n="nav.brand">Magic Time</span>
     </a>
 
-    <!-- Меню + перемикач мов -->
+    <!-- Меню + перемикач мов (desktop) -->
     <ul class="hidden md:flex items-center gap-6 text-sm" role="menubar">
       <li role="none"><a role="menuitem" href="#buy" class="hover:text-brand transition" data-i18n="nav.buy">Buy</a></li>
       <li role="none"><a role="menuitem" href="#tokenomics" class="hover:text-brand transition" data-i18n="nav.tokenomics">Tokenomics</a></li>
@@ -43,11 +46,10 @@
       </li>
     </ul>
 
-    <!-- Бургер -->
-    <label for="nav-burger" class="md:hidden p-2 rounded-lg hover:bg-white/10 cursor-pointer" aria-label="Open menu">
+    <!-- Бургер (label керує #nav-burger) -->
+    <label for="nav-burger" class="md:hidden p-2 rounded-lg hover:bg-white/10 cursor-pointer" aria-label="Open menu" aria-controls="mobile-panel" aria-expanded="false">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </label>
-    <input type="checkbox" id="nav-burger" class="hidden" aria-hidden="true" />
   </div>
 
   <!-- Мобільне меню -->
@@ -83,9 +85,46 @@
       <div id="tonconnect-mobile" class="w-full h-10"></div>
     </div>
   </div>
-</nav>
 
-<!-- Мінімальний CSS для мобільного меню -->
-<style>
-  #nav-burger:checked ~ #mobile-panel { display: block; }
-</style>
+  <!-- Мінімальний CSS для мобільного меню -->
+  <style>
+    /* показуємо панель, коли чекбокс увімкнено */
+    #nav-burger:checked ~ #mobile-panel { display: block; }
+    /* невеликий фікс для iOS, щоб торк по label не виділяв текст */
+    label[for="nav-burger"] { -webkit-tap-highlight-color: transparent; }
+  </style>
+
+  <!-- 5 рядків поведінки: автозакриття меню -->
+  <script>
+    (function () {
+      const burger = document.getElementById('nav-burger');
+      const panel  = document.getElementById('mobile-panel');
+      const label  = document.querySelector('label[for="nav-burger"]');
+
+      function setAria() { if (label) label.setAttribute('aria-expanded', burger.checked ? 'true' : 'false'); }
+      function closeMenu() { if (burger.checked) { burger.checked = false; setAria(); } }
+
+      // Клік по пунктам меню всередині панелі
+      panel?.addEventListener('click', (e) => {
+        const a = e.target.closest('a,button,summary');
+        if (a) closeMenu();
+      });
+
+      // Клік поза панеллю (не по label)
+      document.addEventListener('click', (e) => {
+        if (!burger.checked) return;
+        const t = e.target;
+        if (t.closest('#mobile-panel') || t.closest('label[for="nav-burger"]')) return;
+        closeMenu();
+      });
+
+      // Esc або зміна хеша
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+      window.addEventListener('hashchange', closeMenu);
+
+      // підтримуємо aria-expanded
+      burger.addEventListener('change', setAria);
+      setAria();
+    })();
+  </script>
+</nav>
