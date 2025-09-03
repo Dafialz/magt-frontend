@@ -90,24 +90,42 @@ function short(addr) {
 const REF_ON  = (CONFIG.REF_ENABLED !== false);
 const REF_MIN = Number(CONFIG.REF_MIN_USDT || 0);
 
-/* ===== DOM getters (щоб не залежати від ui.*, коли refs ще не оновлені) ===== */
+/* ===== DOM getters з перевіркою isConnected ===== */
 function getUsdtInput() {
-  return ui.usdtIn || document.getElementById("usdtIn");
+  let el = ui.usdtIn;
+  if (!el || !el.isConnected) {
+    el = document.getElementById("usdtIn") || null;
+    if (el) ui.usdtIn = el;
+  }
+  return el;
 }
 function getAgreeCheckbox() {
-  return ui.agree || document.getElementById("agree");
+  let el = ui.agree;
+  if (!el || !el.isConnected) {
+    el = document.getElementById("agree") || null;
+    if (el) ui.agree = el;
+  }
+  return el;
+}
+function getMagOut() {
+  let el = ui.magOut;
+  if (!el || !el.isConnected) {
+    el = document.getElementById("magOut") || null;
+    if (el) ui.magOut = el;
+  }
+  return el;
 }
 function el(id){ return document.getElementById(id); }
 
 /* ====== керування зверненнями до бекенду рефералок ====== */
-let REF_API_ON = true;               // вимикаємо лише при фатальних мережевих збоях
-let _lastProbeWallet = "";           // антидубль GET
-let _lastPostWallet  = "";           // антидубль POST
+let REF_API_ON = true;
+let _lastProbeWallet = "";
+let _lastPostWallet  = "";
 
 // ✅ Використовуємо абсолютний ендпоінт із config.js
 const REF_ENDPOINT = (CONFIG?.ENDPOINTS?.referral || "").trim();
 
-/* safeguard: якщо хтось раптом конкатить API_BASE, зробимо запасний шлях */
+/* safeguard */
 const REF_API_PATH = REF_ENDPOINT || (
   (API_BASE ? (API_BASE.replace(/\/+$/,"") + "/api/referral") : "/api/referral")
 );
@@ -203,7 +221,6 @@ async function apiGetReferral(walletB64) {
     const url = `${REF_API_PATH}?wallet=${encodeURIComponent(walletB64)}`;
     const res = await fetch(url);
     _lastProbeWallet = walletB64;
-    // сервер повертає 200 і {ok:false} якщо ще не закріплено
     return await res.json().catch(() => ({}));
   } catch {
     REF_API_ON = false;
@@ -252,39 +269,29 @@ export function refreshButtons() {
 function updatePriceUnder(){
   const pn = document.getElementById('price-now');
   const ln = document.getElementById('level-now');
-  // динамічна ціна поточного рівня (fallback на CONFIG)
   if (pn) pn.textContent = (Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0)).toFixed(6);
   if (ln) ln.textContent = ui.level?.textContent || "1";
 }
 
 /* ===================== core calc ===================== */
-/** безпечне обчислення кількості MAGT з округленням вниз */
 function calcTokensFromUsd(usdRaw, priceRaw) {
   const usd = Number(usdRaw);
   const price = Number(priceRaw);
   if (!(usd > 0) || !(price > 0)) return 0;
-  // лише цілі MAGT
   return Math.floor(usd / price);
 }
 
-/** відмальовка блоку “Отримаєш … MAGT” */
 function renderTokensOut(tokens) {
-  // фолбек, якщо ui.magOut ще не оновився
-  const outEl = ui.magOut || document.getElementById("magOut");
+  const outEl = getMagOut();
   if (!outEl) return;
   outEl.textContent = fmt.tokens(tokens);
 }
 
-/** головний перерахунок */
 export function recalc() {
   const usd = sanitizeUsdInput();
-  // ВАЖЛИВО: беремо динамічну ціну поточного рівня
   const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
-
   const tokens = calcTokensFromUsd(usd, price);
   renderTokensOut(tokens);
-
-  // реф-бонус залежить від кількості токенів (через usd/price)
   updateRefBonus();
   updatePriceUnder();
   refreshButtons();
@@ -314,7 +321,6 @@ function getCurrentTierInfo(sold) {
     }
     cum = end;
   }
-  // усе розкуплено — показуємо останній рівень із нульовим залишком
   const last = tiers[tiers.length - 1];
   const pLast = Number(last?.price ?? last?.usd ?? last?.priceUsd ?? 0);
   if (pLast > 0) price = pLast;
@@ -322,16 +328,13 @@ function getCurrentTierInfo(sold) {
 }
 
 function applySaleUi({ raisedUsd, soldMag, totalMag }) {
-  // офсет і хардкапа
   const offset = Number(CONFIG.RAISED_OFFSET_USD || 0);
   const cap    = Number(CONFIG.HARD_CAP || 0) || null;
   const raised = Math.max(0, Number(raisedUsd || 0)) + offset;
 
-  // Процент і смуга (за USD-хардкапо́ю)
   let pct = 0;
   if (cap && cap > 0) pct = Math.max(0, Math.min(100, (raised / cap) * 100));
 
-  // «Зібрано» + прогрес-бар у віджеті
   const saleRaised = el("sale-raised");
   const saleBar    = el("sale-bar");
   const salePercent= el("sale-percent");
@@ -339,23 +342,18 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   if (saleBar)     saleBar.style.width = `${pct.toFixed(2)}%`;
   if (salePercent) salePercent.textContent = `${pct.toFixed(2)}% продано`;
 
-  // ===== ключове: рівень / ціна / залишок у поточному рівні =====
   const sold = Math.max(0, Number(soldMag || 0));
   const info = getCurrentTierInfo(sold);
 
-  // оновлюємо картку параметрів
   if (ui.price) ui.price.textContent = Number(info.price || 0).toFixed(6);
   if (ui.level) ui.level.textContent = String(info.level);
   if (ui.left)  ui.left.textContent  = fmt.tokens(info.remainingInTier);
 
-  // оновлюємо виджет «Залишок»
   const saleRemaining = el("sale-remaining");
   if (saleRemaining) saleRemaining.textContent = fmt.tokens(info.remainingInTier);
 
-  // зберігаємо поточну ціну для інших модулів (калькулятор/покупка)
   try { window.__CURRENT_PRICE_USD = Number(info.price || 0); } catch {}
 
-  // резервні поля старої верстки — без другого долара (сам $ у HTML)
   if (ui.raised) ui.raised.textContent = (raised).toLocaleString();
   if (ui.bar)    ui.bar.style.width = `${pct.toFixed(2)}%`;
 }
@@ -387,11 +385,9 @@ export function initStaticUI() {
   const y = document.querySelector("#year");
   if (y) y.textContent = new Date().getFullYear();
 
-  // початкові плейсхолдери; реальні значення підставить applySaleUi()
   if (ui.price) ui.price.textContent = (CONFIG.PRICE_USD || 0).toFixed(6);
   if (ui.level) ui.level.textContent = "1";
 
-  // Ініціальні значення до першого запиту
   applySaleUi({ raisedUsd: 0, soldMag: 0, totalMag: CONFIG.TOTAL_SUPPLY });
 
   if (ui.claimWrap) ui.claimWrap.classList.toggle("hidden", !CONFIG.CLAIM_ENABLED);
@@ -405,16 +401,12 @@ export function initStaticUI() {
     if (ui.btnCopyRef) ui.btnCopyRef.disabled = false;
   }
 
-  // ⛔️ БЛОК приховування «Ціль збору…» вилучено як зайвий
-
   updatePriceUnder();
   startSalePolling();
 
-  // авто-підв’язка калькулятора на випадок, якщо bindEvents не викличуть
   ensureCalcWires();
   recalc();
 
-  // Якщо адреса вже відома — стартуємо завантаження «Мої баланси»
   const addr = (state.owner || window.__magtAddr || "").trim?.() || "";
   if (isTonEqUq(addr)) startMyStatsPolling(addr);
 }
@@ -424,9 +416,9 @@ export function detectRefInUrl() {
   const locked = localStorage.getItem("magt_ref_locked") === "1";
   const p = new URLSearchParams(location.search);
   const raw = (p.get("ref") || "").trim();
-  const candidate = normalizeToBase64Url(raw); // лише EQ/UQ (без hex)
+  const candidate = normalizeToBase64Url(raw);
 
-  if (locked) { // якщо вже закріплено на бекенді — ігноруємо будь-які нові ?ref
+  if (locked) {
     loadRefFromStorage();
     return;
   }
@@ -473,7 +465,6 @@ export function updateRefBonus() {
     return;
   }
 
-  // один раз — підмінити шаблон на статичний, щоб уникнути «залипань»
   if (!ui.refPayout.__magTplFixed) {
     try {
       const amtId = ui.refBonusUsd?.id || "ref-bonus-usd";
@@ -487,7 +478,6 @@ export function updateRefBonus() {
   }
 
   const pct   = Number(CONFIG.REF_BONUS_PCT || 5);
-  // Динамічна ціна поточного рівня
   const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
   if (!(price > 0)) return;
 
@@ -536,7 +526,7 @@ export async function setOwnRefLink(walletAddress) {
     return;
   }
 
-  const b64 = await ensureBase64Url(walletAddress); // ТІЛЬКИ EQ/UQ
+  const b64 = await ensureBase64Url(walletAddress);
   const has = !!b64;
 
   const wrap  = document.getElementById("ref-yourlink") || ui.refYourLink;
@@ -584,11 +574,8 @@ export async function setOwnRefLink(walletAddress) {
     }
 
     updateRefBonus();
-
-    // ► Стартуємо отримання «Мої баланси»
     startMyStatsPolling(b64);
 
-    /* === РЕФЕРАЛ «НАЗАВЖДИ» === */
     (async () => {
       try {
         if (!REF_API_ON || !REF_API_PATH) return;
@@ -706,7 +693,6 @@ export function bindEvents({ onBuyClick, onClaimClick, getUserUsdtBalance }) {
     ui.btnClaim._bound = true;
   }
 
-  // страховка — щоб розрахунок працював одразу
   ensureCalcWires();
   recalc();
 }
@@ -715,7 +701,7 @@ export function bindEvents({ onBuyClick, onClaimClick, getUserUsdtBalance }) {
 try {
   window.addEventListener("magt:address", async (ev) => {
     const raw = ev?.detail?.address ?? null;
-    await setOwnRefLink(raw); // всередині примусово EQ/UQ або порожньо
+    await setOwnRefLink(raw);
   });
 } catch {}
 
@@ -729,7 +715,6 @@ function startRefAutofillWatchdog() {
       const input = document.getElementById("ref-link") || ui.refLink;
       const wrap  = document.getElementById("ref-yourlink") || ui.refYourLink;
 
-      // беремо адресу з __magtAddr або резервно з __rawAddr (може бути hex/0:)
       const rawCandidate =
         (typeof window.__magtAddr === "string" && window.__magtAddr.trim()) ?
           window.__magtAddr.trim() :
@@ -741,7 +726,6 @@ function startRefAutofillWatchdog() {
         clearInterval(window.__refWatchRunning);
         window.__refWatchRunning = null;
       }
-      // до ~30 секунд на повільні сценарії
       if (ticks >= 200) {
         clearInterval(window.__refWatchRunning);
         window.__refWatchRunning = null;
@@ -761,7 +745,6 @@ if (document.readyState === "loading") {
   ensureCalcWires();
   recalc();
 }
-// страховка: якщо адреса вже є після повного завантаження
 window.addEventListener("load", () => {
   const a = (window.__magtAddr || window.__rawAddr || "").trim?.() || "";
   if (a) setOwnRefLink(a);
