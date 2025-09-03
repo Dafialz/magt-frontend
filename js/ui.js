@@ -4,10 +4,7 @@ import { ui, state } from "./state.js";
 import { fmt as utilFmt, clamp, setBtnLoading } from "./utils.js";
 import { getPresaleStats } from "./ton.js";
 
-/* ===== БАЗА ДЛЯ API =====
- * УВАГА: у проді CONFIG.API_BASE може бути "".
- * Для рефералок завжди використовуємо абсолютний ендпоінт із CONFIG.ENDPOINTS.referral.
- */
+/* ===== БАЗА ДЛЯ API ===== */
 const IS_LOCAL = (location.hostname === "localhost" || location.hostname === "127.0.0.1");
 const API_BASE =
   (CONFIG && CONFIG.API_BASE != null) ? CONFIG.API_BASE :
@@ -260,7 +257,7 @@ function calcTokensFromUsd(usdRaw, priceRaw) {
 
 /** відмальовка блоку “Отримаєш … MAGT” */
 function renderTokensOut(tokens) {
-  // фолбек на прямий пошук елемента, якщо мапінг ui.magOut не спрацював
+  // фолбек, якщо ui.magOut ще не оновився
   const outEl = ui.magOut || document.getElementById("magOut");
   if (!outEl) return;
   outEl.textContent = fmt.tokens(tokens);
@@ -286,7 +283,6 @@ function el(id){ return document.getElementById(id); }
 
 // допоміжне: отримати інфо активного рівня за soldMag
 function getCurrentTierInfo(sold) {
-  // 🔧 використовуємо CONFIG.LEVELS (а не SALE_TIERS)
   const tiers = Array.isArray(CONFIG.LEVELS) ? CONFIG.LEVELS : [];
   let level = 1;
   let price = Number(CONFIG.PRICE_USD || 0);
@@ -339,7 +335,6 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   // оновлюємо картку параметрів
   if (ui.price) ui.price.textContent = Number(info.price || 0).toFixed(6);
   if (ui.level) ui.level.textContent = String(info.level);
-  // лише число (MAGT вже в HTML поруч)
   if (ui.left)  ui.left.textContent  = fmt.tokens(info.remainingInTier);
 
   // оновлюємо виджет «Залишок»
@@ -365,6 +360,15 @@ function startSalePolling() {
   clearInterval(_saleTimer);
   refreshSaleStatsOnce();
   _saleTimer = setInterval(refreshSaleStatsOnce, 20000);
+}
+
+/* ===== авто-підв’язка калькулятора, якщо bindEvents() не викликано ===== */
+function ensureCalcWires() {
+  const input = document.getElementById("usdtIn");
+  if (input && !input._calcWired) {
+    ["input","change","blur"].forEach(ev => input.addEventListener(ev, recalc));
+    input._calcWired = true;
+  }
 }
 
 /* ===================== static UI on boot ===================== */
@@ -395,6 +399,10 @@ export function initStaticUI() {
   updatePriceUnder();
   startSalePolling();
 
+  // авто-підв’язка калькулятора на випадок, якщо bindEvents не викличуть
+  ensureCalcWires();
+  recalc();
+
   // Якщо адреса вже відома — стартуємо завантаження «Мої баланси»
   const addr = (state.owner || window.__magtAddr || "").trim?.() || "";
   if (isTonEqUq(addr)) startMyStatsPolling(addr);
@@ -416,7 +424,6 @@ export function detectRefInUrl() {
     setReferrerInState(candidate);
     try { window.__pendingRef = candidate; } catch {}
   } else {
-    // якщо в URL hex/0:, НЕ зберігаємо його; перевіримо локальне
     try {
       const savedRaw = localStorage.getItem("magt_ref");
       const saved = normalizeToBase64Url(savedRaw);
@@ -492,7 +499,6 @@ export function initRefBonusHandlers() {
 function promptForManualAddress() {
   let raw = "";
   try { raw = prompt("Встав свою TON-адресу (формат EQ… або стандартний формат).") || ""; } catch {}
-  // не приймаємо hex одразу; спробуємо конвертувати згодом у setOwnRefLink
   setOwnRefLink(raw);
 }
 function resetManualAddress() {
@@ -508,9 +514,8 @@ function loadManualAddressIfAny() {
   } catch {}
 }
 
-/* ====== Встановити власний реф-лінк за адресою гаманця (і закріпити назавжди) ====== */
+/* ====== Встановити власний реф-лінк за адресою гаманця ====== */
 export async function setOwnRefLink(walletAddress) {
-  // якщо DOM-елементи ще не готові — зробимо м’який ретрай
   const wrap0  = document.getElementById("ref-yourlink") || ui.refYourLink;
   const input0 = document.getElementById("ref-link")      || ui.refLink;
   if (!wrap0 || !input0) {
@@ -677,6 +682,10 @@ export function bindEvents({ onBuyClick, onClaimClick, getUserUsdtBalance }) {
     ui.btnClaim.addEventListener("click", onClaimClick);
     ui.btnClaim._bound = true;
   }
+
+  // страховка — щоб розрахунок працював одразу
+  ensureCalcWires();
+  recalc();
 }
 
 /* ===================== glue with TonConnect singleton ===================== */
@@ -719,18 +728,30 @@ function startRefAutofillWatchdog() {
 }
 
 if (document.readyState === "loading") {
-  window.addEventListener("DOMContentLoaded", startRefAutofillWatchdog);
+  window.addEventListener("DOMContentLoaded", () => {
+    startRefAutofillWatchdog();
+    ensureCalcWires();
+    recalc();
+  });
 } else {
   startRefAutofillWatchdog();
+  ensureCalcWires();
+  recalc();
 }
 // страховка: якщо адреса вже є після повного завантаження
 window.addEventListener("load", () => {
   const a = (window.__magtAddr || window.__rawAddr || "").trim?.() || "";
   if (a) setOwnRefLink(a);
+  ensureCalcWires();
+  recalc();
 });
-window.addEventListener("partials:main-ready", startRefAutofillWatchdog);
+window.addEventListener("partials:main-ready", () => {
+  startRefAutofillWatchdog();
+  ensureCalcWires();
+  recalc();
+});
 
-// === debug helpers (не впливають на прод, лише полегшують діагностику) ===
+// === debug helpers ===
 try { window.setOwnRefLink = setOwnRefLink; } catch {}
 try {
   window.magtSetAddr = (addr) => {
