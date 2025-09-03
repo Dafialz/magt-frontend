@@ -112,6 +112,16 @@ function scheduleRefLinkRetries() {
   });
 }
 
+/* ===== Локальний страховий байндинг інпуту → recalc() ===== */
+function wireCalcInput() {
+  const el = document.getElementById("usdtIn");
+  if (el && !el.__calcBound) {
+    el.addEventListener("input", () => { try { recalc(); } catch {} });
+    el.addEventListener("change", () => { try { recalc(); } catch {} });
+    el.__calcBound = true;
+  }
+}
+
 /* ================= Handlers ================= */
 function afterConnected(base64Addr) {
   try { setOwnRefLink(base64Addr); } catch {}
@@ -153,6 +163,7 @@ function bindRuntimeEventsOnce() {
     onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick?.()),
     getUserUsdtBalance,
   });
+  wireCalcInput(); // страховка на випадок, якщо форма підвантажилася пізніше
   window.__magtEventsBound = true;
 }
 
@@ -164,6 +175,7 @@ async function reinitAfterPartials() {
     window.__magtEventsBound = false; // дозволимо перев’язати події для свіжого DOM
     bindRuntimeEventsOnce();
 
+    wireCalcInput();   // ← важливо: повторно страхуємо інпут
     refreshReferralUi();
     recalc();
     refreshButtons();
@@ -225,6 +237,7 @@ async function bootOnce() {
   initStaticUI();
 
   bindRuntimeEventsOnce();
+  wireCalcInput(); // ← відразу після старту
 
   refreshReferralUi();
   recalc();
@@ -266,3 +279,6 @@ window.magt = Object.assign(window.magt || {}, {
   showDebugJettonInfo,
   buyNow: onBuyClick,
 });
+
+// зручно дебажити в консолі
+try { if (!window.recalc) window.recalc = recalc; } catch {}
