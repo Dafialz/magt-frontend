@@ -21,8 +21,22 @@ function join(base, path) {
 }
 
 export const CONFIG = {
-  /* ===== Ціноутворення / капа ===== */
-  // ⬆️ стартова ціна рівня 1 помножена ×3
+  /* ===== Загальна емісія / Токеноміка ===== */
+  // Загальний Total Supply токена
+  TOKEN_TOTAL_SUPPLY: 10_000_000_000,
+
+  // Розподіл для віджета токеноміки (widgets.js → initTokenomics)
+  TOKENOMICS: [
+    { label: "Пресейл",            pct: 5  },  // 500,000,000 MAGT
+    { label: "Ліквідність",        pct: 15 },  // 1,500,000,000 MAGT
+    { label: "Маркетинг",          pct: 5  },  // 500,000,000 MAGT
+    { label: "Команда",            pct: 5  },  // 500,000,000 MAGT
+    { label: "Фонд розвитку",      pct: 10 },  // 1,000,000,000 MAGT
+    { label: "Проєкти у розробці", pct: 60 },  // 6,000,000,000 MAGT
+  ],
+
+  /* ===== Ціноутворення / капа пресейлу ===== */
+  // Стартова ціна поточного рівня (динамічно оновлюється з рівнями/статистикою)
   PRICE_USD: 0.011490,
 
   // Прогрес збору
@@ -69,10 +83,12 @@ export const CONFIG = {
   REF_DEBUG_DEMO: false,
 
   /* ===== Дані пресейлу / таймер ===== */
+  // Пул токенів пресейлу (5% від загальної емісії) — критично для прогрес-бару та рівнів
   TOTAL_SUPPLY: 500_000_000,
+
   ROUND_DEADLINE_TS: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
 
-  // ⬆️ кожен рівень — та сама кількість токенів, але ціни ×3
+  // Рівні пресейлу (к-сть токенів і ціна), прогрес та поточна ціна читаються з них
   LEVELS: [
     { tokens: 65_225_022, price: 0.011490 },
     { tokens: 57_039_669, price: 0.013443 },
@@ -132,7 +148,10 @@ if ((!CONFIG.USDT_MASTERS || CONFIG.USDT_MASTERS.length === 0) && !CONFIG.USDT_M
   console.error("❌ Немає адрес майстрів USDT у config.js");
 }
 if (!CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає PRESALE_OWNER_ADDRESS у config.js");
-if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BОНУС_PCT <= 50)) console.warn("⚠️ REF_BОНУС_PCT виглядає підозріло. Рекомендується 0..50%");
+// Виправлено: використовується один і той самий ключ REF_BONUS_PCT
+if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) {
+  console.warn("⚠️ REF_BONUS_PCT виглядає підозріло. Рекомендується 0..50%");
+}
 
 if (IS_BROWSER) {
   console.log(
