@@ -100,23 +100,29 @@
     label[for="nav-burger"] { -webkit-tap-highlight-color: transparent; }
   </style>
 
-  <!-- 5 рядків поведінки: автозакриття меню -->
+  <!-- Поведінка мобільного меню -->
   <script>
     (function () {
       const burger = document.getElementById('nav-burger');
       const panel  = document.getElementById('mobile-panel');
       const label  = document.querySelector('label[for="nav-burger"]');
+      const langDetails = document.getElementById('lang-switcher-mobile');
+      const langSummary = langDetails?.querySelector('summary');
 
       function setAria() { if (label) label.setAttribute('aria-expanded', burger.checked ? 'true' : 'false'); }
       function closeMenu() { if (burger.checked) { burger.checked = false; setAria(); } }
 
-      // Клік по пунктам меню всередині панелі
+      /* 1) НЕ закриваємо меню коли користувач лише відкриває dropdown мов */
+      langSummary?.addEventListener('click', (e) => e.stopPropagation());
+      langDetails?.addEventListener('click', (e) => e.stopPropagation());
+
+      /* 2) Закриваємо, коли натискають реальний пункт: <a> або <button> */
       panel?.addEventListener('click', (e) => {
-        const a = e.target.closest('a,button,summary');
-        if (a) closeMenu();
+        const t = e.target.closest('a,button'); // <summary> виключено
+        if (t) closeMenu();
       });
 
-      // Клік поза панеллю (не по label)
+      /* 3) Клік поза панеллю (і не по label) */
       document.addEventListener('click', (e) => {
         if (!burger.checked) return;
         const t = e.target;
@@ -124,11 +130,11 @@
         closeMenu();
       });
 
-      // Esc або зміна хеша
+      /* 4) Esc або зміна хеша */
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
       window.addEventListener('hashchange', closeMenu);
 
-      // підтримуємо aria-expanded
+      /* 5) aria-expanded підтримуємо в актуальному стані */
       burger.addEventListener('change', setAria);
       setAria();
     })();

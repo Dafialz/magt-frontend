@@ -169,3 +169,22 @@ body::after{
   .mobile-backdrop{ display:none !important; }
   .mobile-drawer{ display:none !important; }
 }
+
+/* ===== Global background fix (cover + fixed) ===== */
+html, body { height: 100%; }
+body::before{
+  content:"";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  /* підстав свій шлях до фону */
+  background:
+    radial-gradient(60% 60% at 50% 20%, rgba(101,210,255,.15), transparent 60%),
+    radial-gradient(40% 40% at 80% 80%, rgba(124,77,255,.12), transparent 70%),
+    url("/assets/bg.png") center/cover no-repeat;
+  /* якщо у тебе інший шлях — заміни /assets/bg.png */
+}
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari: не “стрибає” фон при скролі */
+  body { background-color: #0a0a0a; }
+}
