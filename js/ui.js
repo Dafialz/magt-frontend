@@ -371,7 +371,7 @@ async function fetchStatsDirect() {
     return {
       raisedUsd: Number(j.raisedUsd ?? j.raised_usd ?? 0),
       soldMag:   Number(j.soldMag   ?? j.sold_tokens ?? 0),
-      totalMag:  Number(j.totalMag  ?? j.total_supply ?? CONFIG.TOTAL_SUPPLY || 0),
+      totalMag:  Number(j.totalMag  ?? j.total_supply ?? CONFIG.TOTAL_SUPPLY ?? 0),
     };
   } catch { return null; }
 }
