@@ -141,7 +141,7 @@ let _myStatsTimer = null;
 async function fetchMyStats(addrB64) {
   if (!addrB64 || !MY_STATS_ENDPOINT) return null;
   try {
-    const url = `${MY_STATS_ENDPOINT}?wallet=${encodeURIComponent(addrB64)}`;
+    const url = `${MY_STATS_ENDPOINT}?wallet=${encodeURIComponent(addrB64)}&t=${Date.now()}`;
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return null;
     return await res.json().catch(() => null);
@@ -218,8 +218,8 @@ async function apiGetReferral(walletB64) {
   if (!isTonEqUq(walletB64)) return { ok:false, err:"bad-params" };
   try {
     if (_lastProbeWallet === walletB64) return null; // антидубль
-    const url = `${REF_API_PATH}?wallet=${encodeURIComponent(walletB64)}`;
-    const res = await fetch(url);
+    const url = `${REF_API_PATH}?wallet=${encodeURIComponent(walletB64)}&t=${Date.now()}`;
+    const res = await fetch(url, { cache: "no-store" });
     _lastProbeWallet = walletB64;
     return await res.json().catch(() => ({}));
   } catch {
@@ -358,16 +358,55 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   if (ui.bar)    ui.bar.style.width = `${pct.toFixed(2)}%`;
 }
 
+/* ===== Анти-кеш фолбек на прямий /api/presale/stats ===== */
+async function fetchStatsDirect() {
+  const base = (CONFIG?.ENDPOINTS?.stats || "").trim()
+    || (API_BASE ? API_BASE.replace(/\/+$/,"") + "/api/presale/stats" : "/api/presale/stats");
+  const url = `${base}?t=${Date.now()}`;
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) return null;
+    const j = await r.json().catch(() => null);
+    if (!j) return null;
+    return {
+      raisedUsd: Number(j.raisedUsd ?? j.raised_usd ?? 0),
+      soldMag:   Number(j.soldMag   ?? j.sold_tokens ?? 0),
+      totalMag:  Number(j.totalMag  ?? j.total_supply ?? CONFIG.TOTAL_SUPPLY || 0),
+    };
+  } catch { return null; }
+}
+
 let _saleTimer = null;
+let _warmTimer = null;
+
 async function refreshSaleStatsOnce() {
   try {
-    const s = await getPresaleStats();
-    applySaleUi(s || {});
+    let s = await getPresaleStats()?.catch?.(() => null);
+    if (!s || (s.raisedUsd == null && s.soldMag == null)) {
+      s = await fetchStatsDirect();
+    }
+    if (s) applySaleUi(s);
   } catch {}
 }
 function startSalePolling() {
   clearInterval(_saleTimer);
+  clearInterval(_warmTimer);
+
+  // миттєве оновлення
   refreshSaleStatsOnce();
+
+  // «теплий старт»: кожні 3с ~30с
+  let left = 10;
+  _warmTimer = setInterval(() => {
+    refreshSaleStatsOnce();
+    left -= 1;
+    if (left <= 0) {
+      clearInterval(_warmTimer);
+      _warmTimer = null;
+    }
+  }, 3000);
+
+  // звичайний полінг
   _saleTimer = setInterval(refreshSaleStatsOnce, 20000);
 }
 
