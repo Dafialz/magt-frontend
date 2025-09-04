@@ -18,7 +18,9 @@ export async function run(provider: NetworkProvider) {
   ]);
 
   if (action === "SetJettonWallet") {
-    const jw = await ui.inputAddress("MAGT JettonWallet (owner=presale, master=MAGT):");
+    const jw = await ui.inputAddress(
+      "MAGT JettonWallet (owner=presale, master=MAGT):"
+    );
     await presale.send(
       provider.sender(),
       { value: toNano("0.05") },
@@ -63,7 +65,9 @@ export async function run(provider: NetworkProvider) {
       { $$type: "WithdrawTon", to: destIgnored, amount: nano }
     );
 
-    ui.write("✅ Withdraw sent (note: contract sends to TREASURY regardless of 'to').");
+    ui.write(
+      "✅ Withdraw sent (note: contract sends to TREASURY regardless of 'to')."
+    );
     return;
   }
 }

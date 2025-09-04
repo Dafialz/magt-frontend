@@ -1,0 +1,682 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MagtPresale_MagtPresale.headers.fc
+;;
+;; Header files for MagtPresale
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_store_address_opt
+builder __tact_store_address_opt(builder b, slice address) inline;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; __tact_dict_get_int_cell
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline;
+
+;; $DeployOk$_store
+builder $DeployOk$_store(builder build_0, (int) v) inline;
+
+;; $DeployOk$_store_cell
+cell $DeployOk$_store_cell((int) v, builder b) inline;
+
+;; $Level$_load
+(slice, ((int, int))) $Level$_load(slice sc_0) inline;
+
+;; $Level$_as_optional
+tuple $Level$_as_optional((int, int) v) inline;
+
+;; $Level$_load_opt
+tuple $Level$_load_opt(cell cl) inline;
+
+;; $MagtPresale$_store
+builder $MagtPresale$_store(builder build_0, (slice, slice, slice, int, int, int, cell, int, int) v) inline;
+
+;; $MagtPresale$_load
+(slice, ((slice, slice, slice, int, int, int, cell, int, int))) $MagtPresale$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $Level$_not_null
+((int, int)) $Level$_not_null(tuple v) inline;
+
+;; $MagtPresale$init$_load
+(slice, ((slice, slice, int, cell, int, int))) $MagtPresale$init$_load(slice sc_0) inline;
+
+;; $MagtPresale$_contract_init
+(slice, slice, slice, int, int, int, cell, int, int) $MagtPresale$_contract_init(slice $owner, slice $treasury, int $decimals, cell $levels, int $levelsCount, int $refBps) impure inline;
+
+;; $MagtPresale$_contract_load
+(slice, slice, slice, int, int, int, cell, int, int) $MagtPresale$_contract_load() impure inline;
+
+;; $MagtPresale$_contract_store
+() $MagtPresale$_contract_store((slice, slice, slice, int, int, int, cell, int, int) v) impure inline;
+
+;; $global_tenPow
+int $global_tenPow(int $n) impure inline_ref;
+
+;; $global_iMin
+int $global_iMin(int $a, int $b) impure inline_ref;
+
+;; $global_iMax
+int $global_iMax(int $a, int $b) impure inline_ref;
+
+;; $MagtPresale$_fun_currentLevelIdx
+((slice, slice, slice, int, int, int, cell, int, int), int) $MagtPresale$_fun_currentLevelIdx((slice, slice, slice, int, int, int, cell, int, int) $self, int $sold) impure inline_ref;
+
+;; $MagtPresale$_fun_totalCap
+((slice, slice, slice, int, int, int, cell, int, int), int) $MagtPresale$_fun_totalCap((slice, slice, slice, int, int, int, cell, int, int) $self) impure inline_ref;
+
+;; $SendParameters$_constructor_to_value_body_bounce
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_body_bounce(slice $to, int $value, cell $body, int $bounce) inline;
+
+;; $MagtPresale$_fun_jettonTransfer
+((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_jettonTransfer((slice, slice, slice, int, int, int, cell, int, int) $self, slice $to, int $amount) impure inline_ref;
+
+;; $MagtPresale$_fun_processBuy
+((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_processBuy((slice, slice, slice, int, int, int, cell, int, int) $self, slice $user, int $tonIn, slice $ref) impure inline_ref;
+
+;; $MessageParameters$_constructor_bounce_to_value_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline;
+
+;; $MagtPresale$_fun_notify
+((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_notify((slice, slice, slice, int, int, int, cell, int, int) $self, cell $body) impure inline;
+
+;; $DeployOk$_constructor_queryId
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline;
+
+
+;; MagtPresale_MagtPresale.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(slice, slice) __tact_load_address_opt(slice cs) asm """
+
+            b{00} SDBEGINSQ
+            IF:<{
+              PUSHNULL
+            }>ELSE<{
+              LDMSGADDR
+              SWAP
+            }>
+
+""";
+
+builder __tact_store_addr_none(builder b) asm "b{00} STSLICECONST";
+
+builder __tact_store_address_opt(builder b, slice address) inline {
+    if (null?(address)) {
+        return __tact_store_addr_none(b);
+    } else {
+        return b.store_slice(address);
+    }
+}
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+forall X0, X1 -> tuple __tact_tuple_create_2((X0, X1) v) asm """
+    2 TUPLE
+""";
+
+forall X0, X1 -> (X0, X1) __tact_tuple_destroy_2(tuple v) asm """
+    2 UNTUPLE
+""";
+
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline {
+    var (r, ok) = idict_get_ref?(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+int $global_myBalance() impure asm """
+    BALANCE FIRST
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
+
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
+
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
+
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
+
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
+
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+""";
+
+builder $Builder$_fun_storeBit(int $value, builder $self) impure asm """
+    1 STI
+""";
+
+builder $Builder$_fun_storeCoins(builder $self, int $value) impure asm """
+    STVARUINT16
+""";
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
+    STSLICER
+""";
+
+((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_notify((slice, slice, slice, int, int, int, cell, int, int) $self, cell $body) impure inline {
+    var (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)) = $self;
+    slice $to = __tact_context_get_sender();
+    int $bounce = false;
+    if (false) {
+        int $balance = $global_myBalance();
+        int $balanceBeforeMessage = ($balance - $Context$_get_value(__tact_context_get()));
+        if (($balanceBeforeMessage < 0)) {
+            $global_nativeReserve(0, 0);
+            $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 130, $body));
+            return (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps), ());
+        }
+    }
+    $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 66, $body));
+    return (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps), ());
+}
+
+;; MagtPresale_MagtPresale.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_body_bounce(slice $to, int $value, cell $body, int $bounce) inline {
+    return (0, $body, null(), null(), $value, $to, $bounce);
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: DeployOk
+;; Header: 0xaff90f57
+;; TLB: deploy_ok#aff90f57 queryId:uint64 = DeployOk
+;;
+
+builder $DeployOk$_store(builder build_0, (int) v) inline {
+    var (v'queryId) = v;
+    build_0 = store_uint(build_0, 2952335191, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    return build_0;
+}
+
+cell $DeployOk$_store_cell((int) v, builder b) inline {
+    return $DeployOk$_store(b, v).end_cell();
+}
+
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline {
+    return ($queryId);
+}
+
+;;
+;; Type: Level
+;; TLB: _ tokens:int257 price:int257 = Level
+;;
+
+(slice, ((int, int))) $Level$_load(slice sc_0) inline {
+    var v'tokens = sc_0~load_int(257);
+    var v'price = sc_0~load_int(257);
+    return (sc_0, (v'tokens, v'price));
+}
+
+tuple $Level$_as_optional((int, int) v) inline {
+    var (v'tokens, v'price) = v;
+    return __tact_tuple_create_2(v'tokens, v'price);
+}
+
+tuple $Level$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $Level$_as_optional(sc~$Level$_load());
+}
+
+((int, int)) $Level$_not_null(tuple v) inline {
+    var (int vvv'tokens, int vvv'price) = __tact_tuple_destroy_2(v);
+    return (vvv'tokens, vvv'price);
+}
+
+;;
+;; Type: MagtPresale
+;; TLB: _ owner:address treasury:address jw:address decimals:int257 paused:bool sold:int257 levels:dict<int, ^Level{tokens:int257,price:int257}> levelsCount:int257 refBps:int257 = MagtPresale
+;;
+
+builder $MagtPresale$_store(builder build_0, (slice, slice, slice, int, int, int, cell, int, int) v) inline {
+    var (v'owner, v'treasury, v'jw, v'decimals, v'paused, v'sold, v'levels, v'levelsCount, v'refBps) = v;
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_slice(v'treasury);
+    build_0 = __tact_store_address_opt(build_0, v'jw);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_int(v'decimals, 257);
+    build_1 = build_1.store_int(v'paused, 1);
+    build_1 = build_1.store_int(v'sold, 257);
+    build_1 = build_1.store_dict(v'levels);
+    build_1 = build_1.store_int(v'levelsCount, 257);
+    var build_2 = begin_cell();
+    build_2 = build_2.store_int(v'refBps, 257);
+    build_1 = store_builder_ref(build_1, build_2);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+(slice, ((slice, slice, slice, int, int, int, cell, int, int))) $MagtPresale$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'treasury = sc_0~load_msg_addr();
+    var v'jw = sc_0~__tact_load_address_opt();
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'decimals = sc_1~load_int(257);
+    var v'paused = sc_1~load_int(1);
+    var v'sold = sc_1~load_int(257);
+    var v'levels = sc_1~load_dict();
+    var v'levelsCount = sc_1~load_int(257);
+    slice sc_2 = sc_1~load_ref().begin_parse();
+    var v'refBps = sc_2~load_int(257);
+    return (sc_0, (v'owner, v'treasury, v'jw, v'decimals, v'paused, v'sold, v'levels, v'levelsCount, v'refBps));
+}
+
+(slice, ((slice, slice, int, cell, int, int))) $MagtPresale$init$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'treasury = sc_0~load_msg_addr();
+    var v'decimals = sc_0~load_int(257);
+    var v'levels = sc_0~load_dict();
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'levelsCount = sc_1~load_int(257);
+    var v'refBps = sc_1~load_int(257);
+    return (sc_0, (v'owner, v'treasury, v'decimals, v'levels, v'levelsCount, v'refBps));
+}
+
+(slice, slice, slice, int, int, int, cell, int, int) $MagtPresale$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$MagtPresale$_load();
+    }
+    else {
+        (slice $owner, slice $treasury, int $decimals, cell $levels, int $levelsCount, int $refBps) = $sc~$MagtPresale$init$_load();
+        $sc.end_parse();
+        return $MagtPresale$_contract_init($owner, $treasury, $decimals, $levels, $levelsCount, $refBps);
+    }
+}
+
+() $MagtPresale$_contract_store((slice, slice, slice, int, int, int, cell, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $MagtPresale$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MagtPresale functions
+;;
+
+(slice, slice, slice, int, int, int, cell, int, int) $MagtPresale$_contract_init(slice $owner, slice $treasury, int $decimals, cell $levels, int $levelsCount, int $refBps) impure inline {
+    var (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)) = (null(), null(), null(), null(), null(), null(), null(), null(), null());
+    $self'owner = $owner;
+    $self'treasury = $treasury;
+    $self'decimals = $decimals;
+    $self'levels = $levels;
+    $self'levelsCount = $levelsCount;
+    $self'paused = false;
+    $self'sold = 0;
+    $self'jw = null();
+    $self'refBps = $refBps;
+    return ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps);
+}
+
+int $global_tenPow(int $n) impure inline_ref {
+    int $r = 1;
+    int $i = 0;
+    while (($i < $n)) {
+        $r = ($r * 10);
+        $i = ($i + 1);
+    }
+    return $r;
+}
+
+int $global_iMin(int $a, int $b) impure inline_ref {
+    return (($a < $b) ? $a : $b);
+}
+
+int $global_iMax(int $a, int $b) impure inline_ref {
+    return (($a > $b) ? $a : $b);
+}
+
+((slice, slice, slice, int, int, int, cell, int, int), int) $MagtPresale$_fun_currentLevelIdx((slice, slice, slice, int, int, int, cell, int, int) $self, int $sold) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)) = $self;
+    int $acc = 0;
+    int $i = 0;
+    while (($i < $self'levelsCount)) {
+        var ($lv'tokens, $lv'price) = $Level$_not_null($Level$_load_opt(__tact_dict_get_int_cell($self'levels, 257, $i)));
+        int $capHere = ($acc + $lv'tokens);
+        if (($sold < $capHere)) {
+            var $fresh$ret_5 = $i;
+            return (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps), $fresh$ret_5);
+        }
+        $acc = $capHere;
+        $i = ($i + 1);
+    }
+    var $fresh$ret_6 = $self'levelsCount;
+    return (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps), $fresh$ret_6);
+}
+
+((slice, slice, slice, int, int, int, cell, int, int), int) $MagtPresale$_fun_totalCap((slice, slice, slice, int, int, int, cell, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)) = $self;
+    int $sum = 0;
+    int $i = 0;
+    while (($i < $self'levelsCount)) {
+        var ($lv'tokens, $lv'price) = $Level$_not_null($Level$_load_opt(__tact_dict_get_int_cell($self'levels, 257, $i)));
+        $sum = ($sum + $lv'tokens);
+        $i = ($i + 1);
+    }
+    var $fresh$ret_7 = $sum;
+    return (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps), $fresh$ret_7);
+}
+
+((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_jettonTransfer((slice, slice, slice, int, int, int, cell, int, int) $self, slice $to, int $amount) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)) = $self;
+    builder $b = $global_beginCell();
+    store_uint($b, 260734629, 32);
+    store_uint($b, 0, 64);
+    $Builder$_fun_storeCoins($b, $amount);
+    $Builder$_fun_storeAddress($b, $to);
+    $Builder$_fun_storeAddress($b, $global_myAddress());
+    $Builder$_fun_storeBit(false, $b);
+    $Builder$_fun_storeCoins($b, 1000000);
+    $Builder$_fun_storeBit(false, $b);
+    $global_send($SendParameters$_constructor_to_value_body_bounce($self'jw, 0, $Builder$_fun_endCell($b), false));
+    return (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps), ());
+}
+
+((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_processBuy((slice, slice, slice, int, int, int, cell, int, int) $self, slice $user, int $tonIn, slice $ref) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)) = $self;
+    throw_unless(10751, ($self'paused == false));
+    throw_unless(53873, ($tonIn >= 10000000));
+    throw_unless(29727, (~ null?($self'jw)));
+    int $cap = ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_totalCap();
+    throw_unless(36305, ($self'sold < $cap));
+    int $remainTonVar = $tonIn;
+    int $outTokensVar = 0;
+    int $soldNowVar = $self'sold;
+    int $stop = 0;
+    while (( (($remainTonVar > 0)) ? (($stop == 0)) : (false) )) {
+        int $idx = ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_currentLevelIdx($soldNowVar);
+        throw_unless(46935, ($idx < $self'levelsCount));
+        var ($lv'tokens, $lv'price) = $Level$_not_null($Level$_load_opt(__tact_dict_get_int_cell($self'levels, 257, $idx)));
+        int $accBeforeVar = 0;
+        int $jVar = 0;
+        while (($jVar < $idx)) {
+            var ($p'tokens, $p'price) = $Level$_not_null($Level$_load_opt(__tact_dict_get_int_cell($self'levels, 257, $jVar)));
+            $accBeforeVar = ($accBeforeVar + $p'tokens);
+            $jVar = ($jVar + 1);
+        }
+        int $leftHere = (($accBeforeVar + $lv'tokens) - $soldNowVar);
+        if (($leftHere <= 0)) {
+            $soldNowVar = ($accBeforeVar + $lv'tokens);
+        } else {
+            int $per = $global_tenPow($self'decimals);
+            int $canByTon = (($remainTonVar * $per) / $lv'price);
+            int $buyHere = $global_iMin($canByTon, $leftHere);
+            if (($buyHere <= 0)) {
+                $stop = 1;
+            } else {
+                int $tonSpent = (($buyHere * $lv'price) / $per);
+                $outTokensVar = ($outTokensVar + $buyHere);
+                $soldNowVar = ($soldNowVar + $buyHere);
+                $remainTonVar = ($remainTonVar - $tonSpent);
+                ifnot ($tonSpent) {
+                    $stop = 1;
+                }
+                if (($soldNowVar >= $cap)) {
+                    $stop = 1;
+                }
+            }
+        }
+    }
+    throw_unless(61298, ($outTokensVar > 0));
+    int $bonusVar = 0;
+    if ((~ null?($ref))) {
+        slice $r = $ref;
+        if (( (( (( ~ equal_slices_bits($r, $user) )) ? (( ~ equal_slices_bits($r, $global_myAddress()) )) : (false) )) ? (($self'refBps > 0)) : (false) )) {
+            $bonusVar = (($outTokensVar * $self'refBps) / 10000);
+        }
+    }
+    int $free = ($cap - ($self'sold + $outTokensVar));
+    if (($free < 0)) {
+        $outTokensVar = $global_iMax(0, ($outTokensVar + $free));
+    } elseif (($bonusVar > $free)) {
+        $bonusVar = $free;
+    }
+    throw_unless(2775, ($outTokensVar > 0));
+    $self'sold = (($self'sold + $outTokensVar) + $bonusVar);
+    $global_send($SendParameters$_constructor_to_value_body_bounce($self'treasury, $tonIn, null(), false));
+    ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_jettonTransfer($user, $outTokensVar);
+    if (($bonusVar > 0)) {
+        ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_jettonTransfer($ref, $bonusVar);
+    }
+    return (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps), ());
+}
+
+;;
+;; Get methods of a Contract MagtPresale
+;;
+
+;;
+;; Routing of a Contract MagtPresale
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps) = $MagtPresale$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+    }
+    ;; Receive SetJettonWallet message
+    if (op == 1213265332) {
+        var $msg'addr = in_msg~load_msg_addr();
+        throw_unless(45917, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        $self'jw = $msg'addr;
+        $MagtPresale$_contract_store(($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps));
+        return ();
+    }
+    
+    ;; Receive SetPaused message
+    if (op == 4222196280) {
+        var $msg'state = in_msg~load_int(1);
+        throw_unless(45917, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        $self'paused = $msg'state;
+        $MagtPresale$_contract_store(($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps));
+        return ();
+    }
+    
+    ;; Receive WithdrawTon message
+    if (op == 2066906864) {
+        var $msg'to = in_msg~load_msg_addr();
+        var $msg'amount = in_msg~load_int(257);
+        throw_unless(45917, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        int $left = ($global_myBalance() - 1000000);
+        int $want = (($msg'amount > 0) ? $msg'amount : $left);
+        int $amt = $global_iMax(0, $global_iMin($left, $want));
+        if (($amt > 0)) {
+            $global_send($SendParameters$_constructor_to_value_body_bounce($self'treasury, $amt, null(), false));
+        }
+        $MagtPresale$_contract_store(($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps));
+        return ();
+    }
+    
+    ;; Receive Buy message
+    if (op == 2611342469) {
+        var $msg'ref = in_msg~__tact_load_address_opt();
+        ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_processBuy(__tact_context_get_sender(), $Context$_get_value(__tact_context_get()), $msg'ref);
+        $MagtPresale$_contract_store(($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps));
+        return ();
+    }
+    
+    ;; Receive Deploy message
+    if (op == 0x946a98b6) {
+        var $deploy'queryId = in_msg~load_uint(64);
+        ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_notify($DeployOk$_store_cell($DeployOk$_constructor_queryId($deploy'queryId), begin_cell()));
+        $MagtPresale$_contract_store(($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps));
+        return ();
+    }
+    
+    ;; Receive empty message
+    if ((op == 0) & (in_msg_length <= 32)) {
+        ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_processBuy(__tact_context_get_sender(), $Context$_get_value(__tact_context_get()), null());
+        $MagtPresale$_contract_store(($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}

@@ -117,17 +117,12 @@ contract MagtPresale with Deployable {
     fun currentLevelIdx(sold: Int): Int {
         let acc: Int = 0;
         let i: Int = 0;
-        let accVar: Int = acc;
-        let iVar: Int = i;
-
-        while (iVar < self.levelsCount) {
-            let lv = self.levels.get(iVar)!!;
-            let capHere: Int = accVar + lv.tokens;
-            if (sold < capHere) {
-                return iVar;
-            }
-            accVar = capHere;
-            iVar = iVar + 1;
+        while (i < self.levelsCount) {
+            let lv = self.levels.get(i)!!;
+            let capHere: Int = acc + lv.tokens;
+            if (sold < capHere) { return i; }
+            acc = capHere;
+            i = i + 1;
         }
         return self.levelsCount;
     }
@@ -135,15 +130,12 @@ contract MagtPresale with Deployable {
     fun totalCap(): Int {
         let sum: Int = 0;
         let i: Int = 0;
-        let sumVar: Int = sum;
-        let iVar: Int = i;
-
-        while (iVar < self.levelsCount) {
-            let lv = self.levels.get(iVar)!!;
-            sumVar = sumVar + lv.tokens;
-            iVar = iVar + 1;
+        while (i < self.levelsCount) {
+            let lv = self.levels.get(i)!!;
+            sum = sum + lv.tokens;
+            i = i + 1;
         }
-        return sumVar;
+        return sum;
     }
 
     fun jettonTransfer(to: Address, amount: Int) {
@@ -175,25 +167,19 @@ contract MagtPresale with Deployable {
         require(self.sold < cap, "SOLD_OUT");
 
         // 1) Рахуємо, скільки MAGT купується по рівнях
-        let remainTon: Int = tonIn;
-        let outTokens: Int = 0;
-        let soldNow: Int = self.sold;
+        let remainTonVar: Int = tonIn;
+        let outTokensVar: Int = 0;
+        let soldNowVar: Int = self.sold;
+        let stop: Int = 0; // 0 = продовжуємо, 1 = зупинити цикл
 
-        let remainTonVar: Int = remainTon;
-        let outTokensVar: Int = outTokens;
-        let soldNowVar: Int = soldNow;
-
-        while (remainTonVar > 0) {
+        while ((remainTonVar > 0) && (stop == 0)) {
             let idx: Int = self.currentLevelIdx(soldNowVar);
             require(idx < self.levelsCount, "SOLD_OUT_L");
             let lv = self.levels.get(idx)!!;
 
             // скільки доступно в межах цього рівня
-            let accBefore: Int = 0;
-            let j: Int = 0;
-            let accBeforeVar: Int = accBefore;
-            let jVar: Int = j;
-
+            let accBeforeVar: Int = 0;
+            let jVar: Int = 0;
             while (jVar < idx) {
                 let p = self.levels.get(jVar)!!;
                 accBeforeVar = accBeforeVar + p.tokens;
@@ -202,29 +188,25 @@ contract MagtPresale with Deployable {
             let leftHere: Int = accBeforeVar + lv.tokens - soldNowVar;
 
             if (leftHere <= 0) {
-                // «перестрибнути» на наступний рівень без завершення циклу
+                // «перестрибнути» на наступний рівень (аналог continue)
                 soldNowVar = accBeforeVar + lv.tokens;
-                continue; // ← цей continue НЕ підтримується в Tact 1.6, тож перепишемо нижче
-            }
-
-            // (через відсутність continue в Tact 1.6 — еквівалентна розкладка)
-            if (leftHere > 0) {
+            } else {
                 let per: Int = tenPow(self.decimals);
                 let canByTon: Int = (remainTonVar * per) / lv.price;
                 let buyHere: Int = iMin(canByTon, leftHere);
 
                 if (buyHere <= 0) {
-                    break;
+                    stop = 1; // раніше було break;
+                } else {
+                    let tonSpent: Int = (buyHere * lv.price) / per;
+
+                    outTokensVar = outTokensVar + buyHere;
+                    soldNowVar   = soldNowVar   + buyHere;
+                    remainTonVar = remainTonVar - tonSpent;
+
+                    if (tonSpent == 0) { stop = 1; }
+                    if (soldNowVar >= cap) { stop = 1; }
                 }
-
-                let tonSpent: Int = (buyHere * lv.price) / per;
-
-                outTokensVar = outTokensVar + buyHere;
-                soldNowVar   = soldNowVar   + buyHere;
-                remainTonVar = remainTonVar - tonSpent;
-
-                if (tonSpent == 0) { break; }
-                if (soldNowVar >= cap) { break; }
             }
         }
 
@@ -242,12 +224,9 @@ contract MagtPresale with Deployable {
         // 3) Не виходимо за кап (sold рахує покупку + бонус)
         let free: Int = cap - (self.sold + outTokensVar);
         if (free < 0) {
-            // через округлення могли трохи перелізти
             outTokensVar = iMax(0, outTokensVar + free); // free від’ємний
         } else {
-            if (bonusVar > free) {
-                bonusVar = free;
-            }
+            if (bonusVar > free) { bonusVar = free; }
         }
         require(outTokensVar > 0, "ZERO_OUT2");
 

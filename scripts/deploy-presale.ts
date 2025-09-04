@@ -6,11 +6,11 @@ import { MagtPresale } from "../build/MagtPresale_MagtPresale";
 const OWNER    = Address.parse("UQBDooPilphbndrSB1RdtkyZrnWctibsl356IvU7_jOxh4UT");
 const TREASURY = Address.parse("UQA1VwosHe3LfztkzNJ47UHndev9MbRTcdGHM_qjSpLRa4XD");
 
-// Десятковість MAGT
+// Десятковість MAGT (Int у Tact → bigint у TS)
 const DECIMALS = 9n;
 
-// Реферальний бонус у bps (10000 = 100%). 500 = 5%
-const REF_BPS = 500;
+// Реферальний бонус у bps (10000 = 100%). 500 = 5% (також bigint)
+const REF_BPS = 500n;
 
 // Рівні у «людському» вигляді (токени без десяткових; price — у TON як рядок)
 const LEVELS_HUMAN: { tokens: number; price: string }[] = [
@@ -41,11 +41,11 @@ export async function run(provider: NetworkProvider) {
 
   // Перерахунок у RAW (для контракту): MAGT * 10^decimals; ціна в nanoTON
   const per = 10n ** DECIMALS;
-  const levels = new Map<number, { tokens: bigint; price: bigint }>();
+  const levels = new Map<bigint, { tokens: bigint; price: bigint }>();
   LEVELS_HUMAN.forEach((lv, i) => {
     const tokensRaw = BigInt(lv.tokens) * per; // MAGT у сирих одиницях
     const priceNano = toNano(lv.price);        // nanoTON за 1 MAGT
-    levels.set(i, { tokens: tokensRaw, price: priceNano });
+    levels.set(BigInt(i), { tokens: tokensRaw, price: priceNano });
   });
 
   // Створюємо екземпляр пресейлу з параметрами init (додаємо refBps)
@@ -53,17 +53,21 @@ export async function run(provider: NetworkProvider) {
     await MagtPresale.fromInit(
       OWNER,
       TREASURY,
-      Number(DECIMALS),
-      levels as any,            // біндінги приймають map<Int, Level>
-      LEVELS_HUMAN.length,
+      DECIMALS,                 // Int → bigint
+      levels as any,            // map<Int, Level>
+      BigInt(LEVELS_HUMAN.length),
       REF_BPS
     )
   );
 
   ui.write(`Presale will be deployed at: ${presale.address.toString()}`);
 
-  // Деплой (≈0.25 TON має вистачити з запасом)
-  await presale.sendDeploy(provider.sender(), { value: toNano("0.25") });
+  // Деплой (≈0.25 TON). У Tact v1.6 використовується звичайний send з повідомленням Deploy.
+  await presale.send(
+    provider.sender(),
+    { value: toNano("0.25") },
+    { $$type: "Deploy", queryId: 0n }
+  );
 
   ui.write(
     "✅ Presale deployed.\n" +
