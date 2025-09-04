@@ -10,12 +10,12 @@ export async function run(provider: NetworkProvider) {
   const presaleAddr = await ui.inputAddress("Presale address (EQ…):");
   const presale = provider.open(MagtPresale.fromAddress(presaleAddr));
 
-  const action = await ui.choose<Action>("Action:", [
-    "SetJettonWallet",
-    "Pause",
-    "Unpause",
-    "Withdraw",
-  ]);
+  // ui.choose у поточних @ton/blueprint очікує 3 аргументи: title, options, display
+  const action = await ui.choose<Action>(
+    "Action:",
+    ["SetJettonWallet", "Pause", "Unpause", "Withdraw"],
+    (a) => a
+  );
 
   if (action === "SetJettonWallet") {
     const jw = await ui.inputAddress(
