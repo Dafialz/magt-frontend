@@ -1,0 +1,14 @@
+{
+  "projects": [
+    {
+      "name": "MagtClaimVault",
+      "path": "./contracts/MagtClaimVault.tact",
+      "output": "./build"
+    },
+    {
+      "name": "MagtPresale",
+      "path": "./contracts/MagtPresale.tact",
+      "output": "./build"
+    }
+  ]
+}

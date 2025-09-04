@@ -22,59 +22,58 @@ function join(base, path) {
 
 export const CONFIG = {
   /* ===== Загальна емісія / Токеноміка ===== */
-  // Загальний Total Supply токена
   TOKEN_TOTAL_SUPPLY: 10_000_000_000,
-
-  // Розподіл для віджета токеноміки (widgets.js → initTokenomics)
   TOKENOMICS: [
-    { label: "Пресейл",            pct: 5  },  // 500,000,000 MAGT
-    { label: "Ліквідність",        pct: 15 },  // 1,500,000,000 MAGT
-    { label: "Маркетинг",          pct: 5  },  // 500,000,000 MAGT
-    { label: "Команда",            pct: 5  },  // 500,000,000 MAGT
-    { label: "Фонд розвитку",      pct: 10 },  // 1,000,000,000 MAGT
-    { label: "Наші Проєкти ",      pct: 60 },  // 6,000,000,000 MAGT
+    { label: "Пресейл",            pct: 5  },
+    { label: "Ліквідність",        pct: 15 },
+    { label: "Маркетинг",          pct: 5  },
+    { label: "Команда",            pct: 5  },
+    { label: "Фонд розвитку",      pct: 10 },
+    { label: "Наші Проєкти ",      pct: 60 },
   ],
 
-  /* ===== Ціноутворення / капа пресейлу ===== */
-  // Стартова ціна поточного рівня (динамічно оновлюється з рівнями/статистикою)
+  /* ===== Ціноутворення (USD для віджетів, за бажанням) ===== */
   PRICE_USD: 0.011490,
-
-  // Прогрес збору
   RAISED_OFFSET_USD: 0,
   GOAL_USD: 20_000_000,
   HARD_CAP: 20_000_000,
 
   /* ===== TON RPC / мережа ===== */
-  // ВСІ запити лише через наш бекенд-проксі
   TON_RPC: join(API_BASE_ABS, "/api/rpc"),
-  // ⚠️ Вимкнено зовнішній фолбек, щоб не ламати CSP (раніше: https://tonhubapi.com/jsonRPC)
   TON_RPC_FALLBACK: "",
 
-  /* ===== USDT (Jetton) mainnet ===== */
-  // Декілька можливих майстрів USDT, щоб підхоплювати баланс незалежно від походження токена
+  /* ===== TON-пресейл (ГОЛОВНЕ) ===== */
+  // ОБОВ'ЯЗКОВО: адреса контракту MagtPresale (EQ…)
+  PRESALE_ADDRESS: "",
+
+  // Мінімальна покупка в TON для фронту
+  MIN_BUY_TON: 0.1,
+
+  // Ціна 1 MAGT у TON (для UI/оцінки куплених токенів; контракт рахує сам по рівнях)
+  PRICE_TON: 0, // наприклад: 0.000003 (залежить від рівнів у контракті)
+
+  // (Опційно) майстер MAGT (EQ…), якщо потрібні перевірки/віджети
+  MAGT_MASTER: "",
+
+  /* ===== USDT (Jetton) — лишено для сумісності старих розділів UI ===== */
   USDT_MASTERS: [
-    "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx", // класичний USDT майстер
-    "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs", // твій майстер з tonviewer (де лежать $10.94)
+    "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
+    "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
   ],
-  // Для зворотної сумісності: перший з масиву
   USDT_MASTER: "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
   USDT_JETTON: "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
-
   PRESALE_OWNER_ADDRESS: "UQA1VwosHe3LfztkzNJ47UHndev9MbRTcdGHM_qjSpLRa4XD",
   TREASURY_WALLET:       "UQA1VwosHe3LfztkzNJ47UHndev9MbRTcdGHM_qjSpLRa4XD",
-
   JETTON_DECIMALS: 6,
   USDT_DECIMALS:   6,
-
-  // Оптимальні TON для виконання init/transfer
   JETTON_WALLET_TON: 0.15,
   FORWARD_TON: 0.05,
 
-  /* ===== Обмеження / рефералка ===== */
-  MIN_BUY_USDT: 1,
+  /* ===== Обмеження / рефералка (логіка бонусу виконується контрактом) ===== */
+  MIN_BUY_USDT: 1,              // залишено для старого UI; TON-режим використовує MIN_BUY_TON
   REF_ENABLED: true,
   REF_BONUS_PCT: 5,
-  REF_MIN_USDT: 10,
+  REF_MIN_USDT: 10,             // для старого UI; за потреби додай REF_MIN_TON
   REF_SELF_BAN: true,
   REF_BIND_ONCE: true,
   REF_DAILY_CAP_USD: 0,
@@ -83,12 +82,8 @@ export const CONFIG = {
   REF_DEBUG_DEMO: false,
 
   /* ===== Дані пресейлу / таймер ===== */
-  // Пул токенів пресейлу (5% від загальної емісії) — критично для прогрес-бару та рівнів
   TOTAL_SUPPLY: 500_000_000,
-
   ROUND_DEADLINE_TS: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
-
-  // Рівні пресейлу (к-сть токенів і ціна), прогрес та поточна ціна читаються з них
   LEVELS: [
     { tokens: 65_225_022, price: 0.011490 },
     { tokens: 57_039_669, price: 0.013443 },
@@ -119,7 +114,7 @@ export const CONFIG = {
   CLAIM_POLL_INTERVAL_MS: 30000,
 
   /* ===== API ===== */
-  API_BASE: API_BASE_RUNTIME, // у проді порожньо — використовуємо абсолютні ендпоінти
+  API_BASE: API_BASE_RUNTIME,
   ENDPOINTS: {
     stats:       join(API_BASE_ABS, "/api/presale/stats"),
     feed:        join(API_BASE_ABS, "/api/presale/feed"),
@@ -129,12 +124,7 @@ export const CONFIG = {
     order:       join(API_BASE_ABS, "/api/order"),
     referral:    join(API_BASE_ABS, "/api/referral"),
     rpc:         join(API_BASE_ABS, "/api/rpc"),
-
-    // 🔹 Ендпоінт для блоку “Мої баланси”
-    // очікує JSON: { "bought_magt": number, "referrals_magt": number }
     myBalances:  join(API_BASE_ABS, "/api/my-stats"),
-
-    // сумісні синоніми (на випадок, якщо бекенд уже має інші шляхи)
     balances:    join(API_BASE_ABS, "/api/my-stats"),
     myStats:     join(API_BASE_ABS, "/api/my-stats"),
   },
@@ -143,22 +133,17 @@ export const CONFIG = {
 };
 
 /* ===== Runtime-чек (для дебагу) ===== */
-if (CONFIG.MIN_BUY_USDT < 1) console.warn("⚠️ MIN_BUY_USDT занадто малий, перевір значення в config.js");
-if ((!CONFIG.USDT_MASTERS || CONFIG.USDT_MASTERS.length === 0) && !CONFIG.USDT_MASTER) {
-  console.error("❌ Немає адрес майстрів USDT у config.js");
+if (!CONFIG.PRESALE_ADDRESS) {
+  console.error("❌ Вкажи PRESALE_ADDRESS (адреса контракту пресейлу) у config.js");
 }
-if (!CONFIG.PRESALE_OWNER_ADDRESS) console.error("❌ Немає PRESALE_OWNER_ADDRESS у config.js");
-// Виправлено: використовується один і той самий ключ REF_BONUS_PCT
-if (!(CONFIG.REF_BONUS_PCT >= 0 && CONFIG.REF_BONUS_PCT <= 50)) {
-  console.warn("⚠️ REF_BONUS_PCT виглядає підозріло. Рекомендується 0..50%");
+if (CONFIG.MIN_BUY_TON <= 0) {
+  console.warn("⚠️ Задай адекватний MIN_BUY_TON у config.js");
 }
-
 if (IS_BROWSER) {
   console.log(
     "[MAGT CONFIG] API_BASE:", CONFIG.API_BASE || "(empty, use absolute endpoints)",
     "API_BASE_ABS:", CONFIG.__DEBUG.API_BASE_ABS,
     "override:", CONFIG.__DEBUG.OVERRIDE || "(none)",
-    "is_local:", CONFIG.__DEBUG.IS_LOCAL,
-    "usdt_masters:", (CONFIG.USDT_MASTERS || []).length
+    "is_local:", CONFIG.__DEBUG.IS_LOCAL
   );
 }

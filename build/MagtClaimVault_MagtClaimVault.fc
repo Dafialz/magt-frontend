@@ -1,0 +1,560 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; MagtClaimVault_MagtClaimVault.headers.fc
+;;
+;; Header files for MagtClaimVault
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_store_address_opt
+builder __tact_store_address_opt(builder b, slice address) inline;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; __tact_dict_get_slice_int
+int __tact_dict_get_slice_int(cell d, int kl, slice k, int vl) inline;
+
+;; __tact_dict_set_slice_int
+(cell, ()) __tact_dict_set_slice_int(cell d, int kl, slice k, int v, int vl) inline;
+
+;; $DeployOk$_store
+builder $DeployOk$_store(builder build_0, (int) v) inline;
+
+;; $DeployOk$_store_cell
+cell $DeployOk$_store_cell((int) v, builder b) inline;
+
+;; $MagtClaimVault$_store
+builder $MagtClaimVault$_store(builder build_0, (slice, int, slice, cell) v) inline;
+
+;; $MagtClaimVault$_load
+(slice, ((slice, int, slice, cell))) $MagtClaimVault$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $MagtClaimVault$init$_load
+(slice, ((slice, int))) $MagtClaimVault$init$_load(slice sc_0) inline;
+
+;; $MagtClaimVault$_contract_init
+(slice, int, slice, cell) $MagtClaimVault$_contract_init(slice $owner, int $feeTon) impure inline;
+
+;; $MagtClaimVault$_contract_load
+(slice, int, slice, cell) $MagtClaimVault$_contract_load() impure inline;
+
+;; $MagtClaimVault$_contract_store
+() $MagtClaimVault$_contract_store((slice, int, slice, cell) v) impure inline;
+
+;; $MagtClaimVault$_fun_get_admin
+((slice, int, slice, cell), slice) $MagtClaimVault$_fun_get_admin((slice, int, slice, cell) $self) impure inline_ref;
+
+;; $MagtClaimVault$_fun_get_fee_ton
+((slice, int, slice, cell), int) $MagtClaimVault$_fun_get_fee_ton((slice, int, slice, cell) $self) impure inline_ref;
+
+;; $MagtClaimVault$_fun_get_jetton_wallet
+((slice, int, slice, cell), slice) $MagtClaimVault$_fun_get_jetton_wallet((slice, int, slice, cell) $self) impure inline_ref;
+
+;; $MagtClaimVault$_fun_get_allowance
+((slice, int, slice, cell), int) $MagtClaimVault$_fun_get_allowance((slice, int, slice, cell) $self, slice $addr) impure inline_ref;
+
+;; $MessageParameters$_constructor_bounce_to_value_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline;
+
+;; $MagtClaimVault$_fun_notify
+((slice, int, slice, cell), ()) $MagtClaimVault$_fun_notify((slice, int, slice, cell) $self, cell $body) impure inline;
+
+;; $MagtClaimVault$_fun_owner
+((slice, int, slice, cell), slice) $MagtClaimVault$_fun_owner((slice, int, slice, cell) $self) impure inline_ref;
+
+;; $SendParameters$_constructor_to_value_bounce_body
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_bounce_body(slice $to, int $value, int $bounce, cell $body) inline;
+
+;; $DeployOk$_constructor_queryId
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline;
+
+
+;; MagtClaimVault_MagtClaimVault.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(slice, slice) __tact_load_address_opt(slice cs) asm """
+
+            b{00} SDBEGINSQ
+            IF:<{
+              PUSHNULL
+            }>ELSE<{
+              LDMSGADDR
+              SWAP
+            }>
+
+""";
+
+builder __tact_store_addr_none(builder b) asm "b{00} STSLICECONST";
+
+builder __tact_store_address_opt(builder b, slice address) inline {
+    if (null?(address)) {
+        return __tact_store_addr_none(b);
+    } else {
+        return b.store_slice(address);
+    }
+}
+
+(cell, int) __tact_dict_delete(cell dict, int key_len, slice index) asm(index dict key_len) """
+    DICTDEL
+""";
+
+(slice, int) __tact_dict_get(cell dict, int key_len, slice index) asm(index dict key_len) """
+    DICTGET NULLSWAPIFNOT
+""";
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+int __tact_dict_get_slice_int(cell d, int kl, slice k, int vl) inline {
+    var (r, ok) = __tact_dict_get(d, kl, k);
+    if (ok) {
+        return r~load_int(vl);
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_slice_int(cell d, int kl, slice k, int v, int vl) inline {
+    if (null?(v)) {
+        var (r, ok) = __tact_dict_delete(d, kl, k);
+        return (r, ());
+    } else {
+        return (dict_set_builder(d, kl, k, begin_cell().store_int(v, vl)), ());
+    }
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+int $global_myBalance() impure asm """
+    BALANCE FIRST
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
+
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
+
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
+
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
+
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
+
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+""";
+
+int $global_now() impure asm """
+    NOW
+""";
+
+builder $Builder$_fun_storeCoins(builder $self, int $value) impure asm """
+    STVARUINT16
+""";
+
+builder $Builder$_fun_storeMaybeRef(cell $cell, builder $self) impure asm """
+    STOPTREF
+""";
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+builder $Builder$_fun_storeAddress(builder $self, slice $address) impure asm """
+    STSLICER
+""";
+
+((slice, int, slice, cell), ()) $MagtClaimVault$_fun_notify((slice, int, slice, cell) $self, cell $body) impure inline {
+    var (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances)) = $self;
+    slice $to = __tact_context_get_sender();
+    int $bounce = false;
+    if (false) {
+        int $balance = $global_myBalance();
+        int $balanceBeforeMessage = ($balance - $Context$_get_value(__tact_context_get()));
+        if (($balanceBeforeMessage < 0)) {
+            $global_nativeReserve(0, 0);
+            $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 130, $body));
+            return (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances), ());
+        }
+    }
+    $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 66, $body));
+    return (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances), ());
+}
+
+((slice, int, slice, cell), slice) $MagtClaimVault$_fun_owner((slice, int, slice, cell) $self) impure inline_ref {
+    var (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances)) = $self;
+    var $fresh$ret_4 = $self'owner;
+    return (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances), $fresh$ret_4);
+}
+
+;; MagtClaimVault_MagtClaimVault.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_bounce_body(slice $to, int $value, int $bounce, cell $body) inline {
+    return (0, $body, null(), null(), $value, $to, $bounce);
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: DeployOk
+;; Header: 0xaff90f57
+;; TLB: deploy_ok#aff90f57 queryId:uint64 = DeployOk
+;;
+
+builder $DeployOk$_store(builder build_0, (int) v) inline {
+    var (v'queryId) = v;
+    build_0 = store_uint(build_0, 2952335191, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    return build_0;
+}
+
+cell $DeployOk$_store_cell((int) v, builder b) inline {
+    return $DeployOk$_store(b, v).end_cell();
+}
+
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline {
+    return ($queryId);
+}
+
+;;
+;; Type: MagtClaimVault
+;; TLB: _ owner:address feeTon:int257 jettonWallet:address allowances:dict<address, int> = MagtClaimVault
+;;
+
+builder $MagtClaimVault$_store(builder build_0, (slice, int, slice, cell) v) inline {
+    var (v'owner, v'feeTon, v'jettonWallet, v'allowances) = v;
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_int(v'feeTon, 257);
+    build_0 = __tact_store_address_opt(build_0, v'jettonWallet);
+    build_0 = build_0.store_dict(v'allowances);
+    return build_0;
+}
+
+(slice, ((slice, int, slice, cell))) $MagtClaimVault$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'feeTon = sc_0~load_int(257);
+    var v'jettonWallet = sc_0~__tact_load_address_opt();
+    var v'allowances = sc_0~load_dict();
+    return (sc_0, (v'owner, v'feeTon, v'jettonWallet, v'allowances));
+}
+
+(slice, ((slice, int))) $MagtClaimVault$init$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'feeTon = sc_0~load_int(257);
+    return (sc_0, (v'owner, v'feeTon));
+}
+
+(slice, int, slice, cell) $MagtClaimVault$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$MagtClaimVault$_load();
+    }
+    else {
+        (slice $owner, int $feeTon) = $sc~$MagtClaimVault$init$_load();
+        $sc.end_parse();
+        return $MagtClaimVault$_contract_init($owner, $feeTon);
+    }
+}
+
+() $MagtClaimVault$_contract_store((slice, int, slice, cell) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $MagtClaimVault$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract MagtClaimVault functions
+;;
+
+(slice, int, slice, cell) $MagtClaimVault$_contract_init(slice $owner, int $feeTon) impure inline {
+    var (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances)) = (null(), null(), null(), null());
+    $self'owner = $owner;
+    $self'feeTon = $feeTon;
+    $self'jettonWallet = null();
+    $self'allowances = null();
+    return ($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances);
+}
+
+((slice, int, slice, cell), slice) $MagtClaimVault$_fun_get_admin((slice, int, slice, cell) $self) impure inline_ref {
+    var (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances)) = $self;
+    var $fresh$ret_0 = $self'owner;
+    return (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances), $fresh$ret_0);
+}
+
+((slice, int, slice, cell), int) $MagtClaimVault$_fun_get_fee_ton((slice, int, slice, cell) $self) impure inline_ref {
+    var (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances)) = $self;
+    var $fresh$ret_1 = $self'feeTon;
+    return (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances), $fresh$ret_1);
+}
+
+((slice, int, slice, cell), slice) $MagtClaimVault$_fun_get_jetton_wallet((slice, int, slice, cell) $self) impure inline_ref {
+    var (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances)) = $self;
+    var $fresh$ret_2 = $self'jettonWallet;
+    return (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances), $fresh$ret_2);
+}
+
+((slice, int, slice, cell), int) $MagtClaimVault$_fun_get_allowance((slice, int, slice, cell) $self, slice $addr) impure inline_ref {
+    var (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances)) = $self;
+    int $vOpt = __tact_dict_get_slice_int($self'allowances, 267, $addr, 257);
+    var $fresh$ret_3 = ((~ null?($vOpt)) ? $vOpt : 0);
+    return (($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances), $fresh$ret_3);
+}
+
+;;
+;; Get methods of a Contract MagtClaimVault
+;;
+
+_ %get_admin() method_id(113142) {
+    var self = $MagtClaimVault$_contract_load();
+    var res = self~$MagtClaimVault$_fun_get_admin();
+    return res;
+}
+
+_ %get_fee_ton() method_id(93227) {
+    var self = $MagtClaimVault$_contract_load();
+    var res = self~$MagtClaimVault$_fun_get_fee_ton();
+    return res;
+}
+
+_ %get_jetton_wallet() method_id(68790) {
+    var self = $MagtClaimVault$_contract_load();
+    var res = self~$MagtClaimVault$_fun_get_jetton_wallet();
+    return res;
+}
+
+_ %get_allowance(slice $addr) method_id(72030) {
+    slice $addr = $addr;
+    var self = $MagtClaimVault$_contract_load();
+    var res = self~$MagtClaimVault$_fun_get_allowance($addr);
+    return res;
+}
+
+_ %owner() method_id(83229) {
+    var self = $MagtClaimVault$_contract_load();
+    var res = self~$MagtClaimVault$_fun_owner();
+    return res;
+}
+
+;;
+;; Routing of a Contract MagtClaimVault
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances) = $MagtClaimVault$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    var op = in_msg~load_opcode_internal();
+    ;; Receive SetJettonWallet message
+    if (op == 1213265332) {
+        var $msg'addr = in_msg~load_msg_addr();
+        throw_unless(45917, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        $self'jettonWallet = $msg'addr;
+        $MagtClaimVault$_contract_store(($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances));
+        return ();
+    }
+    
+    ;; Receive SetAllowance message
+    if (op == 3664701100) {
+        var $msg'addr = in_msg~load_msg_addr();
+        var $msg'amount = in_msg~load_int(257);
+        throw_unless(45917, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        if (($msg'amount <= 0)) {
+            $self'allowances~__tact_dict_delete(267, $msg'addr);
+        } else {
+            $self'allowances~__tact_dict_set_slice_int(267, $msg'addr, $msg'amount, 257);
+        }
+        $MagtClaimVault$_contract_store(($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances));
+        return ();
+    }
+    
+    ;; Receive Claim message
+    if (op == 3444911050) {
+        var $msg'amount = in_msg~load_int(1) ? in_msg~load_int(257) : null();
+        throw_unless(29727, (~ null?($self'jettonWallet)));
+        throw_unless(26995, ($Context$_get_value(__tact_context_get()) >= $self'feeTon));
+        slice $user = __tact_context_get_sender();
+        int $curOpt = __tact_dict_get_slice_int($self'allowances, 267, $user, 257);
+        throw_unless(59755, (~ null?($curOpt)));
+        int $current = $curOpt;
+        throw_unless(59755, ($current > 0));
+        int $amount = ((~ null?($msg'amount)) ? $msg'amount : $current);
+        throw_unless(3581, ($amount > 0));
+        throw_unless(44302, ($current >= $amount));
+        int $remain = ($current - $amount);
+        if (($remain > 0)) {
+            $self'allowances~__tact_dict_set_slice_int(267, $user, $remain, 257);
+        } else {
+            $self'allowances~__tact_dict_delete(267, $user);
+        }
+        int $fwdTon = 50000000;
+        builder $b = $global_beginCell();
+        store_uint($b, 260734629, 32);
+        store_uint($b, $global_now(), 64);
+        store_uint($b, $amount, 128);
+        $Builder$_fun_storeAddress($b, $user);
+        $Builder$_fun_storeAddress($b, $global_myAddress());
+        $Builder$_fun_storeMaybeRef(null(), $b);
+        $Builder$_fun_storeCoins($b, $fwdTon);
+        $Builder$_fun_storeMaybeRef(null(), $b);
+        $global_send($SendParameters$_constructor_to_value_bounce_body($self'jettonWallet, $Context$_get_value(__tact_context_get()), true, $Builder$_fun_endCell($b)));
+        $MagtClaimVault$_contract_store(($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances));
+        return ();
+    }
+    
+    ;; Receive Deploy message
+    if (op == 0x946a98b6) {
+        var $deploy'queryId = in_msg~load_uint(64);
+        ($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances)~$MagtClaimVault$_fun_notify($DeployOk$_store_cell($DeployOk$_constructor_queryId($deploy'queryId), begin_cell()));
+        $MagtClaimVault$_contract_store(($self'owner, $self'feeTon, $self'jettonWallet, $self'allowances));
+        return ();
+    }
+    
+    ;; Throw if not handled
+    throw(130);
+}
