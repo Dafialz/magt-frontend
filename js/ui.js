@@ -91,10 +91,19 @@ const REF_ON  = (CONFIG.REF_ENABLED !== false);
 const REF_MIN = Number(CONFIG.REF_MIN_USDT || 0);
 
 /* ===== DOM getters з перевіркою isConnected ===== */
+function getTonInput() {
+  // новий TON-інпут (має пріоритет)
+  let el = ui.tonIn;
+  if (!el || !el.isConnected) {
+    el = document.getElementById("tonIn") || document.querySelector("[data-ton-in]") || document.querySelector("input[name='ton']") || null;
+    if (el) ui.tonIn = el;
+  }
+  return el;
+}
 function getUsdtInput() {
   let el = ui.usdtIn;
   if (!el || !el.isConnected) {
-    el = document.getElementById("usdtIn") || null;
+    el = document.getElementById("usdtIn") || document.querySelector("[data-usdt-in]") || document.querySelector("input[name='usdt']") || null;
     if (el) ui.usdtIn = el;
   }
   return el;
@@ -102,7 +111,7 @@ function getUsdtInput() {
 function getAgreeCheckbox() {
   let el = ui.agree;
   if (!el || !el.isConnected) {
-    el = document.getElementById("agree") || null;
+    el = document.getElementById("agree") || document.querySelector("[data-agree]") || null;
     if (el) ui.agree = el;
   }
   return el;
@@ -110,7 +119,7 @@ function getAgreeCheckbox() {
 function getMagOut() {
   let el = ui.magOut;
   if (!el || !el.isConnected) {
-    el = document.getElementById("magOut") || null;
+    el = document.getElementById("magOut") || document.querySelector("[data-mag-out]") || null;
     if (el) ui.magOut = el;
   }
   return el;
@@ -255,11 +264,33 @@ export function sanitizeUsdInput() {
   input.value = usd ? usd : "";
   return usd;
 }
+function sanitizeTonInput() {
+  const input = getTonInput();
+  if (!input) return 0;
+  const val = String(input.value || "").replace(",", ".").trim();
+  let ton = Number(val);
+  if (!isFinite(ton) || ton < 0) ton = 0;
+  // 9 знаків (нанотони) не потрібні тут, лише інпут користувача
+  input.value = ton ? ton : "";
+  return ton;
+}
 
 export function refreshButtons() {
-  const input = getUsdtInput();
   const agree = getAgreeCheckbox();
-  const usd = Number(input?.value || 0);
+  const tonEl = getTonInput();
+  const usdEl = getUsdtInput();
+
+  // Якщо є TON-інпут — пріоритет TON-режим
+  if (tonEl) {
+    const ton = Number(tonEl.value || 0);
+    const ok = !!agree?.checked && ton >= (Number(CONFIG.MIN_BUY_TON ?? 0) || 0);
+    if (ui.btnBuy) ui.btnBuy.disabled = !ok;
+    if (ui.btnClaim) ui.btnClaim.disabled = true;
+    return;
+  }
+
+  // Інакше працюємо по USD (старий режим)
+  const usd = Number(usdEl?.value || 0);
   const ok = !!agree?.checked && usd >= (CONFIG.MIN_BUY_USDT || 1);
   if (ui.btnBuy) ui.btnBuy.disabled = !ok;
   if (ui.btnClaim) ui.btnClaim.disabled = true;
@@ -280,6 +311,12 @@ function calcTokensFromUsd(usdRaw, priceRaw) {
   if (!(usd > 0) || !(price > 0)) return 0;
   return Math.floor(usd / price);
 }
+function calcTokensFromTon(tonRaw, priceTonRaw) {
+  const ton = Number(tonRaw);
+  const priceTon = Number(priceTonRaw);
+  if (!(ton > 0) || !(priceTon > 0)) return 0;
+  return Math.floor(ton / priceTon);
+}
 
 function renderTokensOut(tokens) {
   const outEl = getMagOut();
@@ -288,6 +325,19 @@ function renderTokensOut(tokens) {
 }
 
 export function recalc() {
+  const tonEl = getTonInput();
+  if (tonEl) {
+    const ton = sanitizeTonInput();
+    const priceTon = Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
+    const tokens = calcTokensFromTon(ton, priceTon);
+    renderTokensOut(tokens);
+    updateRefBonus(); // перерахуємо і реф-бонус (ниже обробка TON)
+    updatePriceUnder(); // підпис під ціною (залишаємо USD-віджет як є)
+    refreshButtons();
+    return;
+  }
+
+  // USD fallback
   const usd = sanitizeUsdInput();
   const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
   const tokens = calcTokensFromUsd(usd, price);
@@ -352,7 +402,13 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   const saleRemaining = el("sale-remaining");
   if (saleRemaining) saleRemaining.textContent = fmt.tokens(info.remainingInTier);
 
-  try { window.__CURRENT_PRICE_USD = Number(info.price || 0); } catch {}
+  try {
+    window.__CURRENT_PRICE_USD = Number(info.price || 0);
+    // Якщо ти задав CONFIG.PRICE_TON — збережемо для калькулятора TON (візуальний бейдж)
+    if (Number(CONFIG.PRICE_TON) > 0) {
+      window.__CURRENT_PRICE_TON = Number(CONFIG.PRICE_TON);
+    }
+  } catch {}
 
   if (ui.raised) ui.raised.textContent = (raised).toLocaleString();
   if (ui.bar)    ui.bar.style.width = `${pct.toFixed(2)}%`;
@@ -412,10 +468,16 @@ function startSalePolling() {
 
 /* ===== авто-підв’язка калькулятора, якщо bindEvents() не викликано ===== */
 function ensureCalcWires() {
-  const input = getUsdtInput();
-  if (input && !input._calcWired) {
-    ["input","change","blur"].forEach(ev => input.addEventListener(ev, recalc));
-    input._calcWired = true;
+  const ton = getTonInput();
+  const usd = getUsdtInput();
+
+  if (ton && !ton._calcWired) {
+    ["input","change","blur"].forEach(ev => ton.addEventListener(ev, recalc));
+    ton._calcWired = true;
+  }
+  if (usd && !usd._calcWired) {
+    ["input","change","blur"].forEach(ev => usd.addEventListener(ev, recalc));
+    usd._calcWired = true;
   }
 }
 
@@ -424,6 +486,7 @@ export function initStaticUI() {
   const y = document.querySelector("#year");
   if (y) y.textContent = new Date().getFullYear();
 
+  // Віджет ціни (історично USD)
   if (ui.price) ui.price.textContent = (CONFIG.PRICE_USD || 0).toFixed(6);
   if (ui.level) ui.level.textContent = "1";
 
@@ -439,6 +502,13 @@ export function initStaticUI() {
     }
     if (ui.btnCopyRef) ui.btnCopyRef.disabled = false;
   }
+
+  // якщо є ціна в TON — збережемо для калькулятора
+  try {
+    if (Number(CONFIG.PRICE_TON) > 0) {
+      window.__CURRENT_PRICE_TON = Number(CONFIG.PRICE_TON);
+    }
+  } catch {}
 
   updatePriceUnder();
   startSalePolling();
@@ -494,14 +564,47 @@ export function loadRefFromStorage() {
 
 /* ===== РЕФ-БОНУС у MAGT ===== */
 export function updateRefBonus() {
-  const input = getUsdtInput();
-  if (!ui.refPayout || !input) return;
+  if (!ui.refPayout) return;
   if (!REF_ON) { ui.refPayout.classList.add("hidden"); return; }
 
-  const usd = Number(input.value || 0);
-  if (!state.referrer || !usd || usd <= 0 || (REF_MIN > 0 && usd < REF_MIN)) {
-    ui.refPayout.classList.add("hidden");
-    return;
+  // спочатку спробуємо TON-інпут (новий режим)
+  const tonEl = getTonInput();
+  const usdEl = getUsdtInput();
+
+  let bonusTokens = 0;
+  let toAddrShort = state.referrerShort || short(state.referrer);
+
+  if (tonEl) {
+    const ton = Number(tonEl.value || 0);
+    const pct = Number(CONFIG.REF_BONUS_PCT || 5);
+    const priceTon = Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
+    if (state.referrer && ton > 0 && priceTon > 0) {
+      const tokens = calcTokensFromTon(ton, priceTon);
+      bonusTokens = Math.floor(tokens * (pct / 100));
+    }
+  } else if (usdEl) {
+    // старий USD-режим
+    const usd = Number(usdEl.value || 0);
+    if (!state.referrer || !usd || usd <= 0 || (REF_MIN > 0 && usd < REF_MIN)) {
+      ui.refPayout.classList.add("hidden");
+      return;
+    }
+    if (!ui.refPayout.__magTplFixed) {
+      try {
+        const amtId = ui.refBonusUsd?.id || "ref-bonus-usd";
+        const toId  = ui.refBonusTo?.id  || "ref-bonus-to";
+        const pct = Number(CONFIG.REF_BONUS_PCT || 5);
+        ui.refPayout.innerHTML = `${pct}% реф-винагорода: <span id="${amtId}">0</span> MAGT → <span id="${toId}">—</span>`;
+        ui.refBonusUsd = document.getElementById(amtId);
+        ui.refBonusTo  = document.getElementById(toId);
+        ui.refPayout.__magTplFixed = true;
+      } catch {}
+    }
+    const pct   = Number(CONFIG.REF_BONUS_PCT || 5);
+    const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
+    if (!(price > 0)) return;
+    const tokens = calcTokensFromUsd(usd, price);
+    bonusTokens = Math.floor(tokens * (pct / 100));
   }
 
   if (!ui.refPayout.__magTplFixed) {
@@ -516,24 +619,25 @@ export function updateRefBonus() {
     } catch {}
   }
 
-  const pct   = Number(CONFIG.REF_BONUS_PCT || 5);
-  const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
-  if (!(price > 0)) return;
-
-  const tokens = calcTokensFromUsd(usd, price);
-  const bonusTokens = Math.floor(tokens * (pct / 100));
-
   if (ui.refBonusUsd) ui.refBonusUsd.textContent = fmt.tokens(bonusTokens);
-  if (ui.refBonusTo)  ui.refBonusTo.textContent  = state.referrerShort || short(state.referrer);
-  ui.refPayout.classList.remove("hidden");
+  if (ui.refBonusTo)  ui.refBonusTo.textContent  = toAddrShort || "—";
+
+  // показ/приховати
+  if (state.referrer && bonusTokens > 0) ui.refPayout.classList.remove("hidden");
+  else ui.refPayout.classList.add("hidden");
 }
 
 export function initRefBonusHandlers() {
-  const input = getUsdtInput();
-  if (!input) return;
-  ["input", "change", "blur"].forEach((ev) =>
-    input.addEventListener(ev, updateRefBonus)
-  );
+  const ton = getTonInput();
+  const usd = getUsdtInput();
+  const bind = (input) => {
+    if (!input) return;
+    ["input", "change", "blur"].forEach((ev) =>
+      input.addEventListener(ev, updateRefBonus)
+    );
+  };
+  bind(ton);
+  bind(usd);
   updateRefBonus();
 }
 
@@ -648,12 +752,17 @@ export async function setOwnRefLink(walletAddress) {
 
 /* ===================== bind events ===================== */
 export function bindEvents({ onBuyClick, onClaimClick, getUserUsdtBalance }) {
-  const input = getUsdtInput();
+  const ton = getTonInput();
+  const usd = getUsdtInput();
   const agree = getAgreeCheckbox();
 
-  if (input && input._bound !== true) {
-    input.addEventListener("input", recalc);
-    input._bound = true;
+  if (ton && ton._bound !== true) {
+    ton.addEventListener("input", recalc);
+    ton._bound = true;
+  }
+  if (usd && usd._bound !== true) {
+    usd.addEventListener("input", recalc);
+    usd._bound = true;
   }
   if (agree && agree._bound !== true) {
     agree.addEventListener("change", refreshButtons);
@@ -662,6 +771,7 @@ export function bindEvents({ onBuyClick, onClaimClick, getUserUsdtBalance }) {
 
   if (ui.btnMax && ui.btnMax._bound !== true) {
     ui.btnMax.addEventListener("click", async () => {
+      // BTN MAX для USD-режиму збережено для сумісності
       setBtnLoading(ui.btnMax, true, "…");
       let max = await getUserUsdtBalance();
       setBtnLoading(ui.btnMax, false);

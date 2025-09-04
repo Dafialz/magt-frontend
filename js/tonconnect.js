@@ -1,6 +1,8 @@
-// Один-єдиний інстанс офіційної TonConnectUI-кнопки у NAV (пріоритет).
+// /js/tonconnect.js
 // Публічне API: initTonConnect({ onConnect, onDisconnect }), mountTonButtons(),
 // getWalletAddress(), getTonConnect(), openConnectModal()
+
+import { ui as UI, refreshUiRefs } from "./state.js";
 
 let primaryUi = null;
 let readyPromise = null;
@@ -23,8 +25,6 @@ function isHexLike(a) {
   const s = a.trim();
   return !!s && (s.startsWith("0:") || /^[0-9a-fA-F:]{48,90}$/.test(s));
 }
-
-/** Синхронна нормалізація в EQ/UQ, якщо TonWeb уже є */
 function normalizeToBase64(addr) {
   const a = (addr || "").trim();
   if (!a) return null;
@@ -35,21 +35,16 @@ function normalizeToBase64(addr) {
       return new A(a).toString(true, true, true);
     }
   } catch {}
-  // Якщо TonWeb недоступний — не повертаємо hex/0:, краще зачекати на конвертацію
   return null;
 }
-
-/** Гарантовано отримати EQ/UQ: якщо треба — підтягуємо TonWeb і конвертуємо */
 async function ensureBase64(addr) {
   const a = (addr || "").trim();
   if (!a) return null;
   if (isB64(a)) return a;
 
-  // Спроба швидкої конвертації (TonWeb вже є)
   let b64 = normalizeToBase64(a);
   if (b64) return b64;
 
-  // Якщо адреса схожа на hex/0:, а TonWeb ще не підвантажений — підвантажимо і сконвертимо
   if (isHexLike(a)) {
     try {
       if (!window.TonWeb) {
@@ -58,13 +53,10 @@ async function ensureBase64(addr) {
       const A = window.TonWeb.utils.Address;
       b64 = new A(a).toString(true, true, true);
       if (isB64(b64)) return b64;
-    } catch (e) {
-      log("ensureBase64 convert failed:", e);
-    }
+    } catch (e) { log("ensureBase64 convert failed:", e); }
   }
   return null;
 }
-
 function shortAddr(a) { return a ? (a.slice(0,4) + "…" + a.slice(-4)) : ""; }
 
 async function waitTonLib(timeoutMs = 15000) {
@@ -85,24 +77,19 @@ function dispatchAddress(addr) {
   } catch {}
 }
 
-/** Головний синк адреси. НІКОЛИ не зберігає hex — лише EQ/UQ. */
+/** Головний синк адреси. Зберігаємо тільки EQ/UQ. */
 async function syncAddress(addr, { onConnect, onDisconnect } = {}, source = "unknown") {
-  // Прагнемо EQ/UQ; якщо ні — конвертуємо (у т.ч. підвантаживши TonWeb)
   let base64 = normalizeToBase64(addr);
   if (!base64 && isHexLike(addr)) {
     base64 = await ensureBase64(addr);
-    if (base64) {
-      // після конвертації повторимо шлях уже з чистою адресою
-      return syncAddress(base64, { onConnect, onDisconnect }, source + "/hex->b64");
-    }
+    if (base64) return syncAddress(base64, { onConnect, onDisconnect }, source + "/hex->b64");
   }
-  if (!base64 && isB64(addr)) base64 = addr?.trim() || null; // рідкісний випадок
+  if (!base64 && isB64(addr)) base64 = addr?.trim() || null;
 
   if (base64) {
     const changed = cachedBase64Addr !== base64;
     cachedBase64Addr = base64;
     try { window.__magtAddr = base64; } catch {}
-
     if (changed) {
       log("address set from:", source, base64, "UI:", shortAddr(base64));
       dispatchAddress(base64);
@@ -195,51 +182,38 @@ function extractFromLocalStorage() {
   return null;
 }
 
-/* =============== кнопка (рівно одна) =============== */
-/** Перевіряємо реальну видимість елемента (display:none, розміри, батьківські display:none). */
-function isVisible(el) {
-  if (!el) return false;
-  const style = window.getComputedStyle(el);
-  if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
-  if (el.getClientRects().length === 0) return false;
-  let p = el.parentElement;
-  while (p) {
-    const s = window.getComputedStyle(p);
-    if (s.display === "none" || s.visibility === "hidden") return false;
-    p = p.parentElement;
+/* =============== монтування кнопки =============== */
+function ensureFallbackContainer() {
+  let el = document.getElementById("tonconnect-fallback");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "tonconnect-fallback";
+    el.style.position = "fixed";
+    el.style.right = "16px";
+    el.style.bottom = "16px";
+    el.style.zIndex = "9999";
+    document.body.appendChild(el);
   }
-  return true;
+  return el;
 }
-
-/**
- * Пріоритет місця монтування (серед ВИДИМИХ):
- * 1) NAV: #tonconnect → #tonconnect-mobile-inline → #tonconnect-mobile
- * 2) Будь-який інший видимий [data-ton-root]:not(#tonconnect-hero)
- * 3) Fallback: видимий #tonconnect-hero
- */
-function findRootOnce() {
-  const preferIds = ["#tonconnect", "#tonconnect-mobile-inline", "#tonconnect-mobile"];
-  for (const sel of preferIds) {
-    const el = document.querySelector(sel);
-    if (el && isVisible(el)) return el;
+function pickMountRoot() {
+  // оновимо референси з state.js
+  try { refreshUiRefs(); } catch {}
+  // 1) пріоритет: перший відомий контейнер з UI (nav/hero/…)
+  if (Array.isArray(UI.tcContainers) && UI.tcContainers.length) {
+    for (const el of UI.tcContainers) {
+      if (el && el instanceof HTMLElement) return el;
+    }
   }
-
-  const anyNonHero = Array.from(document.querySelectorAll("[data-ton-root]:not(#tonconnect-hero)"))
-    .find(isVisible);
-  if (anyNonHero) return anyNonHero;
-
-  const hero = document.querySelector("#tonconnect-hero");
-  if (hero && isVisible(hero)) return hero;
-
-  return Array.from(document.querySelectorAll("[data-ton-root]")).find(isVisible) || null;
+  if (UI.tcPrimary && UI.tcPrimary instanceof HTMLElement) return UI.tcPrimary;
+  // 2) якщо нічого немає — створюємо fallback
+  return ensureFallbackContainer();
 }
-
 async function mountPrimaryAt(root) {
   if (primaryUi) return primaryUi;
   await waitTonLib();
   if (!window.TON_CONNECT_UI) return null;
 
-  // ВАЖЛИВО: НЕ чистимо кеш SDK — інакше розлогін після reload
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
   const ui = new window.TON_CONNECT_UI.TonConnectUI({
     manifestUrl: `${location.origin}/tonconnect-manifest.json`,
@@ -254,18 +228,13 @@ async function mountPrimaryAt(root) {
 }
 
 export async function mountTonButtons() {
-  const root = findRootOnce();
+  const root = pickMountRoot();
   if (!root) return [];
   const created = [];
   if (!primaryUi) {
     const ui = await mountPrimaryAt(root).catch(()=>null);
     if (ui) created.push(ui);
   }
-  // Якщо обрано NAV, а в херо є контейнер — сховаємо його, щоб не було «порожньої» зони
-  try {
-    const hero = document.querySelector("#tonconnect-hero");
-    if (hero && hero !== root) hero.style.display = "none";
-  } catch {}
   return created;
 }
 
@@ -277,7 +246,6 @@ export function getTonConnect() {
   return primaryUi || window.__tcui || null;
 }
 
-// невеликий хелпер, аби визначити, чи вже є підключення
 function _isConnected(ui) {
   if (!ui) return false;
   return Boolean(
@@ -294,18 +262,9 @@ export async function openConnectModal() {
   await mountTonButtons().catch(()=>{});
   const ui = (primaryUi || window.__tcui);
   if (!ui) return;
-
-  // Якщо вже підключено — нічого не робимо (уникаємо TON_CONNECT_SDK_ERROR I)
-  if (_isConnected(ui)) {
-    log("openConnectModal skipped: already connected");
-    return;
-  }
-
-  try {
-    await ui.openModal?.();
-  } catch (e) {
+  if (_isConnected(ui)) { log("openConnectModal skipped: already connected"); return; }
+  try { await ui.openModal?.(); } catch (e) {
     const msg = String(e?.message || e || "").toLowerCase();
-    // тихо ігноруємо “already connected”
     if (msg.includes("already connected")) return;
     log("openConnectModal error:", e);
   }
@@ -315,6 +274,8 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
   if (readyPromise) return readyPromise;
   readyPromise = (async () => {
     await mountTonButtons().catch(()=>{});
+
+    // теплий кеш
     try {
       if (!cachedBase64Addr && window.__magtAddr) {
         await syncAddress(window.__magtAddr, { onConnect, onDisconnect }, "warm-cache");
@@ -382,14 +343,11 @@ if (document.readyState === "loading") {
   autoMount(); autoInit();
 }
 
-/* =============== debug helpers (корисно у дев-режимі) =============== */
+/* =============== debug helpers =============== */
 try { window.getWalletAddress = getWalletAddress; } catch {}
 try { window.getTonConnect   = getTonConnect;   } catch {}
 try {
-  window.magtSetAddr = (addr) => {
-    // ручний тригер (для діагностики): приймає EQ/UQ або hex — всередині буде нормалізація
-    dispatchAddress(addr || null);
-  };
+  window.magtSetAddr = (addr) => { dispatchAddress(addr || null); };
 } catch {}
 setTimeout(() => {
   try {

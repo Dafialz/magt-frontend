@@ -10,14 +10,14 @@ const _rpcFromConfig =
   (CONFIG.TON_RPC && String(CONFIG.TON_RPC).trim()) ||
   "https://toncenter.com/api/v2/jsonRPC";
 
+// Якщо в конфігу все ще залишили toncenter — у проді форсуємо наш бек-ендпоінт
 export const RPC_URL = /toncenter\.com/i.test(_rpcFromConfig)
   ? (CONFIG.ENDPOINTS?.rpc || "https://api.magtcoin.com/api/rpc")
   : _rpcFromConfig;
 
 // Дозволяємо fallback лише якщо це toncenter (CSP friendly)
 const RPC_FALLBACK = (CONFIG.TON_RPC_FALLBACK || "").trim();
-const ALLOW_FALLBACK =
-  !!RPC_FALLBACK && /toncenter\.com/i.test(RPC_FALLBACK);
+const ALLOW_FALLBACK = !!RPC_FALLBACK && /toncenter\.com/i.test(RPC_FALLBACK);
 
 /* Послідовність провайдерів: основний → (опц.) toncenter */
 function* providerSeq(TonWeb) {
@@ -119,6 +119,7 @@ function epUrl(key, qs = "") {
     claim: "/api/presale/claim",
     order: "/api/order",
     referral: "/api/referral",
+    rpc: "/api/rpc",
   };
   const path = paths[key];
   if (!path) return null;
@@ -185,11 +186,7 @@ async function pickUsdtMasterForAmount(usdAmount) {
         info = await readJettonBalanceUnits(TonWeb, prov, master, userAddr);
         break;
       } catch (e) {
-        console.warn(
-          "[USDT master] read failed on provider:",
-          master,
-          e?.message || e
-        );
+        console.warn("[USDT master] read failed on provider:", master, e?.message || e);
       }
     }
     if (!info) continue;
@@ -227,10 +224,7 @@ async function pickUsdtMasterForAmount(usdAmount) {
 
   // Якщо всі RPC упали — беремо перший майстер без префлайту
   const fallbackMaster = USDT_MASTERS[0];
-  console.warn(
-    "[USDT master] RPC failed for all, fallback to first master:",
-    fallbackMaster
-  );
+  console.warn("[USDT master] RPC failed for all, fallback to first master:", fallbackMaster);
   const prov = new TonWeb.HttpProvider(RPC_URL);
   const JettonMinter = TonWeb.token.jetton.JettonMinter;
   const JettonWallet = TonWeb.token.jetton.JettonWallet;
@@ -283,22 +277,15 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   if (balanceUnits !== null && balanceUnits < jetAmountBig) {
     const human = Number(balanceUnits) / 10 ** dec;
     throw new Error(
-      `Недостатньо USDT: на обраному майстрі ${human.toFixed(
-        6
-      )} USDT, потрібно ${numAmount}.`
+      `Недостатньо USDT: на обраному майстрі ${human.toFixed(6)} USDT, потрібно ${numAmount}.`
     );
   }
 
   // реферал
   let cleanRef = null;
-  if (typeof refAddr === "string" && isTonAddress(refAddr))
-    cleanRef = refAddr.trim();
+  if (typeof refAddr === "string" && isTonAddress(refAddr)) cleanRef = refAddr.trim();
   if (cleanRef && CONFIG.REF_SELF_BAN === true) {
-    const buyerBase64 = new TonWeb.utils.Address(resolvedOwner).toString(
-      true,
-      true,
-      true
-    );
+    const buyerBase64 = new TonWeb.utils.Address(resolvedOwner).toString(true, true, true);
     if (buyerBase64 === cleanRef) cleanRef = null;
   }
 
@@ -325,30 +312,26 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
       const minter = new JettonMinter(prov, {
         address: new TonWeb.utils.Address(usdtMasterB64),
       });
-      presaleJettonWalletAddr = await minter.getJettonWalletAddress(
-        presaleOwner
-      );
+      presaleJettonWalletAddr = await minter.getJettonWalletAddress(presaleOwner);
       break;
     } catch {}
   }
   if (!presaleJettonWalletAddr) {
-    throw new Error(
-      "Не вдалося отримати адресу JettonWallet пресейлу (усі RPC недоступні)"
-    );
+    throw new Error("Не вдалося отримати адресу JettonWallet пресейлу (усі RPC недоступні)");
   }
 
   // body transfer (компат: і amount, і jettonAmount)
   const body = await userJettonWallet.createTransferBody({
     queryId: new TonWeb.utils.BN(ts),
-    jettonAmount: amountBN,                 // ← основне поле у новіших версіях
-    amount:       amountBN,                 // ← сумісність зі старими реалізаціями
+    jettonAmount: amountBN,                 // новіші версії
+    amount:       amountBN,                 // сумісність зі старими
     toAddress: presaleJettonWalletAddr,
     responseAddress: new TonWeb.utils.Address(resolvedOwner),
     forwardAmount: forwardTon,
     forwardPayload: cell,
   });
 
-  // stateInit — форсимо, якщо метод доступний (допомагає прокинуть JW в Tonkeeper)
+  // stateInit — форсимо, якщо метод доступний (Tonkeeper іноді вимагає)
   let stateInitB64 = null;
   try {
     if (typeof userJettonWallet.createStateInit === "function") {
@@ -359,7 +342,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
 
   const payloadB64 = u8ToBase64(await body.toBoc(false));
 
-  // логи
+  // Логи
   try {
     console.log(
       "[MAGT TX] picked USDT master:",
@@ -374,16 +357,11 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
       presaleJettonWalletAddr.toString(true, true, true)
     );
     console.log("[MAGT TX] jetAmount (USDT units):", jetAmountBig.toString());
-    console.log(
-      "[MAGT TX] openTon:",
-      openTon.toString(),
-      "forwardTon:",
-      forwardTon.toString()
-    );
+    console.log("[MAGT TX] openTon:", openTon.toString(), "forwardTon:", forwardTon.toString());
     console.log("[MAGT TX] note:", note);
   } catch {}
 
-  // ВАЖЛИВО: адреса одержувача → EQ (bounceable), щоб Tonkeeper/MTW сприймали як jetton-transfer
+  // ВАЖЛИВО: адреса одержувача → EQ (bounceable)
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [
@@ -451,45 +429,77 @@ export async function buildClaimTx(ownerUserAddr, claimContractAddr = null, opts
 }
 
 /* ============================================
+ * RPC helper через бекенд (/api/rpc): runGetMethod
+ * ============================================ */
+export async function rpcRunGetMethod({ address, method, stack = [] }) {
+  const url = CONFIG.ENDPOINTS?.rpc || epUrl("rpc");
+  if (!url) throw new Error("RPC endpoint is not configured");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
+    body: JSON.stringify({ method: "runGetMethod", params: { address, method, stack } }),
+  });
+  if (!res.ok) throw new Error(`RPC HTTP ${res.status}`);
+  const json = await res.json().catch(() => ({}));
+  if (json?.error) throw new Error(String(json.error));
+  return json?.result || json;
+}
+
+/* ============================================
  * Віджити: дані (API або DEMO)
  * ============================================ */
 function demoFeed() {
-  try {
-    return JSON.parse(localStorage.getItem("demo.feed") || "[]");
-  } catch {
-    return [];
-  }
+  try { return JSON.parse(localStorage.getItem("demo.feed") || "[]"); }
+  catch { return []; }
 }
 function demoLeadersObj() {
-  try {
-    return JSON.parse(localStorage.getItem("demo.ref.leaders") || "{}");
-  } catch {
-    return {};
-  }
+  try { return JSON.parse(localStorage.getItem("demo.ref.leaders") || "{}"); }
+  catch { return {}; }
 }
 function saveDemoFeed(list) {
-  try {
-    localStorage.setItem("demo.feed", JSON.stringify(list));
-  } catch {}
+  try { localStorage.setItem("demo.feed", JSON.stringify(list)); } catch {}
 }
 function saveDemoLeaders(obj) {
-  try {
-    localStorage.setItem("demo.ref.leaders", JSON.stringify(obj));
-  } catch {}
+  try { localStorage.setItem("demo.ref.leaders", JSON.stringify(obj)); } catch {}
 }
 
 export async function getPresaleStats() {
-  const url = epUrl("stats");
-  if (url) {
+  const urlBase = epUrl("stats");
+  if (urlBase) {
+    // Анти-кеш: додаємо t=timestamp і no-store
+    const url = `${urlBase}${urlBase.includes("?") ? "&" : "?"}t=${Date.now()}`;
     try {
-      const res = await safeFetch(url, { cache: "no-cache" });
+      const res = await safeFetch(url, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
-        const soldMag = Number(data.soldMag ?? data.sold_tokens ?? 0) || 0;
-        const totalMag =
-          Number(data.totalMag ?? data.total_supply ?? CONFIG.TOTAL_SUPPLY) ||
-          CONFIG.TOTAL_SUPPLY;
-        const raisedRaw = Number(data.raisedUsd ?? data.raised_usd ?? 0) || 0;
+
+        // нормалізація полів
+        const soldMag = Number(
+          data.soldMag ?? data.sold_tokens ?? data.sold ?? 0
+        ) || 0;
+
+        const totalMag = Number(
+          data.totalMag ?? data.total_supply ?? CONFIG.TOTAL_SUPPLY
+        ) || CONFIG.TOTAL_SUPPLY;
+
+        const raisedRaw = Number(
+          data.raisedUsd ?? data.raised_usd ?? data.raised ?? 0
+        ) || 0;
+
+        // якщо бекенд віддає ціну в TON — прокидаємо в глобал
+        const priceTon =
+          Number(data.priceTon ?? data.price_ton ?? data.current_price_ton ?? 0) || 0;
+        if (priceTon > 0) {
+          try { window.__CURRENT_PRICE_TON = priceTon; } catch {}
+        }
+
+        // так само ціна в USD (на випадок, якщо бек віддає її динамічно)
+        const priceUsd =
+          Number(data.priceUsd ?? data.price_usd ?? data.current_price_usd ?? 0) || 0;
+        if (priceUsd > 0) {
+          try { window.__CURRENT_PRICE_USD = priceUsd; } catch {}
+        }
+
         const raisedUsd = raisedRaw + (Number(CONFIG.RAISED_OFFSET_USD) || 0);
         return { soldMag, totalMag, raisedUsd };
       }
@@ -497,25 +507,23 @@ export async function getPresaleStats() {
       console.warn("stats API fail:", e);
     }
   }
+
+  // DEMO fallback
   const feed = demoFeed();
-  const soldMag = feed.reduce(
-    (s, it) => s + (Number(it.magt ?? it.tokens ?? 0) || 0),
-    0
-  );
+  const soldMag = feed.reduce((s, it) => s + (Number(it.magt ?? it.tokens ?? 0) || 0), 0);
   const raisedUsd =
-    feed.reduce(
-      (s, it) => s + (Number(it.amountUsd ?? it.usd ?? 0) || 0),
-      0
-    ) + (Number(CONFIG.RAISED_OFFSET_USD) || 0);
+    feed.reduce((s, it) => s + (Number(it.amountUsd ?? it.usd ?? 0) || 0), 0) +
+    (Number(CONFIG.RAISED_OFFSET_USD) || 0);
   return { soldMag, totalMag: CONFIG.TOTAL_SUPPLY, raisedUsd };
 }
 
 export async function getRecentPurchases(limit = 20) {
   const lim = Math.max(1, Math.min(100, Number(limit) || 20));
-  const url = epUrl("feed", `?limit=${lim}`);
-  if (url) {
+  const urlBase = epUrl("feed", `?limit=${lim}`);
+  if (urlBase) {
+    const url = `${urlBase}${urlBase.includes("?") ? "&" : "?"}t=${Date.now()}`;
     try {
-      const res = await safeFetch(url, { cache: "no-cache" });
+      const res = await safeFetch(url, { cache: "no-store" });
       if (res.ok) {
         const payload = await res.json();
         if (Array.isArray(payload?.items)) return payload.items.slice(0, lim);
@@ -531,10 +539,11 @@ export async function getRecentPurchases(limit = 20) {
 
 export async function getReferralLeaders(limit = 10) {
   const lim = Math.max(1, Math.min(100, Number(limit) || 10));
-  const url = epUrl("leaders", `?limit=${lim}`);
-  if (url) {
+  const urlBase = epUrl("leaders", `?limit=${lim}`);
+  if (urlBase) {
+    const url = `${urlBase}${urlBase.includes("?") ? "&" : "?"}t=${Date.now()}`;
     try {
-      const res = await safeFetch(url, { cache: "no-cache" });
+      const res = await safeFetch(url, { cache: "no-store" });
       if (res.ok) {
         const payload = await res.json();
         if (Array.isArray(payload?.items)) return payload.items.slice(0, lim);
@@ -552,12 +561,17 @@ export async function getReferralLeaders(limit = 10) {
 }
 
 export async function pushPurchaseToBackend({ usd, tokens, address, ref }) {
-  const url = epUrl("purchase");
-  if (!url) return { ok: true, demo: true };
+  const urlBase = epUrl("purchase");
+  if (!urlBase) return { ok: true, demo: true };
+  // анти-кеш лише для GET, POST і так не кешується, але явно відрубаємо
   try {
-    const res = await safeFetch(url, {
+    const res = await safeFetch(urlBase, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "cache-control": "no-store",
+        pragma: "no-cache",
+      },
       body: JSON.stringify({
         usd: Number(usd) || 0,
         tokens: Number(tokens) || 0,

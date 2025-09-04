@@ -17,6 +17,7 @@ export const state = {
 
 /**
  * Посилання на елементи інтерфейсу (оновлюються через refreshUiRefs()).
+ * Для стійкості додано кілька альтернативних селекторів.
  */
 export const ui = {
   // заголовки/прогрес
@@ -28,13 +29,18 @@ export const ui = {
   bar: null,
 
   // форма купівлі
-  usdtIn: null,
+  tonIn: null,   // НОВЕ: інпут сумми в TON
+  usdtIn: null,  // залишаємо для зворотної сумісності
   magOut: null,
   agree: null,
   btnMax: null,
   btnBuy: null,
   btnClaim: null,
   status: null,
+
+  // TonConnect
+  tcContainers: [],   // НОВЕ: куди монтувати офіційну кнопку Connect
+  tcPrimary: null,    // перший доступний контейнер
 
   // рефералка
   refDetected: null,
@@ -53,47 +59,81 @@ export const ui = {
 };
 
 /**
+ * Безпечний пошук першого існуючого елемента з набору селекторів.
+ */
+function pickOne(selectors = []) {
+  for (const s of selectors) {
+    const el = $(s);
+    if (el) return el;
+  }
+  return null;
+}
+
+/**
+ * Повертає всі елементи, що відповідають набору селекторів.
+ */
+function pickAll(selectors = []) {
+  const out = [];
+  for (const s of selectors) {
+    const nodes = document.querySelectorAll(s);
+    nodes.forEach(n => out.push(n));
+  }
+  return out;
+}
+
+/**
  * Перечитує всі потрібні елементи з DOM.
  * Викликати безпечно скільки завгодно разів (ідемпотентно).
  */
 export function refreshUiRefs() {
   // заголовки/прогрес
-  ui.year   = $("#year");
-  ui.price  = $("#ui-price");
-  ui.level  = $("#ui-level");
-  ui.left   = $("#ui-left");
-  ui.raised = $("#ui-raised");
-  ui.bar    = $("#bar");
+  ui.year   = pickOne(["#year", "[data-year]"]);
+  ui.price  = pickOne(["#ui-price", "[data-ui-price]"]);
+  ui.level  = pickOne(["#ui-level", "[data-ui-level]"]);
+  ui.left   = pickOne(["#ui-left", "[data-ui-left]"]);
+  ui.raised = pickOne(["#ui-raised", "[data-ui-raised]"]);
+  ui.bar    = pickOne(["#bar", "[data-progress-bar]"]);
 
-  // форма купівлі
-  ui.usdtIn   = $("#usdtIn");
-  ui.magOut   = $("#magOut");
-  ui.agree    = $("#agree");
-  ui.btnMax   = $("#btn-max");
-  ui.btnBuy   = $("#btn-buy");
-  ui.btnClaim = $("#btn-claim");
-  ui.status   = $("#status");
+  // форма купівлі (TON-first, USDT fallback)
+  ui.tonIn   = pickOne(["#tonIn", "[data-ton-in]", "input[name='ton']"]);
+  ui.usdtIn  = pickOne(["#usdtIn", "[data-usdt-in]", "input[name='usdt']"]);
+  ui.magOut  = pickOne(["#magOut", "[data-mag-out]"]);
+  ui.agree   = pickOne(["#agree", "[data-agree]"]);
+  ui.btnMax  = pickOne(["#btn-max", "[data-btn-max]"]);
+  ui.btnBuy  = pickOne(["#btn-buy", "[data-btn-buy]"]);
+  ui.btnClaim= pickOne(["#btn-claim", "[data-btn-claim]"]);
+  ui.status  = pickOne(["#status", "[data-status]"]);
+
+  // TonConnect кнопка — збираємо всі відомі контейнери
+  ui.tcContainers = pickAll([
+    "#tonconnect",
+    "#tonconnect-mobile",
+    "#tonconnect-hero",
+    "[data-tonconnect]",
+    ".tonconnect"
+  ]);
+  ui.tcPrimary = ui.tcContainers?.[0] || null;
 
   // рефералка
-  ui.refDetected   = $("#ref-detected");
-  ui.referrerShort = $("#referrer-short");
-  ui.refYourLink   = $("#ref-yourlink");
-  ui.refLink       = $("#ref-link");
-  ui.btnCopyRef    = $("#btn-copy-ref");
-  ui.refPayout     = $("#ref-payout");
-  ui.refBonusUsd   = $("#ref-bonus-usd");
-  ui.refBonusTo    = $("#ref-bonus-to");
+  ui.refDetected   = pickOne(["#ref-detected", "[data-ref-detected]"]);
+  ui.referrerShort = pickOne(["#referrer-short", "[data-referrer-short]"]);
+  ui.refYourLink   = pickOne(["#ref-yourlink", "[data-ref-yourlink]"]);
+  ui.refLink       = pickOne(["#ref-link", "[data-ref-link]"]);
+  ui.btnCopyRef    = pickOne(["#btn-copy-ref", "[data-btn-copy-ref]"]);
+  ui.refPayout     = pickOne(["#ref-payout", "[data-ref-payout]"]);
+  ui.refBonusUsd   = pickOne(["#ref-bonus-usd", "[data-ref-bonus-usd]"]);
+  ui.refBonusTo    = pickOne(["#ref-bonus-to", "[data-ref-bonus-to]"]);
 
   // claim (підстраховка: або id, або data-атрибут)
-  ui.claimWrap  = $("#claim-wrap") || $("[data-claim-wrap]");
-  ui.claimInfo  = $("#claim-info");
-  ui.claimBadge = $("#claim-badge");
+  ui.claimWrap  = pickOne(["#claim-wrap", "[data-claim-wrap]"]);
+  ui.claimInfo  = pickOne(["#claim-info", "[data-claim-info]"]);
+  ui.claimBadge = pickOne(["#claim-badge", "[data-claim-badge]"]);
 }
 
 /* ===== Авто-оновлення посилань на UI ===== */
 
 // якщо DOM уже готовий — одразу оновимо
-if (document.readyState !== "loading") {
+if (typeof document !== "undefined" && document.readyState !== "loading") {
   refreshUiRefs();
 } else {
   window.addEventListener("DOMContentLoaded", () => refreshUiRefs(), { once: true });
@@ -102,3 +142,16 @@ if (document.readyState !== "loading") {
 // після підвантаження partials (ці події шле /js/partials.js)
 window.addEventListener("partials:loaded", refreshUiRefs);
 window.addEventListener("partials:main-ready", refreshUiRefs);
+
+// якщо на сторінці щось динамічно підвантажується, можна періодично освіжати (very light)
+let __lastRefresh = Date.now();
+const __obs = new MutationObserver(() => {
+  const now = Date.now();
+  if (now - __lastRefresh > 1500) {
+    __lastRefresh = now;
+    refreshUiRefs();
+  }
+});
+try {
+  __obs.observe(document.documentElement, { childList: true, subtree: true });
+} catch { /* no-op */ }
