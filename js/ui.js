@@ -1,6 +1,6 @@
 // /js/ui.js
 import { CONFIG } from "./config.js";
-import { ui, state } from "./state.js";
+import { ui, state, refreshUiRefs } from "./state.js";
 import { fmt as utilFmt, clamp, setBtnLoading } from "./utils.js";
 import { getPresaleStats } from "./ton.js";
 
@@ -292,7 +292,7 @@ export function refreshButtons() {
   // Інакше працюємо по USD (старий режим)
   const usd = Number(usdEl?.value || 0);
   const ok = !!agree?.checked && usd >= (CONFIG.MIN_BUY_USDT || 1);
-  if (ui.btnBuy) ui.btnBuy.disabled = !ok;
+  if (ui.btnBuy) ui.btnBuy.disabled = !ок;
   if (ui.btnClaim) ui.btnClaim.disabled = true;
 }
 
@@ -331,15 +331,15 @@ export function recalc() {
     const priceTon = Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
     const tokens = calcTokensFromTon(ton, priceTon);
     renderTokensOut(tokens);
-    updateRefBonus(); // перерахуємо і реф-бонус (ниже обробка TON)
-    updatePriceUnder(); // підпис під ціною (залишаємо USD-віджет як є)
+    updateRefBonus(); // перерахуємо і реф-бонус
+    updatePriceUnder(); // підпис під ціною (USD-віджет лишається)
     refreshButtons();
     return;
   }
 
   // USD fallback
   const usd = sanitizeUsdInput();
-  const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
+  const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0);
   const tokens = calcTokensFromUsd(usd, price);
   renderTokensOut(tokens);
   updateRefBonus();
@@ -404,7 +404,6 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
 
   try {
     window.__CURRENT_PRICE_USD = Number(info.price || 0);
-    // Якщо ти задав CONFIG.PRICE_TON — збережемо для калькулятора TON (візуальний бейдж)
     if (Number(CONFIG.PRICE_TON) > 0) {
       window.__CURRENT_PRICE_TON = Number(CONFIG.PRICE_TON);
     }
@@ -412,6 +411,9 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
 
   if (ui.raised) ui.raised.textContent = (raised).toLocaleString();
   if (ui.bar)    ui.bar.style.width = `${pct.toFixed(2)}%`;
+
+  // синхронізуємо підпис під калькулятором після оновлення
+  updatePriceUnder();
 }
 
 /* ===== Анти-кеш фолбек на прямий /api/presale/stats ===== */
@@ -483,6 +485,9 @@ function ensureCalcWires() {
 
 /* ===================== static UI on boot ===================== */
 export function initStaticUI() {
+  // 🔹 Гарантовано перечитуємо DOM-посилання перед першим рендером
+  try { refreshUiRefs(); } catch {}
+
   const y = document.querySelector("#year");
   if (y) y.textContent = new Date().getFullYear();
 
@@ -601,7 +606,7 @@ export function updateRefBonus() {
       } catch {}
     }
     const pct   = Number(CONFIG.REF_BONUS_PCT || 5);
-    const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0.00383);
+    const price = Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0);
     if (!(price > 0)) return;
     const tokens = calcTokensFromUsd(usd, price);
     bonusTokens = Math.floor(tokens * (pct / 100));
