@@ -950,6 +950,59 @@ export function dictValueParserWithdrawTon(): DictionaryValue<WithdrawTon> {
     }
 }
 
+export type AdminTransfer = {
+    $$type: 'AdminTransfer';
+    to: Address;
+    amount: bigint;
+}
+
+export function storeAdminTransfer(src: AdminTransfer) {
+    return (builder: Builder) => {
+        const b_0 = builder;
+        b_0.storeUint(2802657700, 32);
+        b_0.storeAddress(src.to);
+        b_0.storeInt(src.amount, 257);
+    };
+}
+
+export function loadAdminTransfer(slice: Slice) {
+    const sc_0 = slice;
+    if (sc_0.loadUint(32) !== 2802657700) { throw Error('Invalid prefix'); }
+    const _to = sc_0.loadAddress();
+    const _amount = sc_0.loadIntBig(257);
+    return { $$type: 'AdminTransfer' as const, to: _to, amount: _amount };
+}
+
+export function loadTupleAdminTransfer(source: TupleReader) {
+    const _to = source.readAddress();
+    const _amount = source.readBigNumber();
+    return { $$type: 'AdminTransfer' as const, to: _to, amount: _amount };
+}
+
+export function loadGetterTupleAdminTransfer(source: TupleReader) {
+    const _to = source.readAddress();
+    const _amount = source.readBigNumber();
+    return { $$type: 'AdminTransfer' as const, to: _to, amount: _amount };
+}
+
+export function storeTupleAdminTransfer(source: AdminTransfer) {
+    const builder = new TupleBuilder();
+    builder.writeAddress(source.to);
+    builder.writeNumber(source.amount);
+    return builder.build();
+}
+
+export function dictValueParserAdminTransfer(): DictionaryValue<AdminTransfer> {
+    return {
+        serialize: (src, builder) => {
+            builder.storeRef(beginCell().store(storeAdminTransfer(src)).endCell());
+        },
+        parse: (src) => {
+            return loadAdminTransfer(src.loadRef().beginParse());
+        }
+    }
+}
+
 export type Level = {
     $$type: 'Level';
     tokens: bigint;
@@ -1125,7 +1178,7 @@ function initMagtPresale_init_args(src: MagtPresale_init_args) {
 }
 
 async function MagtPresale_init(owner: Address, treasury: Address, decimals: bigint, levels: Dictionary<bigint, Level>, levelsCount: bigint, refBps: bigint) {
-    const __code = Cell.fromHex('b5ee9c7241021701000661000114ff00f4a413f4bcf2c80b010130d301d072d721d200d200fa4021103450666f04f86102f8620202fced44d0d200018e36fa40fa40d72c01916d93fa4001e201d401d0810101d700d200810101d700f404810101d700d430d0810101d700301069106810676c198e2efa40fa40810101d700f404d401d0810101d700810101d70030102610251024102306d1550470706d064515504403e20a925f0ae07029d74920c21fe300210304000a3109d31f0a03fe82104850f5b4ba8e595b3507fa40308200b35df84228c705f2f410681057061035443012c87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed54e0218210fba99a38bae3022182107b327ef0bae3022182109ba5ec85ba05060700b25b3307d200308200b35df84228c705f2f410681057104610354334c87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed5403ea5b08fa4031810101d700308200b35df84229c705f2f4f8276f1082080f4240a121c200923120df7002db3cdb3c20c2008e3c52606d7070046d03046d5023c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb009130e21068551511130904fc8ee55b08d72c01916d93fa4001e231f842f8416f24135f03109b108a1079106810571046103558db3cc87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed54e0218210946a98b6bae3023ac00009c12119b0e3025f090b080a1601845b08d33f30c8018210aff90f5758cb1fcb3fc9107910681057104610354430f84270705003804201503304c8cf8580ca00cf8440ce01fa02806acf40f400c901fb0009007cc87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed5401b0f842f8416f24135f03108a1079106810571046103510246ddb3cc87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed540b03f28129ff28c000f2f48200d271228208989680bef2f481741f2a6eb3f2f45582db3c82008dd15351b9f2f42b7053609a23c2009320c0009170e28ae810235f038200ef7221c200f2f4702c6eb38e22547ccec705b395f828c705b3923070e29323c2009170e299305302a8812710a904dede5361a013a120c1000c0d12006e7020935303b98e2d248101012259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e26f223012a001a4e83002fe108d107c106b105a1049103d4cba2bdb3c8200b7575313b9f2f4238101012259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e26f227020935304b98e2d278101012259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e26f223012a001a4e830335321a02fa10e0f008ceda2edfb7020935304b98e36258101012259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e26f223012a05320b9943031db31e001a4e85f032102ae20c101955b3d500ca08f3c6c2227db3c561021a823a90458db3c20c101945f033a718e205203a801a90451e1a050dda051eda10d92713bdf53d9be92713bde10cd10bc0ae20a0be2108d107c106b105a104910384706051011001e7170935302b99501a70a01a4e83031000e5cb991309131e204fe8e86017002a0db3c985320bc91329130e2e2810ad721c200f2f45155a021a0529d6d7070046d03046d5023c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00109a1089107810671056105b103441cc03db3c2ac2008e88108a5517db3c5561923939e213141415000e5cbc91309131e200c6c85202fa02305202cf1630f8285210cf16307021ca00302082080f4240fa02307021ca00307001c928597070046d03046d5023c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00000455160006f2c0823f865f54');
+    const __code = Cell.fromHex('b5ee9c7241021701000724000114ff00f4a413f4bcf2c80b010130d301d072d721d200d200fa4021103450666f04f86102f8620202fced44d0d200018e36fa40fa40d72c01916d93fa4001e201d401d0810101d700d200810101d700f404810101d700d430d0810101d700301069106810676c198e2efa40fa40810101d700f404d401d0810101d700810101d70030102610251024102306d1550470706d064515504403e20a925f0ae07029d74920c21fe300210304000a3109d31f0a03fe82104850f5b4ba8e595b3507fa40308200b35df84228c705f2f410681057061035443012c87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed54e0218210fba99a38bae3022182107b327ef0bae302218210a70d29a4ba05060700b25b3307d200308200b35df84228c705f2f410681057104610354334c87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed5403ea5b08fa4031810101d700308200b35df84229c705f2f4f8276f1082080f4240a121c200923120df7002db3cdb3c20c2008e3c52606d7070046d03046d5023c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb009130e21068551512140a02fa8ef95b08fa40810101d700308200b35df8422ac705f2f481741f276eb3f2f482009f4b21c200f2f4108a107910681057104610351024820b938700db3cc87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed54e021160803fe82109ba5ec85ba8ee55b08d72c01916d93fa4001e231f842f8416f24135f03109b108a1079106810571046103558db3cc87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed54e0218210946a98b6bae3023ac00009c1210c090b01845b08d33f30c8018210aff90f5758cb1fcb3fc9107910681057104610354430f84270705003804201503304c8cf8580ca00cf8440ce01fa02806acf40f400c901fb000a007cc87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed5401c419b08ed8f842f8416f24135f03108a1079106810571046103510246ddb3cc87f01ca0055805089ce16ce5004206e9430cf84809201cee202c8810101cf00ca0012810101cf0012f40012810101cf0002c8810101cf0012cdcdc9ed54e05f09f2c0820c03f28129ff28c000f2f48200d271228208989680bef2f481741f2a6eb3f2f45582db3c82008dd15351b9f2f42b7053609a23c2009320c0009170e28ae810235f038200ef7221c200f2f4702c6eb38e22547ccec705b395f828c705b3923070e29323c2009170e299305302a8812710a904dede5361a013a120c1000d0e13006e7020935303b98e2d248101012259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e26f223012a001a4e83002fe108d107c106b105a1049103d4cba2bdb3c8200b7575313b9f2f4238101012259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e26f227020935304b98e2d278101012259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e26f223012a001a4e830335321a02fa10f10008ceda2edfb7020935304b98e36258101012259f40d6fa192306ddf206e92306d8e10d0810101d700810101d700596c126f02e26f223012a05320b9943031db31e001a4e85f032102ae20c101955b3d500ca08f3c6c2227db3c561021a823a90458db3c20c101945f033a718e205203a801a90451e1a050dda051eda10d92713bdf53d9be92713bde10cd10bc0ae20a0be2108d107c106b105a104910384706051112001e7170935302b99501a70a01a4e83031000e5cb991309131e204a68e86017002a0db3c985320bc91329130e2e2810ad721c200f2f45155a021a0820afaf08022c20091209170e25210a082081e8480a00e700fa11edb3c10ab109b108b107b106b505b144330541e0ddb3c2cc20014141615000e5cbc91309131e201d88e96108b107a1069105810471036451350cc4414db3c556295102c3a3a30e226c2008e3c52476d7070046d03046d5023c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb009136e21048103746145052131600c2c85203fa02305213cf1630f8285210cf16307021ca00302082080f4240fa02307021ca0030c928597070046d03046d5023c8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb003edbfd6d');
     const builder = beginCell();
     builder.storeUint(0, 1);
     initMagtPresale_init_args({ $$type: 'MagtPresale_init_args', owner, treasury, decimals, levels, levelsCount, refBps })(builder);
@@ -1174,6 +1227,7 @@ export const MagtPresale_errors = {
     10751: { message: "PAUSED" },
     29727: { message: "NO_JW" },
     36305: { message: "SOLD_OUT" },
+    40779: { message: "ZERO_AMT" },
     45917: { message: "NOT_ADMIN" },
     46935: { message: "SOLD_OUT_L" },
     53873: { message: "LOW_TON" },
@@ -1221,6 +1275,7 @@ export const MagtPresale_errors_backward = {
     "PAUSED": 10751,
     "NO_JW": 29727,
     "SOLD_OUT": 36305,
+    "ZERO_AMT": 40779,
     "NOT_ADMIN": 45917,
     "SOLD_OUT_L": 46935,
     "LOW_TON": 53873,
@@ -1245,6 +1300,7 @@ const MagtPresale_types: ABIType[] = [
     {"name":"SetJettonWallet","header":1213265332,"fields":[{"name":"addr","type":{"kind":"simple","type":"address","optional":false}}]},
     {"name":"SetPaused","header":4222196280,"fields":[{"name":"state","type":{"kind":"simple","type":"bool","optional":false}}]},
     {"name":"WithdrawTon","header":2066906864,"fields":[{"name":"to","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
+    {"name":"AdminTransfer","header":2802657700,"fields":[{"name":"to","type":{"kind":"simple","type":"address","optional":false}},{"name":"amount","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"Level","header":null,"fields":[{"name":"tokens","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"price","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
     {"name":"MagtPresale$Data","header":null,"fields":[{"name":"owner","type":{"kind":"simple","type":"address","optional":false}},{"name":"treasury","type":{"kind":"simple","type":"address","optional":false}},{"name":"jw","type":{"kind":"simple","type":"address","optional":true}},{"name":"decimals","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"paused","type":{"kind":"simple","type":"bool","optional":false}},{"name":"sold","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"levels","type":{"kind":"dict","key":"int","value":"Level","valueFormat":"ref"}},{"name":"levelsCount","type":{"kind":"simple","type":"int","optional":false,"format":257}},{"name":"refBps","type":{"kind":"simple","type":"int","optional":false,"format":257}}]},
 ]
@@ -1257,6 +1313,7 @@ const MagtPresale_opcodes = {
     "SetJettonWallet": 1213265332,
     "SetPaused": 4222196280,
     "WithdrawTon": 2066906864,
+    "AdminTransfer": 2802657700,
 }
 
 const MagtPresale_getters: ABIGetter[] = [
@@ -1269,6 +1326,7 @@ const MagtPresale_receivers: ABIReceiver[] = [
     {"receiver":"internal","message":{"kind":"typed","type":"SetJettonWallet"}},
     {"receiver":"internal","message":{"kind":"typed","type":"SetPaused"}},
     {"receiver":"internal","message":{"kind":"typed","type":"WithdrawTon"}},
+    {"receiver":"internal","message":{"kind":"typed","type":"AdminTransfer"}},
     {"receiver":"internal","message":{"kind":"typed","type":"Buy"}},
     {"receiver":"internal","message":{"kind":"empty"}},
     {"receiver":"internal","message":{"kind":"typed","type":"Deploy"}},
@@ -1309,7 +1367,7 @@ export class MagtPresale implements Contract {
         this.init = init;
     }
     
-    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: SetJettonWallet | SetPaused | WithdrawTon | Buy | null | Deploy) {
+    async send(provider: ContractProvider, via: Sender, args: { value: bigint, bounce?: boolean| null | undefined }, message: SetJettonWallet | SetPaused | WithdrawTon | AdminTransfer | Buy | null | Deploy) {
         
         let body: Cell | null = null;
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'SetJettonWallet') {
@@ -1320,6 +1378,9 @@ export class MagtPresale implements Contract {
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'WithdrawTon') {
             body = beginCell().store(storeWithdrawTon(message)).endCell();
+        }
+        if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'AdminTransfer') {
+            body = beginCell().store(storeAdminTransfer(message)).endCell();
         }
         if (message && typeof message === 'object' && !(message instanceof Slice) && message.$$type === 'Buy') {
             body = beginCell().store(storeBuy(message)).endCell();

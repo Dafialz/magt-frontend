@@ -1,6 +1,6 @@
 // /js/tonconnect.js
 // Публічне API: initTonConnect({ onConnect, onDisconnect }), mountTonButtons(),
-// getWalletAddress(), getTonConnect(), openConnectModal()
+// getWalletAddress(), getTonConnect(), openConnectModal(), forceDisconnect(), forgetCachedWallet()
 
 import { ui as UI, refreshUiRefs } from "./state.js";
 
@@ -148,39 +148,9 @@ function addrFromUiAccount(ui){
   const b64 = normalizeToBase64(raw);
   return b64 || deepFindAddress(ui, 8) || null;
 }
-function extractFromUi(ui) {
-  const quick = [
-    ui?.account?.address,
-    ui?.wallet?.account?.address,
-    ui?.state?.account?.address,
-    ui?.state?.wallet?.account?.address,
-    ui?.tonConnect?.account?.address,
-    ui?.tonConnect?.wallet?.account?.address,
-    ui?._wallet?.account?.address,
-    ui?.connector?.wallet?.account?.address,
-    ui?.connector?.account?.address,
-  ].filter(Boolean);
-  for (const raw of quick) {
-    const b64 = normalizeToBase64(raw);
-    if (b64) return b64;
-  }
-  return deepFindAddress(ui, 8);
-}
-function extractFromLocalStorage() {
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      const v = localStorage.getItem(k);
-      if (!v) continue;
-      try {
-        const data = JSON.parse(v);
-        const b64 = deepFindAddress(data, 8);
-        if (b64) return b64;
-      } catch {}
-    }
-  } catch {}
-  return null;
-}
+
+/* ====== БІЛЬШЕ НЕ ЧИТАЄМО ніякі localStorage кеші ====== */
+// Випиляли extractFromLocalStorage() та весь код, який його викликав.
 
 /* =============== монтування кнопки =============== */
 function ensureFallbackContainer() {
@@ -197,16 +167,13 @@ function ensureFallbackContainer() {
   return el;
 }
 function pickMountRoot() {
-  // оновимо референси з state.js
   try { refreshUiRefs(); } catch {}
-  // 1) пріоритет: перший відомий контейнер з UI (nav/hero/…)
   if (Array.isArray(UI.tcContainers) && UI.tcContainers.length) {
     for (const el of UI.tcContainers) {
       if (el && el instanceof HTMLElement) return el;
     }
   }
   if (UI.tcPrimary && UI.tcPrimary instanceof HTMLElement) return UI.tcPrimary;
-  // 2) якщо нічого немає — створюємо fallback
   return ensureFallbackContainer();
 }
 async function mountPrimaryAt(root) {
@@ -219,6 +186,8 @@ async function mountPrimaryAt(root) {
     manifestUrl: `${location.origin}/tonconnect-manifest.json`,
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
+    // критично: НЕ відновлюємо попереднє підключення
+    restoreConnection: false
   });
   primaryUi = ui;
   window.__tcui = ui;
@@ -258,11 +227,38 @@ function _isConnected(ui) {
   );
 }
 
+export async function forceDisconnect() {
+  const ui = (primaryUi || window.__tcui);
+  try { await ui?.disconnect?.(); } catch {}
+  // на всякий випадок — стираємо можливі ключі SDK
+  try {
+    const prefixes = ["tonconnect", "ton-connect", "tonconnect-ui"];
+    for (const p of prefixes) {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.toLowerCase().includes(p)) localStorage.removeItem(k);
+      }
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const k = sessionStorage.key(i);
+        if (k && k.toLowerCase().includes(p)) sessionStorage.removeItem(k);
+      }
+    }
+  } catch {}
+  await syncAddress(null, {}, "forceDisconnect");
+}
+
+export async function forgetCachedWallet() {
+  await forceDisconnect();
+}
+
 export async function openConnectModal() {
   await mountTonButtons().catch(()=>{});
   const ui = (primaryUi || window.__tcui);
   if (!ui) return;
-  if (_isConnected(ui)) { log("openConnectModal skipped: already connected"); return; }
+  // якщо раптом має статус підключення — спершу скинемо, щоб точно не взяв чужий кеш
+  if (_isConnected(ui)) {
+    await forceDisconnect().catch(()=>{});
+  }
   try { await ui.openModal?.(); } catch (e) {
     const msg = String(e?.message || e || "").toLowerCase();
     if (msg.includes("already connected")) return;
@@ -275,19 +271,13 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
   readyPromise = (async () => {
     await mountTonButtons().catch(()=>{});
 
-    // теплий кеш
-    try {
-      if (!cachedBase64Addr && window.__magtAddr) {
-        await syncAddress(window.__magtAddr, { onConnect, onDisconnect }, "warm-cache");
-      }
-    } catch {}
-
+    // НІЯКИХ теплих кешів із LS — тільки те, що повертає сам UI
     async function bindOn(ui) {
       if (!ui || ui.__magtHooked) return;
       ui.__magtHooked = true;
       try {
         ui.onStatusChange?.(() => {
-          const raw = addrFromUiAccount(ui) || extractFromUi(ui) || null;
+          const raw = addrFromUiAccount(ui) || null;
           syncAddress(raw, { onConnect, onDisconnect }, "statusChange/ui.account");
         });
         log("subscribed to onStatusChange");
@@ -300,31 +290,20 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
     if (accAddr) {
       await syncAddress(accAddr, { onConnect, onDisconnect }, "ui.account/immediate");
     } else {
-      const snapshot = primaryUi ? (extractFromUi(primaryUi) || extractFromLocalStorage()) : extractFromLocalStorage();
-      if (snapshot) await syncAddress(snapshot, { onConnect, onDisconnect }, "immediate");
+      // Жодних snapshot із localStorage — нехай користувач підключиться вручну
+      await syncAddress(null, { onConnect, onDisconnect }, "no-addr-initial");
     }
 
+    // Легка періодична перевірка лише з UI (без LS)
     if (primaryUi && !primaryUi.__magtPoll) {
       primaryUi.__magtPoll = setInterval(() => {
         try {
-          const fromUi = addrFromUiAccount(primaryUi) || extractFromUi(primaryUi);
-          const fromLS = extractFromLocalStorage();
-          const addr   = fromUi || fromLS;
-          if (addr && addr !== cachedBase64Addr) {
-            syncAddress(addr, { onConnect, onDisconnect }, fromUi ? "ui.account/poll" : "ls/poll");
+          const fromUi = addrFromUiAccount(primaryUi);
+          if (fromUi && fromUi !== cachedBase64Addr) {
+            syncAddress(fromUi, { onConnect, onDisconnect }, "ui.account/poll");
           }
         } catch {}
       }, 1200);
-    }
-
-    if (!window.__magtLsBound) {
-      window.addEventListener("storage", () => {
-        const addr = extractFromLocalStorage();
-        if (addr && addr !== cachedBase64Addr) {
-          syncAddress(addr, { onConnect, onDisconnect }, "ls/event");
-        }
-      });
-      window.__magtLsBound = true;
     }
 
     if (cachedBase64Addr) dispatchAddress(cachedBase64Addr);
@@ -346,13 +325,14 @@ if (document.readyState === "loading") {
 /* =============== debug helpers =============== */
 try { window.getWalletAddress = getWalletAddress; } catch {}
 try { window.getTonConnect   = getTonConnect;   } catch {}
+try { window.forceDisconnect = forceDisconnect; } catch {}
+try { window.forgetCachedWallet = forgetCachedWallet; } catch {}
 try {
   window.magtSetAddr = (addr) => { dispatchAddress(addr || null); };
 } catch {}
 setTimeout(() => {
   try {
     if (cachedBase64Addr) dispatchAddress(cachedBase64Addr);
-    else if (window.__magtAddr) dispatchAddress(window.__magtAddr);
   } catch {}
 }, 0);
 try { window.debugTC = () => ({ ui: getTonConnect(), addr: getTonConnect()?.account?.address || null, cached: getWalletAddress() }); } catch {}

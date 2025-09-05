@@ -1,4 +1,7 @@
 {
+  "aliases": {
+    "@stdlib": "./node_modules/@tact-lang/compiler/dist/stdlib/stdlib"
+  },
   "projects": [
     {
       "name": "MagtClaimVault",
@@ -8,6 +11,16 @@
     {
       "name": "MagtPresale",
       "path": "./contracts/MagtPresale.tact",
+      "output": "./build"
+    },
+    {
+      "name": "JettonMinter",
+      "path": "./contracts/jetton/JettonMinter.tact",
+      "output": "./build"
+    },
+    {
+      "name": "JettonWallet",
+      "path": "./contracts/jetton/JettonWallet.tact",
       "output": "./build"
     }
   ]

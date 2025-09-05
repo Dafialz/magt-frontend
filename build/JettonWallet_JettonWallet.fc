@@ -1,0 +1,205 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; JettonWallet_JettonWallet.headers.fc
+;;
+;; Header files for JettonWallet
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $JettonWallet$_store
+builder $JettonWallet$_store(builder build_0, (slice, slice, int) v) inline;
+
+;; $JettonWallet$_load
+(slice, ((slice, slice, int))) $JettonWallet$_load(slice sc_0) inline;
+
+;; $JettonWallet$init$_load
+(slice, ((slice, slice))) $JettonWallet$init$_load(slice sc_0) inline;
+
+;; $JettonWallet$_contract_init
+(slice, slice, int) $JettonWallet$_contract_init(slice $owner, slice $minter) impure inline;
+
+;; $JettonWallet$_contract_load
+(slice, slice, int) $JettonWallet$_contract_load() impure inline;
+
+;; $JettonWallet$_contract_store
+() $JettonWallet$_contract_store((slice, slice, int) v) impure inline;
+
+;; $JettonWallet$_fun_get_owner
+((slice, slice, int), slice) $JettonWallet$_fun_get_owner((slice, slice, int) $self) impure inline_ref;
+
+;; $JettonWallet$_fun_get_minter
+((slice, slice, int), slice) $JettonWallet$_fun_get_minter((slice, slice, int) $self) impure inline_ref;
+
+;; $JettonWallet$_fun_get_balance
+((slice, slice, int), int) $JettonWallet$_fun_get_balance((slice, slice, int) $self) impure inline_ref;
+
+;; $JettonWallet$_fun_onlyOwner
+((slice, slice, int), ()) $JettonWallet$_fun_onlyOwner((slice, slice, int) $self, slice $sender) impure inline_ref;
+
+
+;; JettonWallet_JettonWallet.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+;; JettonWallet_JettonWallet.storage.fc
+;;
+;; Type: JettonWallet
+;; TLB: _ owner:address minter:address balance:int257 = JettonWallet
+;;
+
+builder $JettonWallet$_store(builder build_0, (slice, slice, int) v) inline {
+    var (v'owner, v'minter, v'balance) = v;
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_slice(v'minter);
+    build_0 = build_0.store_int(v'balance, 257);
+    return build_0;
+}
+
+(slice, ((slice, slice, int))) $JettonWallet$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'minter = sc_0~load_msg_addr();
+    var v'balance = sc_0~load_int(257);
+    return (sc_0, (v'owner, v'minter, v'balance));
+}
+
+(slice, ((slice, slice))) $JettonWallet$init$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'minter = sc_0~load_msg_addr();
+    return (sc_0, (v'owner, v'minter));
+}
+
+(slice, slice, int) $JettonWallet$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$JettonWallet$_load();
+    }
+    else {
+        (slice $owner, slice $minter) = $sc~$JettonWallet$init$_load();
+        $sc.end_parse();
+        return $JettonWallet$_contract_init($owner, $minter);
+    }
+}
+
+() $JettonWallet$_contract_store((slice, slice, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $JettonWallet$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract JettonWallet functions
+;;
+
+(slice, slice, int) $JettonWallet$_contract_init(slice $owner, slice $minter) impure inline {
+    var (($self'owner, $self'minter, $self'balance)) = (null(), null(), null());
+    $self'owner = $owner;
+    $self'minter = $minter;
+    $self'balance = 0;
+    return ($self'owner, $self'minter, $self'balance);
+}
+
+((slice, slice, int), slice) $JettonWallet$_fun_get_owner((slice, slice, int) $self) impure inline_ref {
+    var (($self'owner, $self'minter, $self'balance)) = $self;
+    var $fresh$ret_1 = $self'owner;
+    return (($self'owner, $self'minter, $self'balance), $fresh$ret_1);
+}
+
+((slice, slice, int), slice) $JettonWallet$_fun_get_minter((slice, slice, int) $self) impure inline_ref {
+    var (($self'owner, $self'minter, $self'balance)) = $self;
+    var $fresh$ret_2 = $self'minter;
+    return (($self'owner, $self'minter, $self'balance), $fresh$ret_2);
+}
+
+((slice, slice, int), int) $JettonWallet$_fun_get_balance((slice, slice, int) $self) impure inline_ref {
+    var (($self'owner, $self'minter, $self'balance)) = $self;
+    var $fresh$ret_3 = $self'balance;
+    return (($self'owner, $self'minter, $self'balance), $fresh$ret_3);
+}
+
+((slice, slice, int), ()) $JettonWallet$_fun_onlyOwner((slice, slice, int) $self, slice $sender) impure inline_ref {
+    var (($self'owner, $self'minter, $self'balance)) = $self;
+    throw_unless(49280, ( equal_slices_bits($sender, $self'owner) ));
+    return (($self'owner, $self'minter, $self'balance), ());
+}
+
+;;
+;; Get methods of a Contract JettonWallet
+;;
+
+_ %get_owner() method_id(80293) {
+    var self = $JettonWallet$_contract_load();
+    var res = self~$JettonWallet$_fun_get_owner();
+    return res;
+}
+
+_ %get_minter() method_id(127658) {
+    var self = $JettonWallet$_contract_load();
+    var res = self~$JettonWallet$_fun_get_minter();
+    return res;
+}
+
+_ %get_balance() method_id(130343) {
+    var self = $JettonWallet$_contract_load();
+    var res = self~$JettonWallet$_fun_get_balance();
+    return res;
+}
+
+;;
+;; Routing of a Contract JettonWallet
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'owner, $self'minter, $self'balance) = $JettonWallet$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    var op = in_msg~load_opcode_internal();
+    ;; Receive SetMinter message
+    if (op == 3800574984) {
+        var $msg'new_minter = in_msg~load_msg_addr();
+        ($self'owner, $self'minter, $self'balance)~$JettonWallet$_fun_onlyOwner(__tact_context_get_sender());
+        $self'minter = $msg'new_minter;
+        $JettonWallet$_contract_store(($self'owner, $self'minter, $self'balance));
+        return ();
+    }
+    
+    ;; Receive InternalTransfer message
+    if (op == 1536546933) {
+        var $msg'from = in_msg~load_msg_addr();
+        var $msg'amount = in_msg~load_int(257);
+        $self'balance = ($self'balance + $msg'amount);
+        $JettonWallet$_contract_store(($self'owner, $self'minter, $self'balance));
+        return ();
+    }
+    
+    ;; Throw if not handled
+    throw(130);
+}

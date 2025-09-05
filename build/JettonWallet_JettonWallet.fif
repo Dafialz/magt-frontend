@@ -1,0 +1,155 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/magt/build/JettonWallet_JettonWallet.fc` 
+PROGRAM{
+  DECLPROC __tact_context_get_sender
+  DECLPROC $JettonWallet$_store
+  DECLPROC $JettonWallet$_load
+  DECLPROC $JettonWallet$init$_load
+  DECLPROC $JettonWallet$_contract_init
+  DECLPROC $JettonWallet$_contract_load
+  DECLPROC $JettonWallet$_contract_store
+  DECLPROC $JettonWallet$_fun_get_owner
+  DECLPROC $JettonWallet$_fun_get_minter
+  DECLPROC $JettonWallet$_fun_get_balance
+  DECLPROC $JettonWallet$_fun_onlyOwner
+  80293 DECLMETHOD %get_owner
+  127658 DECLMETHOD %get_minter
+  130343 DECLMETHOD %get_balance
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
+  }>
+  $JettonWallet$_store PROCINLINE:<{
+    s2 s3 XCHG2
+    STSLICE
+    STSLICE
+    257 PUSHINT
+    STIX
+  }>
+  $JettonWallet$_load PROCINLINE:<{
+    LDMSGADDR
+    LDMSGADDR
+    257 PUSHINT
+    LDIX
+    3 -ROLL
+  }>
+  $JettonWallet$init$_load PROCINLINE:<{
+    LDMSGADDR
+    LDMSGADDR
+    -ROT
+  }>
+  $JettonWallet$_contract_init PROCINLINE:<{
+    0 PUSHINT
+  }>
+  $JettonWallet$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $JettonWallet$_load INLINECALLDICT
+      1 3 BLKDROP2
+    }>ELSE<{
+      $JettonWallet$init$_load INLINECALLDICT
+      s0 s2 XCHG
+      ENDS
+      SWAP
+      $JettonWallet$_contract_init INLINECALLDICT
+    }>
+  }>
+  $JettonWallet$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    3 -ROLL
+    $JettonWallet$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $JettonWallet$_fun_get_owner PROCREF:<{
+    s2 PUSH
+  }>
+  $JettonWallet$_fun_get_minter PROCREF:<{
+    OVER
+  }>
+  $JettonWallet$_fun_get_balance PROCREF:<{
+    DUP
+  }>
+  $JettonWallet$_fun_onlyOwner PROCREF:<{
+    49280 PUSHINT
+    s1 s4 XCPU
+    SDEQ
+    THROWANYIFNOT
+  }>
+  %get_owner PROC:<{
+    $JettonWallet$_contract_load INLINECALLDICT
+    $JettonWallet$_fun_get_owner INLINECALLDICT
+    3 1 BLKDROP2
+  }>
+  %get_minter PROC:<{
+    $JettonWallet$_contract_load INLINECALLDICT
+    $JettonWallet$_fun_get_minter INLINECALLDICT
+    3 1 BLKDROP2
+  }>
+  %get_balance PROC:<{
+    $JettonWallet$_contract_load INLINECALLDICT
+    $JettonWallet$_fun_get_balance INLINECALLDICT
+    3 1 BLKDROP2
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $JettonWallet$_contract_load INLINECALLDICT
+    s0 s4 XCHG
+    IFJMP:<{
+      4 BLKDROP
+    }>
+    s0 s2 XCHG
+    32 LDUQ 130 THROWIFNOT
+    OVER
+    3800574984 PUSHINT
+    EQUAL
+    IFJMP:<{
+      NIP
+      LDMSGADDR
+      DROP
+      __tact_context_get_sender INLINECALLDICT
+      4 1 REVERSE
+      $JettonWallet$_fun_onlyOwner INLINECALLDICT
+      NIP
+      s1 s2 XCHG
+      $JettonWallet$_contract_store INLINECALLDICT
+    }>
+    SWAP
+    1536546933 PUSHINT
+    EQUAL
+    IFJMP:<{
+      LDMSGADDR
+      NIP
+      257 PUSHINT
+      LDIX
+      DROP
+      s1 s3 XCHG
+      ADD
+      $JettonWallet$_contract_store INLINECALLDICT
+    }>
+    4 BLKDROP
+    130 THROW
+  }>
+}END>c

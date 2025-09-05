@@ -78,7 +78,7 @@ int $global_iMax(int $a, int $b) impure inline_ref;
 ((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_body_bounce(slice $to, int $value, cell $body, int $bounce) inline;
 
 ;; $MagtPresale$_fun_jettonTransfer
-((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_jettonTransfer((slice, slice, slice, int, int, int, cell, int, int) $self, slice $to, int $amount) impure inline_ref;
+((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_jettonTransfer((slice, slice, slice, int, int, int, cell, int, int) $self, slice $to, int $amount, int $valueTon) impure inline_ref;
 
 ;; $MagtPresale$_fun_processBuy
 ((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_processBuy((slice, slice, slice, int, int, int, cell, int, int) $self, slice $user, int $tonIn, slice $ref) impure inline_ref;
@@ -505,7 +505,7 @@ int $global_iMax(int $a, int $b) impure inline_ref {
     return (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps), $fresh$ret_7);
 }
 
-((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_jettonTransfer((slice, slice, slice, int, int, int, cell, int, int) $self, slice $to, int $amount) impure inline_ref {
+((slice, slice, slice, int, int, int, cell, int, int), ()) $MagtPresale$_fun_jettonTransfer((slice, slice, slice, int, int, int, cell, int, int) $self, slice $to, int $amount, int $valueTon) impure inline_ref {
     var (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)) = $self;
     builder $b = $global_beginCell();
     store_uint($b, 260734629, 32);
@@ -516,7 +516,7 @@ int $global_iMax(int $a, int $b) impure inline_ref {
     $Builder$_fun_storeBit(false, $b);
     $Builder$_fun_storeCoins($b, 1000000);
     $Builder$_fun_storeBit(false, $b);
-    $global_send($SendParameters$_constructor_to_value_body_bounce($self'jw, 0, $Builder$_fun_endCell($b), false));
+    $global_send($SendParameters$_constructor_to_value_body_bounce($self'jw, $valueTon, $Builder$_fun_endCell($b), false));
     return (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps), ());
 }
 
@@ -581,10 +581,15 @@ int $global_iMax(int $a, int $b) impure inline_ref {
     }
     throw_unless(2775, ($outTokensVar > 0));
     $self'sold = (($self'sold + $outTokensVar) + $bonusVar);
-    $global_send($SendParameters$_constructor_to_value_body_bounce($self'treasury, $tonIn, null(), false));
-    ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_jettonTransfer($user, $outTokensVar);
+    int $reserveOne = 50000000;
+    int $reserve = (($reserveOne + (($bonusVar > 0) ? $reserveOne : 0)) + 2000000);
+    int $toTreasury = $global_iMax(0, ($tonIn - $reserve));
+    ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_jettonTransfer($user, $outTokensVar, $reserveOne);
     if (($bonusVar > 0)) {
-        ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_jettonTransfer($ref, $bonusVar);
+        ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_jettonTransfer($ref, $bonusVar, $reserveOne);
+    }
+    if (($toTreasury > 0)) {
+        $global_send($SendParameters$_constructor_to_value_body_bounce($self'treasury, $toTreasury, null(), false));
     }
     return (($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps), ());
 }
@@ -651,6 +656,18 @@ int $global_iMax(int $a, int $b) impure inline_ref {
         if (($amt > 0)) {
             $global_send($SendParameters$_constructor_to_value_body_bounce($self'treasury, $amt, null(), false));
         }
+        $MagtPresale$_contract_store(($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps));
+        return ();
+    }
+    
+    ;; Receive AdminTransfer message
+    if (op == 2802657700) {
+        var $msg'to = in_msg~load_msg_addr();
+        var $msg'amount = in_msg~load_int(257);
+        throw_unless(45917, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+        throw_unless(29727, (~ null?($self'jw)));
+        throw_unless(40779, ($msg'amount > 0));
+        ($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps)~$MagtPresale$_fun_jettonTransfer($msg'to, $msg'amount, 60000000);
         $MagtPresale$_contract_store(($self'owner, $self'treasury, $self'jw, $self'decimals, $self'paused, $self'sold, $self'levels, $self'levelsCount, $self'refBps));
         return ();
     }

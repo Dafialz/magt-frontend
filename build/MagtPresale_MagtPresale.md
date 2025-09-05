@@ -1,9 +1,9 @@
 # Tact compilation report
 Contract: MagtPresale
-BoC Size: 1645 bytes
+BoC Size: 1840 bytes
 
 ## Structures (Structs and Messages)
-Total structures: 19
+Total structures: 20
 
 ### DataSize
 TL-B: `_ cells:int257 bits:int257 refs:int257 = DataSize`
@@ -73,6 +73,10 @@ Signature: `SetPaused{state:bool}`
 TL-B: `withdraw_ton#7b327ef0 to:address amount:int257 = WithdrawTon`
 Signature: `WithdrawTon{to:address,amount:int257}`
 
+### AdminTransfer
+TL-B: `admin_transfer#a70d29a4 to:address amount:int257 = AdminTransfer`
+Signature: `AdminTransfer{to:address,amount:int257}`
+
 ### Level
 TL-B: `_ tokens:int257 price:int257 = Level`
 Signature: `Level{tokens:int257,price:int257}`
@@ -125,6 +129,7 @@ Total get methods: 0
 * 10751: PAUSED
 * 29727: NO_JW
 * 36305: SOLD_OUT
+* 40779: ZERO_AMT
 * 45917: NOT_ADMIN
 * 46935: SOLD_OUT_L
 * 53873: LOW_TON

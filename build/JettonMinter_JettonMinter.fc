@@ -1,0 +1,167 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; JettonMinter_JettonMinter.headers.fc
+;;
+;; Header files for JettonMinter
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $JettonMinter$_store
+builder $JettonMinter$_store(builder build_0, (slice) v) inline;
+
+;; $JettonMinter$_load
+(slice, ((slice))) $JettonMinter$_load(slice sc_0) inline;
+
+;; $JettonMinter$init$_load
+(slice, ((slice))) $JettonMinter$init$_load(slice sc_0) inline;
+
+;; $JettonMinter$_contract_init
+(slice) $JettonMinter$_contract_init(slice $owner) impure inline;
+
+;; $JettonMinter$_contract_load
+(slice) $JettonMinter$_contract_load() impure inline;
+
+;; $JettonMinter$_contract_store
+() $JettonMinter$_contract_store((slice) v) impure inline;
+
+;; $JettonMinter$_fun_get_owner
+((slice), slice) $JettonMinter$_fun_get_owner((slice) $self) impure inline_ref;
+
+;; $JettonMinter$_fun_onlyOwner
+((slice), ()) $JettonMinter$_fun_onlyOwner((slice) $self, slice $sender) impure inline_ref;
+
+
+;; JettonMinter_JettonMinter.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+;; JettonMinter_JettonMinter.storage.fc
+;;
+;; Type: JettonMinter
+;; TLB: _ owner:address = JettonMinter
+;;
+
+builder $JettonMinter$_store(builder build_0, (slice) v) inline {
+    var (v'owner) = v;
+    build_0 = build_0.store_slice(v'owner);
+    return build_0;
+}
+
+(slice, ((slice))) $JettonMinter$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    return (sc_0, (v'owner));
+}
+
+(slice, ((slice))) $JettonMinter$init$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    return (sc_0, (v'owner));
+}
+
+(slice) $JettonMinter$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$JettonMinter$_load();
+    }
+    else {
+        (slice $owner) = $sc~$JettonMinter$init$_load();
+        $sc.end_parse();
+        return $JettonMinter$_contract_init($owner);
+    }
+}
+
+() $JettonMinter$_contract_store((slice) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $JettonMinter$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract JettonMinter functions
+;;
+
+(slice) $JettonMinter$_contract_init(slice $owner) impure inline {
+    var (($self'owner)) = (null());
+    $self'owner = $owner;
+    return ($self'owner);
+}
+
+((slice), slice) $JettonMinter$_fun_get_owner((slice) $self) impure inline_ref {
+    var (($self'owner)) = $self;
+    var $fresh$ret_0 = $self'owner;
+    return (($self'owner), $fresh$ret_0);
+}
+
+((slice), ()) $JettonMinter$_fun_onlyOwner((slice) $self, slice $sender) impure inline_ref {
+    var (($self'owner)) = $self;
+    throw_unless(49280, ( equal_slices_bits($sender, $self'owner) ));
+    return (($self'owner), ());
+}
+
+;;
+;; Get methods of a Contract JettonMinter
+;;
+
+_ %get_owner() method_id(80293) {
+    var self = $JettonMinter$_contract_load();
+    var res = self~$JettonMinter$_fun_get_owner();
+    return res;
+}
+
+;;
+;; Routing of a Contract JettonMinter
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'owner) = $JettonMinter$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    var op = in_msg~load_opcode_internal();
+    ;; Receive SetOwner message
+    if (op == 552748733) {
+        var $msg'new_owner = in_msg~load_msg_addr();
+        ($self'owner)~$JettonMinter$_fun_onlyOwner(__tact_context_get_sender());
+        $self'owner = $msg'new_owner;
+        $JettonMinter$_contract_store(($self'owner));
+        return ();
+    }
+    
+    ;; Receive Mint message
+    if (op == 275720840) {
+        var $_'to = in_msg~load_msg_addr();
+        var $_'amount = in_msg~load_int(257);
+        $JettonMinter$_contract_store(($self'owner));
+        return ();
+    }
+    
+    ;; Throw if not handled
+    throw(130);
+}

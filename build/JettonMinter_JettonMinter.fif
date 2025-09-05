@@ -1,0 +1,117 @@
+// automatically generated from `@stdlib/std/stdlib.fc` `C:/magt/build/JettonMinter_JettonMinter.fc` 
+PROGRAM{
+  DECLPROC __tact_context_get_sender
+  DECLPROC $JettonMinter$_store
+  DECLPROC $JettonMinter$_load
+  DECLPROC $JettonMinter$init$_load
+  DECLPROC $JettonMinter$_contract_init
+  DECLPROC $JettonMinter$_contract_load
+  DECLPROC $JettonMinter$_contract_store
+  DECLPROC $JettonMinter$_fun_get_owner
+  DECLPROC $JettonMinter$_fun_onlyOwner
+  80293 DECLMETHOD %get_owner
+  DECLPROC recv_internal
+  DECLGLOBVAR __tact_context
+  DECLGLOBVAR __tact_context_sender
+  DECLGLOBVAR __tact_child_contract_codes
+  DECLGLOBVAR __tact_randomized
+  __tact_context_get_sender PROCINLINE:<{
+    __tact_context_sender GETGLOB
+  }>
+  $JettonMinter$_store PROCINLINE:<{
+    SWAP
+    STSLICE
+  }>
+  $JettonMinter$_load PROCINLINE:<{
+    LDMSGADDR
+    SWAP
+  }>
+  $JettonMinter$init$_load PROCINLINE:<{
+    LDMSGADDR
+    SWAP
+  }>
+  $JettonMinter$_contract_init PROCINLINE:<{
+  }>
+  $JettonMinter$_contract_load PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    1 LDI
+    SWAP
+    IF:<{
+      $JettonMinter$_load INLINECALLDICT
+      NIP
+    }>ELSE<{
+      $JettonMinter$init$_load INLINECALLDICT
+      SWAP
+      ENDS
+      $JettonMinter$_contract_init INLINECALLDICT
+    }>
+  }>
+  $JettonMinter$_contract_store PROCINLINE:<{
+    NEWC
+    TRUE
+    SWAP
+    1 STI
+    SWAP
+    $JettonMinter$_store INLINECALLDICT
+    ENDC
+    c4 POP
+  }>
+  $JettonMinter$_fun_get_owner PROCREF:<{
+    DUP
+  }>
+  $JettonMinter$_fun_onlyOwner PROCREF:<{
+    49280 PUSHINT
+    s1 s2 XCPU
+    SDEQ
+    THROWANYIFNOT
+  }>
+  %get_owner PROC:<{
+    $JettonMinter$_contract_load INLINECALLDICT
+    $JettonMinter$_fun_get_owner INLINECALLDICT
+    NIP
+  }>
+  recv_internal PROC:<{
+    SWAP
+    CTOS
+    2 PUSHINT
+    SDSKIPFIRST
+    1 LDI
+    1 LDI
+    LDMSGADDR
+    OVER
+    s3 s4 XCHG
+    s6 s6 XCHG2
+    4 TUPLE
+    __tact_context SETGLOB
+    s0 s2 XCHG
+    __tact_context_sender SETGLOB
+    $JettonMinter$_contract_load INLINECALLDICT
+    s0 s2 XCHG
+    IFJMP:<{
+      2DROP
+    }>
+    32 LDUQ 130 THROWIFNOT
+    OVER
+    552748733 PUSHINT
+    EQUAL
+    IFJMP:<{
+      NIP
+      LDMSGADDR
+      DROP
+      __tact_context_get_sender INLINECALLDICT
+      s1 s2 XCHG
+      $JettonMinter$_fun_onlyOwner INLINECALLDICT
+      DROP
+      $JettonMinter$_contract_store INLINECALLDICT
+    }>
+    DROP
+    275720840 PUSHINT
+    EQUAL
+    IFJMP:<{
+      $JettonMinter$_contract_store INLINECALLDICT
+    }>
+    DROP
+    130 THROW
+  }>
+}END>c

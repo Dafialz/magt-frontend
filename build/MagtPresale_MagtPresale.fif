@@ -312,10 +312,10 @@ PROGRAM{
   }>
   $MagtPresale$_fun_jettonTransfer PROCREF:<{
         NEWC
-    s0 s1 PUXC
+    s0 s2 PUXC
         STVARUINT16
     DROP
-    s0 s1 PUXC
+    s1 s2 PUXC
         STSLICER
     DROP
         MYADDR
@@ -334,8 +334,6 @@ PROGRAM{
     OVER
         1 STI
     DROP
-    0 PUSHINT
-    SWAP
         ENDC
     s8 PUSH
     -ROT
@@ -612,98 +610,135 @@ PROGRAM{
     ADD
     OVER
     ADD
-    s9 s12 PUXC
-    PUSHNULL
-    FALSE
-    $SendParameters$_constructor_to_value_body_bounce INLINECALLDICT
-        NEWC
-        b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
-        1 STI               // store `bounce`
-        b{000} STSLICECONST // store bounced = false and src = addr_none
-        STSLICE             // store `to`
-        SWAP
-        STGRAMS             // store `value`
-        105 PUSHINT         // 1 + 4 + 4 + 64 + 32
-        STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
-        // → Stack state
-        // s0: Builder
-        // s1: `data`
-        // s2: `code`
-        // s3: `body`
-        // s4: `mode`
-        // Group 2: Placing the Builder after code and data, then checking those for nullability
-        s2 XCHG0
-        DUP2
-        ISNULL
-        SWAP
-        ISNULL
-        AND
-        // → Stack state
-        // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
-        // s1: `code`
-        // s2: `data`
-        // s3: Builder
-        // s4: `body`
-        // s5: `mode`
-        // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
-        <{
-            DROP2 // drop `data` and `code`, since either of those is null
-            b{0} STSLICECONST
-        }> PUSHCONT
-        // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
-        <{
-            // _ split_depth:(Maybe (## 5))
-            //   special:(Maybe TickTock)
-            //   code:(Maybe ^Cell)
-            //   data:(Maybe ^Cell)
-            //   library:(Maybe ^Cell)
-            // = StateInit;
-            ROT                // place message Builder on top
-            b{10} STSLICECONST // store Maybe = true, Either = false
-            // Start composing inlined StateInit
-            b{00} STSLICECONST // store split_depth and special first
-            STDICT             // store code
-            STDICT             // store data
-            b{0} STSLICECONST  // store library
-        }> PUSHCONT
-        // Group 3: IFELSE that does the branching shown above
-        IFELSE
-        // → Stack state
-        // s0: Builder
-        // s1: null or StateInit
-        // s2: `body`
-        // s3: `mode`
-        // Group 4: Finalizing the message
-        STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
-        ENDC
-        // → Stack state
-        // s0: Cell
-        // s1: `mode`
-        // Group 5: Sending the message, with `mode` on top
-        SWAP
-        SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
-    s9 s10 XCHG
-    s8 s9 XCHG
-    s7 s8 XCHG
-    s6 s7 XCHG
-    s5 s6 XCHG
-    s5 s11 XCHG
-    s3 s4 XCHG
-    s1 s12 s12 XCHG3
-    s0 s3 XCHG
-    $MagtPresale$_fun_jettonTransfer INLINECALLDICT
-    s10 PUSH
+    50000000 PUSHINT
+    s2 PUSH
     0 GTINT
     IF:<{
-      s8 s10 XCHG
-      2 8 BLKSWAP
-      $MagtPresale$_fun_jettonTransfer INLINECALLDICT
-      7 2 BLKSWAP
+      DUP
     }>ELSE<{
-      s9 POP
-      s9 POP
+      0 PUSHINT
     }>
-    2 7 BLKSWAP
+    s1 s(-1) PUXC
+    ADD
+    2000000 PUSHINT
+    ADD
+    s0 s14 XCHG
+    0 PUSHINT
+    s0 s15 XCHG
+    SUB
+    s1 s14 XCHG
+    $global_iMax INLINECALLDICT
+    s10 s11 XCHG
+    s9 s11 XCHG
+    s8 s11 XCHG
+    s7 s11 XCHG
+    s6 s11 XCHG
+    s5 s11 XCHG2
+    s1 s4 XCHG
+    s3 s3 s0 XCHG3
+    s14 s0 s13 XC2PU
+    $MagtPresale$_fun_jettonTransfer INLINECALLDICT
+    s12 PUSH
+    0 GTINT
+    IF:<{
+      s8 s11 XCHG
+      s7 s10 XCHG
+      s6 s9 XCHG
+      s5 s8 XCHG
+      s4 s7 XCHG
+      s3 s6 XCHG
+      s5 s1 s3 XCHG3
+      s12 s12 XCHG2
+      s4 s1 s4 XCHG3
+      $MagtPresale$_fun_jettonTransfer INLINECALLDICT
+      7 3 BLKSWAP
+    }>ELSE<{
+      s2 s12 XCHG
+      s10 POP
+      s10 POP
+      DROP
+    }>
+    s6 PUSH
+    0 GTINT
+    IF:<{
+      s4 s6 PUXC
+      PUSHNULL
+      FALSE
+      $SendParameters$_constructor_to_value_body_bounce INLINECALLDICT
+          NEWC
+          b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+          1 STI               // store `bounce`
+          b{000} STSLICECONST // store bounced = false and src = addr_none
+          STSLICE             // store `to`
+          SWAP
+          STGRAMS             // store `value`
+          105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+          STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+          // → Stack state
+          // s0: Builder
+          // s1: `data`
+          // s2: `code`
+          // s3: `body`
+          // s4: `mode`
+          // Group 2: Placing the Builder after code and data, then checking those for nullability
+          s2 XCHG0
+          DUP2
+          ISNULL
+          SWAP
+          ISNULL
+          AND
+          // → Stack state
+          // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+          // s1: `code`
+          // s2: `data`
+          // s3: Builder
+          // s4: `body`
+          // s5: `mode`
+          // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+          <{
+              DROP2 // drop `data` and `code`, since either of those is null
+              b{0} STSLICECONST
+          }> PUSHCONT
+          // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+          <{
+              // _ split_depth:(Maybe (## 5))
+              //   special:(Maybe TickTock)
+              //   code:(Maybe ^Cell)
+              //   data:(Maybe ^Cell)
+              //   library:(Maybe ^Cell)
+              // = StateInit;
+              ROT                // place message Builder on top
+              b{10} STSLICECONST // store Maybe = true, Either = false
+              // Start composing inlined StateInit
+              b{00} STSLICECONST // store split_depth and special first
+              STDICT             // store code
+              STDICT             // store data
+              b{0} STSLICECONST  // store library
+          }> PUSHCONT
+          // Group 3: IFELSE that does the branching shown above
+          IFELSE
+          // → Stack state
+          // s0: Builder
+          // s1: null or StateInit
+          // s2: `body`
+          // s3: `mode`
+          // Group 4: Finalizing the message
+          STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+          ENDC
+          // → Stack state
+          // s0: Cell
+          // s1: `mode`
+          // Group 5: Sending the message, with `mode` on top
+          SWAP
+          SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+    }>ELSE<{
+      s6 POP
+    }>
+    s4 s8 XCHG
+    s3 s7 XCHG
+    s6 s1 s4 XCHG3
+    s5 s2 XCHG2
+    s1 s3 XCHG
   }>
   $MessageParameters$_constructor_bounce_to_value_mode_body PROCINLINE:<{
     s3 s3 XCHG2
@@ -919,6 +954,41 @@ PROGRAM{
       }>
       s6 s8 XCHG
       2 6 BLKSWAP
+      $MagtPresale$_contract_store INLINECALLDICT
+    }>
+    OVER
+    2802657700 PUSHINT
+    EQUAL
+    IFJMP:<{
+      2DROP
+      s0 s8 XCHG
+      LDMSGADDR
+      257 PUSHINT
+      LDIX
+      DROP
+      45917 PUSHINT
+      __tact_context_get_sender INLINECALLDICT
+      s10 PUSH
+      SDEQ
+      THROWANYIFNOT
+      29727 PUSHINT
+      s7 PUSH
+      ISNULL
+      NOT
+      THROWANYIFNOT
+      40779 PUSHINT
+      OVER
+      0 GTINT
+      THROWANYIFNOT
+      s8 s10 XCHG
+      s7 s9 XCHG
+      s6 s8 XCHG
+      s5 s7 XCHG
+      s4 s6 XCHG
+      s3 s5 XCHG
+      s2 s4 XCHG
+      60000000 PUSHINT
+      $MagtPresale$_fun_jettonTransfer INLINECALLDICT
       $MagtPresale$_contract_store INLINECALLDICT
     }>
     OVER
