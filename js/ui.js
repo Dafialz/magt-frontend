@@ -297,16 +297,33 @@ export function refreshButtons() {
   // Інакше працюємо по USD (старий режим)
   const usd = Number(usdEl?.value || 0);
   const ok = !!agree?.checked && usd >= (CONFIG.MIN_BUY_USDT || 1);
-  if (ui.btnBuy) ui.btnBuy.disabled = !ok;   // <— FIX: латинське ok
+  if (ui.btnBuy) ui.btnBuy.disabled = !ok;   // FIX: латинське ok
   if (ui.btnClaim) ui.btnClaim.disabled = true;
+}
+
+/* ===== допоміжне: привести видимі одиниці ціни до TON у DOM ===== */
+function enforceTonUnitsInHero(priceTonShown) {
+  const priceSpan = document.getElementById("ui-price");
+  const container = priceSpan?.parentElement || null;
+  if (container && priceSpan) {
+    container.innerHTML = `<span id="ui-price">${Number(priceTonShown || 0).toFixed(6)}</span> TON`;
+  }
 }
 
 /* ===== підпис під “Отримаєш … MAGT” ===== */
 function updatePriceUnder(){
-  const pn = document.getElementById('price-now');
-  const ln = document.getElementById('level-now');
-  if (pn) pn.textContent = (Number(window.__CURRENT_PRICE_USD ?? CONFIG.PRICE_USD ?? 0)).toFixed(6);
-  if (ln) ln.textContent = ui.level?.textContent || "1";
+  const levelTxt = ui.level?.textContent || "1";
+  const priceTon = Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
+
+  const wrap = document.getElementById("price-under-output");
+  if (wrap) {
+    wrap.innerHTML = `Ціна зараз: <span id="price-now">${priceTon.toFixed(6)}</span> TON • Рівень <span id="level-now">${levelTxt}</span>`;
+    return;
+  }
+  const pn = document.getElementById("price-now");
+  const ln = document.getElementById("level-now");
+  if (pn) pn.textContent = priceTon.toFixed(6);
+  if (ln) ln.textContent = levelTxt;
 }
 
 /* ===================== core calc ===================== */
@@ -337,7 +354,7 @@ export function recalc() {
     const tokens = calcTokensFromTon(ton, priceTon);
     renderTokensOut(tokens);
     updateRefBonus(); // перерахуємо і реф-бонус
-    updatePriceUnder(); // підпис під ціною (USD-віджет лишається)
+    updatePriceUnder(); // підпис під ціною (TON)
     refreshButtons();
     return;
   }
@@ -358,7 +375,8 @@ export function recalc() {
 function getCurrentTierInfo(sold) {
   const tiers = Array.isArray(CONFIG.LEVELS) ? CONFIG.LEVELS : [];
   let level = 1;
-  let price = Number(CONFIG.PRICE_USD || 0);
+  // Ціна за замовчуванням тут не має значення — нижче переприсвоїмо TON
+  let price = Number(CONFIG.PRICE_TON || 0);
   let remainingInTier = Math.max(0, Number(CONFIG.TOTAL_SUPPLY || 0) - Number(sold || 0));
 
   if (!tiers.length) return { level, price, remainingInTier };
@@ -400,7 +418,10 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   const sold = Math.max(0, Number(soldMag || 0));
   const info = getCurrentTierInfo(sold);
 
+  // показуємо ціну рівня у TON
   if (ui.price) ui.price.textContent = Number(info.price || 0).toFixed(6);
+  enforceTonUnitsInHero(info.price);
+
   if (ui.level) ui.level.textContent = String(info.level);
   if (ui.left)  ui.left.textContent  = fmt.tokens(info.remainingInTier);
 
@@ -408,10 +429,9 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   if (saleRemaining) saleRemaining.textContent = fmt.tokens(info.remainingInTier);
 
   try {
-    window.__CURRENT_PRICE_USD = Number(info.price || 0);
-    if (Number(CONFIG.PRICE_TON) > 0) {
-      window.__CURRENT_PRICE_TON = Number(CONFIG.PRICE_TON);
-    }
+    // головне: зберегти поточну ціну в TON для калькулятора/рефа
+    window.__CURRENT_PRICE_TON = Number(info.price || 0);
+    // USD більше не форсимо; якщо бекенд шле — оновиться у ton.js
   } catch {}
 
   if (ui.raised) ui.raised.textContent = (raised).toLocaleString();
@@ -496,8 +516,9 @@ export function initStaticUI() {
   const y = document.querySelector("#year");
   if (y) y.textContent = new Date().getFullYear();
 
-  // Віджет ціни (історично USD)
-  if (ui.price) ui.price.textContent = (CONFIG.PRICE_USD || 0).toFixed(6);
+  // Віджет ціни — тепер у TON (історично було USD)
+  if (ui.price) ui.price.textContent = (Number(CONFIG.PRICE_TON || 0)).toFixed(6);
+  enforceTonUnitsInHero(Number(CONFIG.PRICE_TON || 0));
   if (ui.level) ui.level.textContent = "1";
 
   applySaleUi({ raisedUsd: 0, soldMag: 0, totalMag: CONFIG.TOTAL_SUPPLY });

@@ -37,8 +37,8 @@ export const CONFIG = {
   ],
 
   /* ===== Ціноутворення для UI ===== */
-  PRICE_USD: 0.011490,      // показ у віджетах
-  PRICE_TON: 0,             // якщо продаєш і за TON — вистави тут ціну, інакше 0
+  PRICE_USD: 0.011490,      // залишимо для віджетів у $, якщо треба
+  PRICE_TON: 0.003734,      // базова ціна за 1 MAGT у TON (ціна 1 рівня)
   RAISED_OFFSET_USD: 0,
   GOAL_USD: 20_000_000,
   HARD_CAP: 20_000_000,
@@ -49,11 +49,9 @@ export const CONFIG = {
   TON_RPC_FALLBACK: "",
 
   /* ===== Адреси пресейлу ===== */
-  // ВСТАВ ОДНУ АБО ОБИДВІ, ЗАЛЕЖНО ВІД ТВОЄЇ СХЕМИ
-  // PRESALE_OWNER_ADDRESS — власник USDT-джеттонів (адреса, для якої рахуємо JW отримувача)
-  // PRESALE_ADDRESS       — якщо є окремий контракт пресейлу (для віджетів/перевірок)
-  PRESALE_OWNER_ADDRESS: "", // <-- ВСТАВ СВОЮ EQ/UQ
-  PRESALE_ADDRESS:       "", // <-- за наявності
+  // У твоєму кейсі приймаємо напряму на холодний гаманець:
+  PRESALE_OWNER_ADDRESS: "UQBDooPilphbndrSB1RdtkyZrnWctibsl356IvU7_jOxh4UT",
+  PRESALE_ADDRESS:       "UQBDooPilphbndrSB1RdtkyZrnWctibsl356IvU7_jOxh4UT",
 
   // Мінімальна покупка в TON для фронту
   MIN_BUY_TON: 0.1,
@@ -63,7 +61,7 @@ export const CONFIG = {
   JETTON_DECIMALS: 6,
   USDT_DECIMALS:   6,
 
-  // Кандидати майстрів USDT-джеттона (TON)
+  // (USDT-частина лишена для сумісності старих екранів, але для TON-режиму не використовується)
   USDT_MASTERS: [
     "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
     "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
@@ -71,7 +69,7 @@ export const CONFIG = {
   USDT_MASTER: "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
   USDT_JETTON: "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
 
-  // Куди відкривати TON при трансфері джеттонів (витрати на відкриття та forward)
+  // Куди відкривати TON при трансфері джеттонів (не актуально для TON-only покупки)
   JETTON_WALLET_TON: 0.15,
   FORWARD_TON:       0.05,
 
@@ -92,30 +90,30 @@ export const CONFIG = {
 
   /* ===== Дані пресейлу / рівні (для віджетів) ===== */
   TOTAL_SUPPLY: 500_000_000,
-ROUND_DEADLINE_TS: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
-LEVELS: [
-  { tokens: 65_225_022, price: 0.003734 },
-  { tokens: 57_039_669, price: 0.004369 },
-  { tokens: 50_370_908, price: 0.005112 },
-  { tokens: 44_326_399, price: 0.005981 },
-  { tokens: 39_007_231, price: 0.006998 },
-  { tokens: 34_326_365, price: 0.008187 },
-  { tokens: 30_207_200, price: 0.009578 },
-  { tokens: 26_582_336, price: 0.011207 },
-  { tokens: 23_392_455, price: 0.013112 },
-  { tokens: 20_585_361, price: 0.015342 },
-  { tokens: 18_115_117, price: 0.017950 },
-  { tokens: 15_941_303, price: 0.021001 },
-  { tokens: 14_028_347, price: 0.024571 },
-  { tokens: 12_344_945, price: 0.028748 },
-  { tokens: 10_863_552, price: 0.033636 },
-  { tokens:  9_559_925, price: 0.039353 },
-  { tokens:  8_412_734, price: 0.046043 },
-  { tokens:  7_423_267, price: 0.053871 },
-  { tokens:  6_514_821, price: 0.063029 },
-  { tokens:  5_733_043, price: 0.073579 }, // підігнано, щоб сума ~6.5M TON
-],
-FALLBACK_SOLD_TOKENS: 0,
+  ROUND_DEADLINE_TS: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
+  LEVELS: [
+    { tokens: 65_225_022, price: 0.003734 },
+    { tokens: 57_039_669, price: 0.004369 },
+    { tokens: 50_370_908, price: 0.005112 },
+    { tokens: 44_326_399, price: 0.005981 },
+    { tokens: 39_007_231, price: 0.006998 },
+    { tokens: 34_326_365, price: 0.008187 },
+    { tokens: 30_207_200, price: 0.009578 },
+    { tokens: 26_582_336, price: 0.011207 },
+    { tokens: 23_392_455, price: 0.013112 },
+    { tokens: 20_585_361, price: 0.015342 },
+    { tokens: 18_115_117, price: 0.017950 },
+    { tokens: 15_941_303, price: 0.021001 },
+    { tokens: 14_028_347, price: 0.024571 },
+    { tokens: 12_344_945, price: 0.028748 },
+    { tokens: 10_863_552, price: 0.033636 },
+    { tokens:  9_559_925, price: 0.039353 },
+    { tokens:  8_412_734, price: 0.046043 },
+    { tokens:  7_423_267, price: 0.053871 },
+    { tokens:  6_514_821, price: 0.063029 },
+    { tokens:  5_733_043, price: 0.073579 }, // підігнано, щоб сума ~6.5M TON
+  ],
+  FALLBACK_SOLD_TOKENS: 0,
 
   /* ===== Claim (опційно) ===== */
   CLAIM_ENABLED: false,

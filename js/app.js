@@ -112,13 +112,17 @@ function scheduleRefLinkRetries() {
   });
 }
 
-/* ===== Локальний страховий байндинг інпуту → recalc() ===== */
+/* ===== Локальний страховий байндинг інпутів → recalc() ===== */
 function wireCalcInput() {
-  const el = document.getElementById("usdtIn");
-  if (el && !el.__calcBound) {
-    el.addEventListener("input", () => { try { recalc(); } catch {} });
-    el.addEventListener("change", () => { try { recalc(); } catch {} });
-    el.__calcBound = true;
+  const tonEl = document.getElementById("tonIn");
+  if (tonEl && !tonEl.__calcBound) {
+    ["input","change"].forEach(ev => tonEl.addEventListener(ev, () => { try { recalc(); } catch {} }));
+    tonEl.__calcBound = true;
+  }
+  const usdEl = document.getElementById("usdtIn"); // fallback для старого шаблону
+  if (usdEl && !usdEl.__calcBound) {
+    ["input","change"].forEach(ev => usdEl.addEventListener(ev, () => { try { recalc(); } catch {} }));
+    usdEl.__calcBound = true;
   }
 }
 
@@ -200,7 +204,7 @@ function bindRuntimeEventsOnce() {
   bindEvents({
     onBuyClick,
     onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick?.()),
-    getUserUsdtBalance,
+    getUserUsdtBalance, // лишили для сумісності з USD-режимом (кнопка MAX)
   });
   wireCalcInput(); // страховка на випадок, якщо форма підвантажилася пізніше
   window.__magtEventsBound = true;
@@ -262,13 +266,26 @@ window.addEventListener("magt:purchase", (ev) => {
     fetchBalance(a);
     try { refreshClaimSection?.(); } catch {}
   }
+
+  // універсальний тост: спочатку намагаємось відобразити TON-купівлю
   try {
-    const p = Number((ev?.detail?.price) ?? CONFIG.PRICE_USD);
-    const usd = Number((ev?.detail?.usd) ?? (ui.usdtIn?.value || 0));
-    const tokens = Number((ev?.detail?.tokens) ?? (p > 0 ? usd / p : 0));
     const level = ev?.detail?.level ?? (ui.level?.textContent || "—");
-    if (tokens > 0 && isFinite(tokens) && p > 0) {
-      toast(`Купівля: ${Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(tokens)} MAGT по $${p.toFixed(6)} (рівень ${level})`);
+    const tokens = Number(ev?.detail?.tokens ?? 0);
+
+    const tonAmount  = Number(ev?.detail?.ton ?? 0);
+    const priceTon   = Number(ev?.detail?.priceTon ?? window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
+
+    if (tokens > 0 && priceTon > 0 && tonAmount >= 0) {
+      toast(`Купівля: ${Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(tokens)} MAGT по ${priceTon.toFixed(6)} TON (рівень ${level})`);
+      return;
+    }
+
+    // fallback на USD-режим (старі івенти)
+    const pUsd = Number((ev?.detail?.price) ?? CONFIG.PRICE_USD);
+    const usd = Number((ev?.detail?.usd) ?? (ui.usdtIn?.value || 0));
+    const tokensUsd = pUsd > 0 ? usd / pUsd : 0;
+    if (tokensUsd > 0 && isFinite(tokensUsd) && pUsd > 0) {
+      toast(`Купівля: ${Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(tokensUsd)} MAGT по $${pUsd.toFixed(6)} (рівень ${level})`);
     }
   } catch {}
 });
