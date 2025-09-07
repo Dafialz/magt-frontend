@@ -1,14 +1,16 @@
 // /js/config.js
+// ВАЖЛИВО: жодних <script> тут бути не повинно. Це ES-module з export { CONFIG }.
+
 const IS_BROWSER = typeof window !== "undefined" && typeof location !== "undefined";
 const IS_LOCAL   = IS_BROWSER && (location.hostname === "localhost" || location.hostname === "127.0.0.1");
-
-<script type="module" src="/js/api-override.js?v=1"></script>
 
 // Публічний продовий бекенд
 const PROD_API_BASE = "https://api.magtcoin.com";
 
-// Можливість override (для тестів/стендів)
-const OVERRIDE = (IS_BROWSER && window.API_BASE_OVERRIDE) ? String(window.API_BASE_OVERRIDE).trim() : "";
+// Можливість override (для тестів/стендів) — задається в index.html через window.API_BASE_OVERRIDE
+const OVERRIDE = (IS_BROWSER && window.API_BASE_OVERRIDE)
+  ? String(window.API_BASE_OVERRIDE).trim()
+  : "";
 
 // У локалці — локальний бекенд; у проді рядок порожній (використовуємо абсолютні ендпоінти нижче)
 const API_BASE_RUNTIME = OVERRIDE || (IS_LOCAL ? "http://127.0.0.1:8787" : "");
@@ -26,56 +28,61 @@ export const CONFIG = {
   /* ===== Загальна емісія / Токеноміка ===== */
   TOKEN_TOTAL_SUPPLY: 10_000_000_000,
   TOKENOMICS: [
-    { label: "Пресейл",            pct: 5  },
-    { label: "Ліквідність",        pct: 15 },
-    { label: "Маркетинг",          pct: 5  },
-    { label: "Команда",            pct: 5  },
-    { label: "Фонд розвитку",      pct: 10 },
-    { label: "Наші Проєкти ",      pct: 60 },
+    { label: "Пресейл",       pct: 5  },
+    { label: "Ліквідність",   pct: 15 },
+    { label: "Маркетинг",     pct: 5  },
+    { label: "Команда",       pct: 5  },
+    { label: "Фонд розвитку", pct: 10 },
+    { label: "Наші Проєкти ", pct: 60 },
   ],
 
-  /* ===== Ціноутворення (USD для віджетів, за бажанням) ===== */
-  PRICE_USD: 0.011490,
+  /* ===== Ціноутворення для UI ===== */
+  PRICE_USD: 0.011490,      // показ у віджетах
+  PRICE_TON: 0,             // якщо продаєш і за TON — вистави тут ціну, інакше 0
   RAISED_OFFSET_USD: 0,
   GOAL_USD: 20_000_000,
   HARD_CAP: 20_000_000,
 
-  /* ===== TON RPC / мережа ===== */
-  TON_RPC: join(API_BASE_ABS, "/api/rpc"),
+  /* ===== TON RPC ===== */
+  // За замовчуванням — через твій бекенд-проксі (/api/rpc). У ton.js є fallback-логіка.
+  TON_RPC:          join(API_BASE_ABS, "/api/rpc"),
   TON_RPC_FALLBACK: "",
 
-  /* ===== TON-пресейл (ГОЛОВНЕ) ===== */
-  // ОБОВ'ЯЗКОВО: адреса контракту MagtPresale (EQ…)
-  PRESALE_ADDRESS: "",
+  /* ===== Адреси пресейлу ===== */
+  // ВСТАВ ОДНУ АБО ОБИДВІ, ЗАЛЕЖНО ВІД ТВОЄЇ СХЕМИ
+  // PRESALE_OWNER_ADDRESS — власник USDT-джеттонів (адреса, для якої рахуємо JW отримувача)
+  // PRESALE_ADDRESS       — якщо є окремий контракт пресейлу (для віджетів/перевірок)
+  PRESALE_OWNER_ADDRESS: "", // <-- ВСТАВ СВОЮ EQ/UQ
+  PRESALE_ADDRESS:       "", // <-- за наявності
 
   // Мінімальна покупка в TON для фронту
   MIN_BUY_TON: 0.1,
 
-  // Ціна 1 MAGT у TON (для UI/оцінки куплених токенів; контракт рахує сам по рівнях)
-  PRICE_TON: 0, // наприклад: 0.000003 (залежить від рівнів у контракті)
-
-  // (Опційно) майстер MAGT (EQ…), якщо потрібні перевірки/віджети
+  /* ===== MAGT / USDT (для сумісності старого UI) ===== */
   MAGT_MASTER: "",
+  JETTON_DECIMALS: 6,
+  USDT_DECIMALS:   6,
 
-  /* ===== USDT (Jetton) — лишено для сумісності старих розділів UI ===== */
+  // Кандидати майстрів USDT-джеттона (TON)
   USDT_MASTERS: [
     "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
     "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
   ],
   USDT_MASTER: "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
   USDT_JETTON: "EQDxQWrZz7vI1EqVvtDv1sFLmvK1hNpxrQpvMXhjBasUSXjx",
-  PRESALE_OWNER_ADDRESS: "UQA1VwosHe3LfztkzNJ47UHndev9MbRTcdGHM_qjSpLRa4XD",
-  TREASURY_WALLET:       "UQA1VwosHe3LfztkzNJ47UHndev9MbRTcdGHM_qjSpLRa4XD",
-  JETTON_DECIMALS: 6,
-  USDT_DECIMALS:   6,
-  JETTON_WALLET_TON: 0.15,
-  FORWARD_TON: 0.05,
 
-  /* ===== Обмеження / рефералка (логіка бонусу виконується контрактом) ===== */
-  MIN_BUY_USDT: 1,              // залишено для старого UI; TON-режим використовує MIN_BUY_TON
+  // Куди відкривати TON при трансфері джеттонів (витрати на відкриття та forward)
+  JETTON_WALLET_TON: 0.15,
+  FORWARD_TON:       0.05,
+
+  // Казначейський гаманець (за потреби в бекенді/виджетах)
+  TREASURY_WALLET: "UQA1VwosHe3LfztkzNJ47UHndev9MbRTcdGHM_qjSpLRa4XD",
+
+  /* ===== Рефералка (UI) ===== */
+  MIN_BUY_USDT: 1,       // лишено для USD-режиму
   REF_ENABLED: true,
   REF_BONUS_PCT: 5,
-  REF_MIN_USDT: 10,             // для старого UI; за потреби додай REF_MIN_TON
+  REF_MIN_USDT: 10,
   REF_SELF_BAN: true,
   REF_BIND_ONCE: true,
   REF_DAILY_CAP_USD: 0,
@@ -83,7 +90,7 @@ export const CONFIG = {
   REF_POOL_TOKENS: 25_000_000,
   REF_DEBUG_DEMO: false,
 
-  /* ===== Дані пресейлу / таймер ===== */
+  /* ===== Дані пресейлу / рівні (для віджетів) ===== */
   TOTAL_SUPPLY: 500_000_000,
   ROUND_DEADLINE_TS: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
   LEVELS: [
@@ -110,7 +117,7 @@ export const CONFIG = {
   ],
   FALLBACK_SOLD_TOKENS: 0,
 
-  /* ===== Claim ===== */
+  /* ===== Claim (опційно) ===== */
   CLAIM_ENABLED: false,
   CLAIM_CONTRACT: "",
   CLAIM_POLL_INTERVAL_MS: 30000,
@@ -134,9 +141,9 @@ export const CONFIG = {
   __DEBUG: { API_BASE_RUNTIME, API_BASE_ABS, OVERRIDE, IS_LOCAL },
 };
 
-/* ===== Runtime-чек (для дебагу) ===== */
-if (!CONFIG.PRESALE_ADDRESS) {
-  console.error("❌ Вкажи PRESALE_ADDRESS (адреса контракту пресейлу) у config.js");
+/* ===== Runtime-чек (м’який) ===== */
+if (!CONFIG.PRESALE_OWNER_ADDRESS && !CONFIG.PRESALE_ADDRESS) {
+  console.warn("⚠️ Вкажи PRESALE_OWNER_ADDRESS або PRESALE_ADDRESS у config.js — інакше купівля працюватиме, але деякі віджети/перевірки можуть бути обмежені.");
 }
 if (CONFIG.MIN_BUY_TON <= 0) {
   console.warn("⚠️ Задай адекватний MIN_BUY_TON у config.js");
