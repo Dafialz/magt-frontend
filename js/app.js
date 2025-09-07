@@ -214,6 +214,9 @@ function bindRuntimeEventsOnce() {
 async function reinitAfterPartials() {
   try {
     refreshUiRefs();
+    // ✅ КРИТИЧНО: перевстановити статику для нових partials (ціль/прогрес/ціна/залишок)
+    initStaticUI();
+
     await mountTonButtons().catch(()=>{});
     window.__magtEventsBound = false; // дозволимо перев’язати події для свіжого DOM
     bindRuntimeEventsOnce();
