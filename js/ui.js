@@ -13,15 +13,26 @@ const API_BASE =
 /* опційне вимкнення my-stats, щоб не спамити 404 */
 const DISABLE_MY_STATS = !!(window.CONFIG_OVERRIDE && window.CONFIG_OVERRIDE.DISABLE_MY_STATS);
 
+/* ===== МЕТА-ПЛАН У TON ===== */
+const GOAL_TON = Number(CONFIG.GOAL_TON ?? 6_500_000);
+
 /* ===================== helpers ===================== */
 
-// універсальні форматери — не покладаємось на сигнатуру utils.fmt
+// формат із крапками: 6500000 -> "6.500.000"
+function intDots(n) {
+  const s = String(Math.floor(Number(n) || 0));
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
 const nf0 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
-const nf2 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 
 const fmt = {
   tokens(n) { return nf0.format(Number(n) || 0); },
-  usd(n, fd = 2) { return (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: fd }); },
+  ton(n, fd = 0) {
+    const x = Number(n) || 0;
+    if (fd === 0) return intDots(x);
+    const [i, f = ""] = x.toFixed(fd).split(".");
+    return `${intDots(i)}${fd ? `.${f}` : ""}`;
+  },
 };
 
 export function toast(msg) {
@@ -61,7 +72,7 @@ function normalizeToBase64Url(addr) {
       return new A(a).toString(true, true, true);
     }
   } catch {}
-  return null; // БІЛЬШЕ НЕ ПОВЕРТАЄМО HEX!
+  return null;
 }
 
 /** гарантовано отримаємо EQ/UQ: при потребі підвантажимо TonWeb і сконвертуємо */
@@ -95,7 +106,6 @@ const REF_MIN = Number(CONFIG.REF_MIN_USDT || 0);
 
 /* ===== DOM getters з перевіркою isConnected ===== */
 function getTonInput() {
-  // новий TON-інпут (має пріоритет)
   let el = ui.tonIn;
   if (!el || !el.isConnected) {
     el = document.getElementById("tonIn") || document.querySelector("[data-ton-in]") || document.querySelector("input[name='ton']") || null;
@@ -136,8 +146,6 @@ let _lastPostWallet  = "";
 
 // ✅ Використовуємо абсолютний ендпоінт із config.js
 const REF_ENDPOINT = (CONFIG?.ENDPOINTS?.referral || "").trim();
-
-/* safeguard */
 const REF_API_PATH = REF_ENDPOINT || (
   (API_BASE ? (API_BASE.replace(/\/+$/,"") + "/api/referral") : "/api/referral")
 );
@@ -275,7 +283,6 @@ function sanitizeTonInput() {
   const val = String(input.value || "").replace(",", ".").trim();
   let ton = Number(val);
   if (!isFinite(ton) || ton < 0) ton = 0;
-  // 9 знаків (нанотони) не потрібні тут, лише інпут користувача
   input.value = ton ? ton : "";
   return ton;
 }
@@ -285,7 +292,7 @@ export function refreshButtons() {
   const tonEl = getTonInput();
   const usdEl = getUsdtInput();
 
-  // Якщо є TON-інпут — пріоритет TON-режим
+  // TON-режим має пріоритет
   if (tonEl) {
     const ton = Number(tonEl.value || 0);
     const ok = !!agree?.checked && ton >= (Number(CONFIG.MIN_BUY_TON ?? 0) || 0);
@@ -294,10 +301,10 @@ export function refreshButtons() {
     return;
   }
 
-  // Інакше працюємо по USD (старий режим)
+  // USD fallback
   const usd = Number(usdEl?.value || 0);
   const ok = !!agree?.checked && usd >= (CONFIG.MIN_BUY_USDT || 1);
-  if (ui.btnBuy) ui.btnBuy.disabled = !ok;   // FIX: латинське ok
+  if (ui.btnBuy) ui.btnBuy.disabled = !ok;
   if (ui.btnClaim) ui.btnClaim.disabled = true;
 }
 
@@ -306,8 +313,20 @@ function enforceTonUnitsInHero(priceTonShown) {
   const priceSpan = document.getElementById("ui-price");
   const container = priceSpan?.parentElement || null;
   if (container && priceSpan) {
-    container.innerHTML = `<span id="ui-price">${Number(priceTonShown || 0).toFixed(6)}</span> TON`;
+    container.innerHTML = `<span id="ui-price">${Number(priceTonShown || 0).toFixed(6)}</span> <span class="opacity-70">TON</span>`;
   }
+}
+
+/* ===== патч статичного тексту «Ціль: …» у герої ===== */
+function patchGoalTextStatic() {
+  const needle = "$20,000,000";
+  const replacement = `${fmt.ton(GOAL_TON, 0)} TON`;
+  // замінимо в будь-якому елементі, що містить старе значення
+  document.querySelectorAll("section,div,span,p,small").forEach((n) => {
+    if (n.childElementCount === 0 && typeof n.textContent === "string" && n.textContent.includes(needle)) {
+      n.textContent = n.textContent.replace(needle, replacement);
+    }
+  });
 }
 
 /* ===== підпис під “Отримаєш … MAGT” ===== */
@@ -317,12 +336,12 @@ function updatePriceUnder(){
 
   const wrap = document.getElementById("price-under-output");
   if (wrap) {
-    wrap.innerHTML = `Ціна зараз: <span id="price-now">${priceTon.toFixed(6)}</span> TON • Рівень <span id="level-now">${levelTxt}</span>`;
+    wrap.innerHTML = `Ціна зараз: <span id="price-now">${(priceTon || 0).toFixed(6)}</span> • Рівень <span id="level-now">${levelTxt}</span>`;
     return;
   }
   const pn = document.getElementById("price-now");
   const ln = document.getElementById("level-now");
-  if (pn) pn.textContent = priceTon.toFixed(6);
+  if (pn) pn.textContent = (priceTon || 0).toFixed(6);
   if (ln) ln.textContent = levelTxt;
 }
 
@@ -353,8 +372,8 @@ export function recalc() {
     const priceTon = Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
     const tokens = calcTokensFromTon(ton, priceTon);
     renderTokensOut(tokens);
-    updateRefBonus(); // перерахуємо і реф-бонус
-    updatePriceUnder(); // підпис під ціною (TON)
+    updateRefBonus();
+    updatePriceUnder();
     refreshButtons();
     return;
   }
@@ -371,11 +390,10 @@ export function recalc() {
 
 /* ===== Прогрес/залишок ===== */
 
-// допоміжне: отримати інфо активного рівня за soldMag
+// інфо активного рівня за soldMag (ціни рівнів інтерпретуємо як TON)
 function getCurrentTierInfo(sold) {
   const tiers = Array.isArray(CONFIG.LEVELS) ? CONFIG.LEVELS : [];
   let level = 1;
-  // Ціна за замовчуванням тут не має значення — нижче переприсвоїмо TON
   let price = Number(CONFIG.PRICE_TON || 0);
   let remainingInTier = Math.max(0, Number(CONFIG.TOTAL_SUPPLY || 0) - Number(sold || 0));
 
@@ -384,7 +402,7 @@ function getCurrentTierInfo(sold) {
   let cum = 0;
   for (let i = 0; i < tiers.length; i++) {
     const qty = Number(tiers[i]?.qty ?? tiers[i]?.tokens ?? 0);
-    const p   = Number(tiers[i]?.price ?? tiers[i]?.usd ?? tiers[i]?.priceUsd ?? 0);
+    const p   = Number(tiers[i]?.price ?? tiers[i]?.ton ?? tiers[i]?.priceTon ?? 0);
     const end = cum + (qty > 0 ? qty : 0);
     if (sold < end) {
       level = i + 1;
@@ -395,30 +413,41 @@ function getCurrentTierInfo(sold) {
     cum = end;
   }
   const last = tiers[tiers.length - 1];
-  const pLast = Number(last?.price ?? last?.usd ?? last?.priceUsd ?? 0);
+  const pLast = Number(last?.price ?? last?.ton ?? last?.priceTon ?? 0);
   if (pLast > 0) price = pLast;
   return { level: tiers.length, price, remainingInTier: 0 };
 }
 
+function rewriteRaisedLine(raisedTon) {
+  // перезаписуємо " $<ui-raised> / $20,000,000 " -> " <ui-raised> / 6.500.000 TON "
+  const slot = document.getElementById("ui-raised");
+  const parent = slot?.parentElement;
+  if (parent) {
+    parent.innerHTML = `<span id="ui-raised">${fmt.ton(raisedTon, 0)}</span> / ${fmt.ton(GOAL_TON, 0)} TON`;
+    try { ui.raised = document.getElementById("ui-raised"); } catch {}
+  }
+}
+
 function applySaleUi({ raisedUsd, soldMag, totalMag }) {
-  const offset = Number(CONFIG.RAISED_OFFSET_USD || 0);
-  const cap    = Number(CONFIG.HARD_CAP || 0) || null;
-  const raised = Math.max(0, Number(raisedUsd || 0)) + offset;
+  // приблизна оцінка зібраного в TON
+  const priceTonNow = Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
+  const raisedTon = (Number(soldMag || 0) * (priceTonNow > 0 ? priceTonNow : 0)) || 0;
 
+  // % прогресу по TON-цілі
   let pct = 0;
-  if (cap && cap > 0) pct = Math.max(0, Math.min(100, (raised / cap) * 100));
+  if (GOAL_TON > 0) pct = Math.max(0, Math.min(100, (raisedTon / GOAL_TON) * 100));
 
-  const saleRaised = el("sale-raised");
-  const saleBar    = el("sale-bar");
-  const salePercent= el("sale-percent");
-  if (saleRaised)  saleRaised.textContent = `$${fmt.usd(raised, 0)}`;
+  const saleRaised  = el("sale-raised");
+  const saleBar     = el("sale-bar");
+  const salePercent = el("sale-percent");
+
+  if (saleRaised)  saleRaised.textContent = `${fmt.ton(raisedTon, 0)} TON`;
   if (saleBar)     saleBar.style.width = `${pct.toFixed(2)}%`;
   if (salePercent) salePercent.textContent = `${pct.toFixed(2)}% продано`;
 
   const sold = Math.max(0, Number(soldMag || 0));
   const info = getCurrentTierInfo(sold);
 
-  // показуємо ціну рівня у TON
   if (ui.price) ui.price.textContent = Number(info.price || 0).toFixed(6);
   enforceTonUnitsInHero(info.price);
 
@@ -429,15 +458,14 @@ function applySaleUi({ raisedUsd, soldMag, totalMag }) {
   if (saleRemaining) saleRemaining.textContent = fmt.tokens(info.remainingInTier);
 
   try {
-    // головне: зберегти поточну ціну в TON для калькулятора/рефа
     window.__CURRENT_PRICE_TON = Number(info.price || 0);
-    // USD більше не форсимо; якщо бекенд шле — оновиться у ton.js
   } catch {}
 
-  if (ui.raised) ui.raised.textContent = (raised).toLocaleString();
-  if (ui.bar)    ui.bar.style.width = `${pct.toFixed(2)}%`;
+  // верхній рядок під прогресом у герої
+  rewriteRaisedLine(raisedTon);
 
-  // синхронізуємо підпис під калькулятором після оновлення
+  if (ui.bar) ui.bar.style.width = `${pct.toFixed(2)}%`;
+
   updatePriceUnder();
 }
 
@@ -475,7 +503,6 @@ function startSalePolling() {
   clearInterval(_saleTimer);
   clearInterval(_warmTimer);
 
-  // миттєве оновлення
   refreshSaleStatsOnce();
 
   // «теплий старт»: кожні 3с ~30с
@@ -510,18 +537,22 @@ function ensureCalcWires() {
 
 /* ===================== static UI on boot ===================== */
 export function initStaticUI() {
-  // 🔹 Гарантовано перечитуємо DOM-посилання перед першим рендером
   try { refreshUiRefs(); } catch {}
 
   const y = document.querySelector("#year");
   if (y) y.textContent = new Date().getFullYear();
 
-  // Віджет ціни — тепер у TON (історично було USD)
+  // Початкова ціна/одиниці як TON
   if (ui.price) ui.price.textContent = (Number(CONFIG.PRICE_TON || 0)).toFixed(6);
   enforceTonUnitsInHero(Number(CONFIG.PRICE_TON || 0));
   if (ui.level) ui.level.textContent = "1";
 
-  applySaleUi({ raisedUsd: 0, soldMag: 0, totalMag: CONFIG.TOTAL_SUPPLY });
+  // Патч статичного тексту "Ціль"
+  patchGoalTextStatic();
+
+  // Початковий прогрес (0 / GOAL_TON)
+  rewriteRaisedLine(0);
+  if (ui.bar) ui.bar.style.width = "0%";
 
   if (ui.claimWrap) ui.claimWrap.classList.toggle("hidden", !CONFIG.CLAIM_ENABLED);
 
@@ -534,7 +565,6 @@ export function initStaticUI() {
     if (ui.btnCopyRef) ui.btnCopyRef.disabled = false;
   }
 
-  // якщо є ціна в TON — збережемо для калькулятора
   try {
     if (Number(CONFIG.PRICE_TON) > 0) {
       window.__CURRENT_PRICE_TON = Number(CONFIG.PRICE_TON);
@@ -598,7 +628,6 @@ export function updateRefBonus() {
   if (!ui.refPayout) return;
   if (!REF_ON) { ui.refPayout.classList.add("hidden"); return; }
 
-  // спочатку спробуємо TON-інпут (новий режим)
   const tonEl = getTonInput();
   const usdEl = getUsdtInput();
 
@@ -614,7 +643,6 @@ export function updateRefBonus() {
       bonusTokens = Math.floor(tokens * (pct / 100));
     }
   } else if (usdEl) {
-    // старий USD-режим
     const usd = Number(usdEl.value || 0);
     if (!state.referrer || !usd || usd <= 0 || (REF_MIN > 0 && usd < REF_MIN)) {
       ui.refPayout.classList.add("hidden");
@@ -653,7 +681,6 @@ export function updateRefBonus() {
   if (ui.refBonusUsd) ui.refBonusUsd.textContent = fmt.tokens(bonusTokens);
   if (ui.refBonusTo)  ui.refBonusTo.textContent  = toAddrShort || "—";
 
-  // показ/приховати
   if (state.referrer && bonusTokens > 0) ui.refPayout.classList.remove("hidden");
   else ui.refPayout.classList.add("hidden");
 }
@@ -802,7 +829,6 @@ export function bindEvents({ onBuyClick, onClaimClick, getUserUsdtBalance }) {
 
   if (ui.btnMax && ui.btnMax._bound !== true) {
     ui.btnMax.addEventListener("click", async () => {
-      // BTN MAX для USD-режиму збережено для сумісності
       setBtnLoading(ui.btnMax, true, "…");
       let max = await getUserUsdtBalance();
       setBtnLoading(ui.btnMax, false);

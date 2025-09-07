@@ -80,10 +80,17 @@ export function normalizeToBase64Url(addr) {
 }
 
 /* ========== Config sanity ========== */
+/**
+ * Для TON-only достатньо, щоб була вказана адреса прийому:
+ * PRESALE_OWNER_ADDRESS або PRESALE_ADDRESS.
+ * USDT-поля не перевіряємо.
+ */
 export function cfgReady() {
   const bad = (v) =>
     !v || String(v).includes("REPLACE") || String(v).trim().length < 8;
-  return !(bad(CONFIG.USDT_MASTER) || bad(CONFIG.PRESALE_OWNER_ADDRESS));
+  const hasTonDest =
+    !bad(CONFIG.PRESALE_OWNER_ADDRESS) || !bad(CONFIG.PRESALE_ADDRESS);
+  return hasTonDest;
 }
 
 /* ========== Buttons ========== */

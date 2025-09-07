@@ -40,8 +40,7 @@ export const CONFIG = {
   PRICE_USD: 0.011490,      // залишимо для віджетів у $, якщо треба
   PRICE_TON: 0.003734,      // базова ціна за 1 MAGT у TON (ціна 1 рівня)
   RAISED_OFFSET_USD: 0,
-  GOAL_USD: 20_000_000,
-  HARD_CAP: 20_000_000,
+  GOAL_TON: 6_500_000,
 
   /* ===== TON RPC ===== */
   // За замовчуванням — через твій бекенд-проксі (/api/rpc). У ton.js є fallback-логіка.
