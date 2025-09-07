@@ -1,18 +1,42 @@
-// /js/buy.js
+// /js/buy.js  (TON-only)
 import { CONFIG } from "./config.js";
-import {
-  buildUsdtTransferTx,
-  buildUsdtTxUsingConnected,
-  pushPurchaseToBackend,
-  RPC_URL,
-} from "./ton.js";
-import { cfgReady, setBtnLoading } from "./utils.js";
+import { pushPurchaseToBackend } from "./ton.js";
+import { setBtnLoading } from "./utils.js";
 import { ui, state } from "./state.js";
 import { toast, recalc, refreshButtons, updateRefBonus } from "./ui.js";
 import { getWalletAddress, getTonConnect, openConnectModal } from "./tonconnect.js";
 
 /* ---------------- helpers ---------------- */
-export function mapTonConnectError(e) {
+function isTonEqUq(addr) {
+  if (typeof addr !== "string") return false;
+  const a = addr.trim();
+  return !!a && (a.startsWith("EQ") || a.startsWith("UQ")) && /^[A-Za-z0-9_-]{48,68}$/.test(a);
+}
+
+function getTonInput() {
+  return (
+    document.getElementById("tonIn") ||
+    document.querySelector("[data-ton-in]") ||
+    document.querySelector("input[name='ton']") ||
+    null
+  );
+}
+function getAgree() {
+  return document.getElementById("agree") || document.querySelector("[data-agree]") || null;
+}
+function u8ToBase64(u8) {
+  let bin = "";
+  for (const b of u8) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+async function ensureTonWeb() {
+  if (!window.TonWeb) {
+    await import("https://cdn.jsdelivr.net/npm/tonweb@0.0.66/dist/tonweb.min.js");
+  }
+  return window.TonWeb;
+}
+
+function mapTonConnectError(e) {
   const raw = e?.message || String(e) || "";
   const msg = raw.toLowerCase();
   if (msg.includes("wallet_not_connected") || msg.includes("wallet not connected")) return "Підключи гаманець і спробуй ще раз.";
@@ -22,152 +46,7 @@ export function mapTonConnectError(e) {
   return "Скасовано або помилка відправки.";
 }
 
-function isTonAddress(addr) {
-  if (typeof addr !== "string") return false;
-  const a = addr.trim();
-  if (!a || !(a.startsWith("EQ") || a.startsWith("UQ"))) return false;
-  return /^[A-Za-z0-9_-]{48,68}$/.test(a);
-}
-
-function isConnected(tc) {
-  return Boolean(
-    tc?.account?.address ||
-      tc?.state?.account?.address ||
-      tc?.wallet?.account?.address ||
-      tc?.connector?.wallet?.account?.address ||
-      tc?.tonConnect?.account?.address ||
-      tc?._wallet?.account?.address
-  );
-}
-
-/* ===== баланс USDT (через бекенд-проксі /api/rpc) ===== */
-/** Читаємо баланс по КОЖНОМУ майстру і беремо максимум */
-export async function getUserUsdtBalance() {
-  try {
-    const walletAddress = getWalletAddress();
-    if (!window.TonWeb || !walletAddress || !cfgReady()) return null;
-
-    const TonWeb = window.TonWeb;
-    const provider = new TonWeb.HttpProvider(RPC_URL);
-    const tonweb = new TonWeb(provider);
-
-    const userAddr = new TonWeb.utils.Address(walletAddress);
-    const JettonMinter = TonWeb.token.jetton.JettonMinter;
-
-    const masters = (Array.isArray(CONFIG.USDT_MASTERS) && CONFIG.USDT_MASTERS.length
-      ? CONFIG.USDT_MASTERS
-      : [CONFIG.USDT_MASTER]
-    )
-      .map((s) => String(s || "").trim())
-      .filter(Boolean);
-
-    if (!masters.length) return null;
-
-    let bestHuman = 0;
-    const dec = Number(CONFIG.JETTON_DECIMALS ?? 6);
-
-    for (const m of masters) {
-      try {
-        const masterAddr = new TonWeb.utils.Address(m);
-        const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
-        const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
-        const jw = userJettonWalletAddr.toString(true, true, false);
-
-        const res = await fetch(RPC_URL, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            method: "runGetMethod",
-            params: { address: jw, method: "get_wallet_data", stack: [] },
-          }),
-        });
-
-        const json = await res.json();
-        const stack =
-          json?.result?.stack || json?.result?.data?.stack || json?.stack || [];
-
-        if (!Array.isArray(stack) || stack.length === 0) continue;
-
-        const raw0 = stack[0];
-        let hexRaw = (raw0 && (raw0[1] ?? raw0.value ?? raw0.number)) ?? "";
-        if (typeof hexRaw === "number") hexRaw = "0x" + hexRaw.toString(16);
-        const hex = String(hexRaw).startsWith("0x") ? String(hexRaw) : "0x" + String(hexRaw);
-
-        const balanceUnits = BigInt(hex);
-        const human = Number(balanceUnits) / 10 ** dec;
-        if (human > bestHuman) bestHuman = human;
-      } catch (e) {
-        console.warn("getUserUsdtBalance per-master fail:", m, e?.message || e);
-      }
-    }
-
-    return bestHuman;
-  } catch (e) {
-    console.warn("getUserUsdtBalance failed:", e?.message || e);
-    return null;
-  }
-}
-
-export async function showDebugJettonInfo() {
-  const walletAddress = getWalletAddress();
-  if (!window.TonWeb) {
-    console.warn("TonWeb не завантажено.");
-    return;
-  }
-  if (!cfgReady()) {
-    console.warn("⚠️ Заповни CONFIG.USDT_MASTER та CONFIG.PRESALE_OWNER_ADDRESS у /js/config.js");
-    return;
-  }
-  if (!walletAddress) return;
-
-  const TonWeb = window.TonWeb;
-  const provider = new TonWeb.HttpProvider(RPC_URL);
-  const tonweb = new TonWeb(provider);
-
-  const userAddr = new TonWeb.utils.Address(walletAddress);
-  const masterAddr = new TonWeb.utils.Address(CONFIG.USDT_MASTER);
-  const presaleOwner = new TonWeb.utils.Address(CONFIG.PRESALE_OWNER_ADDRESS);
-
-  const JettonMinter = TonWeb.token.jetton.JettonMinter;
-  const minter = new JettonMinter(tonweb.provider, { address: masterAddr });
-
-  const userJettonWalletAddr = await minter.getJettonWalletAddress(userAddr);
-  const presaleJettonWalletAddr = await minter.getJettonWalletAddress(presaleOwner);
-
-  console.groupCollapsed("%cMAGT Presale • Jetton debug", "color:#65d2ff");
-  console.log("USDT master:", masterAddr.toString(true, true, true));
-  console.log("Presale owner:", presaleOwner.toString(true, true, true));
-  console.log("User address:", userAddr.toString(true, true, true));
-  console.log("User USDT wallet:", userJettonWalletAddr.toString(true, true, true));
-  console.log("Presale USDT wallet:", presaleJettonWalletAddr.toString(true, true, true));
-  console.groupEnd();
-
-  try {
-    const jw = userJettonWalletAddr.toString(true, true, false);
-    const res = await fetch(RPC_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        method: "runGetMethod",
-        params: { address: jw, method: "get_wallet_data", stack: [] },
-      }),
-    });
-    const json = await res.json();
-    const stack =
-      json?.result?.stack || json?.result?.data?.stack || json?.stack || [];
-    const hexRaw =
-      (stack[0] && (stack[0][1] ?? stack[0].value ?? stack[0].number)) ?? "0x0";
-    const hex = String(hexRaw).startsWith("0x") ? String(hexRaw) : "0x" + String(hexRaw);
-    const balanceUnits = BigInt(hex);
-    const dec = Number(CONFIG.JETTON_DECIMALS ?? 6);
-    const human = Number(balanceUnits) / 10 ** dec;
-    console.log(`USDT balance (user): ${human}`);
-  } catch (e2) {
-    console.warn("Не вдалось прочитати баланс USDT у користувача:", e2?.message || e2);
-  }
-}
-
-/* ===== локальний CLAIM (для миттєвого бейджа) ===== */
+/* ===== локальний CLAIM бейдж (як і раніше) ===== */
 function bumpLocalClaim(tokens) {
   try {
     const key = "magt_claim_local";
@@ -175,9 +54,7 @@ function bumpLocalClaim(tokens) {
     const next = cur + Number(tokens || 0);
     localStorage.setItem(key, String(next));
     return next;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 function updateClaimUI(tokensAdded) {
   const next = bumpLocalClaim(tokensAdded);
@@ -187,160 +64,127 @@ function updateClaimUI(tokensAdded) {
   if (info) info.classList.remove("hidden");
 }
 
-/* ===== утиліти очікування/конвертації ===== */
-function toUnits(usd, dec = Number(CONFIG.USDT_DECIMALS ?? 6)) {
-  const s = String(usd).replace(",", ".");
-  const n = Math.round(Number(s) * 10 ** dec);
-  return BigInt(Number.isFinite(n) ? n : 0);
-}
-async function pollUntil(fn, { timeoutMs = 60000, everyMs = 2000 } = {}) {
-  const t0 = Date.now();
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const ok = await fn();
-    if (ok) return true;
-    if (Date.now() - t0 > timeoutMs) return false;
-    await new Promise((r) => setTimeout(r, everyMs));
+/* ===== Побудова TON-транзакції на пресейл ===== */
+async function buildTonPurchaseTx(tonAmount, refAddr) {
+  const TonWeb = await ensureTonWeb();
+
+  const dest = (CONFIG.PRESALE_ADDRESS || CONFIG.PRESALE_OWNER_ADDRESS || "").trim();
+  if (!dest) throw new Error("Не задано PRESALE_ADDRESS / PRESALE_OWNER_ADDRESS у config.js");
+
+  const amount = Number(tonAmount);
+  if (!Number.isFinite(amount) || !(amount > 0)) throw new Error("Некоректна сума TON");
+
+  // короткий коментар у payload
+  const buyer = (window.__magtAddr || getWalletAddress() || "").trim();
+  const A = TonWeb.utils.Address;
+  const buyerB64 = buyer ? new A(buyer).toString(true, true, true) : "-";
+  let refB64 = "-";
+  if (refAddr) {
+    try { refB64 = new A(refAddr).toString(true, true, true); } catch {}
   }
+  const ts = Date.now();
+  const nonce = (Math.floor(Math.random() * 1e9) >>> 0);
+  const short = (s) => (s && s !== "-" ? `${s.slice(0,6)}..${s.slice(-6)}` : "-");
+  const note = `MAGT|b=${short(buyerB64)}|r=${short(refB64)}|t=${ts}|n=${nonce}`;
+
+  const cell = new TonWeb.boc.Cell();
+  cell.bits.writeUint(0, 32);
+  cell.bits.writeString(note);
+
+  return {
+    validUntil: Math.floor(Date.now() / 1000) + 300,
+    messages: [
+      {
+        address: new A(dest).toString(true, true, false), // EQ bounceable
+        amount: TonWeb.utils.toNano(String(amount)).toString(),
+        payload: u8ToBase64(await cell.toBoc(false)),
+      },
+    ],
+  };
 }
 
-/* ===== основний клік BUY ===== */
+/* ===== основний клік BUY (TON-only) ===== */
 let _buyInFlight = false;
 
 export async function onBuyClick() {
-  if (_buyInFlight) return; // антидубль
+  if (_buyInFlight) return;
   _buyInFlight = true;
 
   const walletAddress = getWalletAddress();
   const tonConnectUI = getTonConnect();
 
-  if (!tonConnectUI || !walletAddress || !isConnected(tonConnectUI)) {
+  // підключення
+  if (!tonConnectUI || !walletAddress) {
     await openConnectModal();
     _buyInFlight = false;
     return toast("Підключи гаманець");
   }
-
-  if (!ui?.agree?.checked) {
+  if (!ui?.agree?.checked && getAgree()) {
     _buyInFlight = false;
     return toast("Підтверди правила пресейлу");
   }
 
-  const usdRaw = ui.usdtIn?.value || 0;
-  const usd = Math.max(0, Math.round(Number(String(usdRaw).replace(",", ".")) * 100) / 100);
-  const minBuy = Number(CONFIG.MIN_BUY_USDT || 0);
-  if (!(usd >= minBuy)) {
+  // сума TON
+  const tonEl = getTonInput();
+  const raw = String(tonEl?.value || "").replace(",", ".").trim();
+  const ton = Math.max(0, Number(raw));
+  const minTon = Number(CONFIG.MIN_BUY_TON || 0.1);
+  if (!(ton > 0) || ton < minTon) {
     _buyInFlight = false;
-    return toast(`Мінімум $${minBuy}`);
+    return toast(`Мінімум ${minTon} TON`);
   }
 
-  if (!cfgReady()) {
-    _buyInFlight = false;
-    return toast("⚠️ Заповни USDT_MASTER і PRESALE_OWNER_ADDRESS у /js/config.js");
-  }
-  if (!window.TonWeb) {
-    _buyInFlight = false;
-    return toast("TonWeb не завантажено (перевір <script src=tonweb...> у <head>)");
-  }
-
-  // === реферал
+  // реферал
   let ref = null;
-  if (state?.referrer && isTonAddress(state.referrer)) ref = state.referrer.trim();
-  if (!ref) ref = new URLSearchParams(location.search).get("ref")?.trim() || null;
+  if (state?.referrer && isTonEqUq(state.referrer)) ref = state.referrer.trim();
   if (!ref) {
     try {
-      const saved = localStorage.getItem("magt_ref");
-      if (isTonAddress(saved)) ref = saved.trim();
+      const qRef = new URLSearchParams(location.search).get("ref") || "";
+      if (isTonEqUq(qRef)) ref = qRef.trim();
     } catch {}
   }
-  if (!isTonAddress(ref || "")) ref = null;
-  if (
-    ref &&
-    CONFIG.REF_SELF_BAN &&
-    typeof walletAddress === "string" &&
-    walletAddress.trim() === ref
-  ) {
-    console.warn("Self-ref detected — ref cleared by REF_SELF_BAN");
-    ref = null;
+  if (!ref) {
+    try {
+      const saved = localStorage.getItem("magt_ref") || "";
+      if (isTonEqUq(saved)) ref = saved.trim();
+    } catch {}
   }
+  if (ref && CONFIG.REF_SELF_BAN && walletAddress && walletAddress.trim() === ref) ref = null;
+  try { window.__referrer = ref || null; } catch {}
 
   try {
     setBtnLoading(ui.btnBuy, true, "Підпис…");
     toast("Готуємо транзакцію…");
 
-    const usdtBalBefore = await getUserUsdtBalance();
-    console.log("[BUY] usdt balance before =", usdtBalBefore);
-
-    window.__referrer = ref || null;
-
-    let tx;
-    try {
-      tx = await buildUsdtTxUsingConnected(usd, ref);
-    } catch {
-      tx = await buildUsdtTransferTx(walletAddress, usd, ref);
-    }
-
-    // Нормалізуємо адресу одержувача → EQ (bounceable)
-    try {
-      const TonWeb = window.TonWeb;
-      const A = TonWeb?.utils?.Address;
-      if (A && tx?.messages?.[0]?.address) {
-        const addrObj = new A(tx.messages[0].address);
-        tx.messages[0].address = addrObj.toString(true, true, true);
-      }
-    } catch (eAddr) {
-      console.warn("Address normalize warning:", eAddr?.message || eAddr);
-    }
-
-    if (!tx?.messages?.[0]?.payload) {
-      throw new Error("TX_WITHOUT_PAYLOAD");
-    }
-
-    console.log("[BUY] TonConnect tx =", tx);
+    const tx = await buildTonPurchaseTx(ton, ref);
     toast("Підтверди платіж у гаманці…");
     const res = await tonConnectUI.sendTransaction(tx);
-    console.log("[BUY] USDT transfer sent →", res);
-    toast("Платіж відправлено в мережу. Чекаємо підтвердження…");
+    console.log("[BUY TON] sent:", res);
 
-    // Пулінг списання (з урахуванням мульти-майстрів)
-    const expectedUnits = toUnits(usd);
-    const ok = await pollUntil(
-      async () => {
-        const now = await getUserUsdtBalance();
-        console.log("[BUY] poll balance:", now, "(before:", usdtBalBefore, ")");
-        if (now === null || usdtBalBefore === null) return false;
-        const beforeUnits = toUnits(usdtBalBefore);
-        const nowUnits = toUnits(now);
-        return beforeUnits - nowUnits >= expectedUnits;
-      },
-      { timeoutMs: 60000, everyMs: 2000 }
-    );
-
-    if (!ok) {
-      toast(
-        "Не бачу списання USDT поки що. Якщо кошти спишуться пізніше — токени нарахуються автоматично."
-      );
-      return;
-    }
-
-    const dynPrice = Number(window.__magtPriceUsd || CONFIG.PRICE_USD || 0.00383);
-    const tokensBought = dynPrice > 0 ? Math.floor(usd / dynPrice) : 0;
+    // Оцінка куплених токенів для локального бейджа/фіду
+    const priceTon = Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
+    const tokensBought = priceTon > 0 ? Math.floor(ton / priceTon) : 0;
 
     updateClaimUI(tokensBought);
 
-    if (CONFIG.REF_DEBUG_DEMO !== false) {
+    // демо-фід і реф-лідерборд (локально)
+    try {
       window.dispatchEvent(
         new CustomEvent("magt:purchase", {
-          detail: { usd, tokens: tokensBought, address: walletAddress, ref: ref || null },
+          detail: { usd: 0, tokens: tokensBought, address: walletAddress, ref: ref || null },
         })
       );
-    }
+    } catch {}
 
-    pushPurchaseToBackend({ usd, tokens: tokensBought, address: walletAddress, ref });
+    // пуш у бекенд (якщо є ENDPOINTS.purchase)
+    pushPurchaseToBackend({ usd: 0, tokens: tokensBought, address: walletAddress, ref });
 
-    if (ui.usdtIn) ui.usdtIn.value = "";
+    // очистити інпут і оновити UI
+    if (tonEl) tonEl.value = "";
     recalc();
     updateRefBonus?.();
-    toast("Готово. MAGT нараховано.");
+    toast("Готово. Транзакцію відправлено в мережу.");
+
   } catch (e) {
     console.error(e);
     toast(mapTonConnectError(e));

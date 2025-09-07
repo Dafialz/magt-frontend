@@ -33,7 +33,7 @@ function* providerSeq(TonWeb) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ============================================
- * Кандидати майстрів USDT
+ * Кандидати майстрів USDT (залишено для сумісності віджетів)
  * ============================================ */
 const USDT_MASTERS = Array.from(
   new Set(
@@ -101,6 +101,10 @@ export const fmt = {
   },
 };
 
+export function getPriceTon() {
+  return Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
+}
+
 /* ============================================
  * Абсолютні ендпоінти
  * ============================================ */
@@ -139,8 +143,79 @@ function buildSafeComment({ buyerB64, refB64, ts, nonce }) {
   return `MAGT|n=${nonce}`;
 }
 
+/* ==========================================================
+ * TON purchase (native TON → PRESALE_ADDRESS)
+ * ========================================================== */
+export async function buildTonPurchaseTx(ownerUserAddr, tonAmount, refAddr) {
+  if (!window.TonWeb) throw new Error("TonWeb не завантажено");
+  const TonWeb = window.TonWeb;
+
+  const resolvedOwner =
+    (ownerUserAddr && String(ownerUserAddr).trim()) || getWalletAddress();
+  if (!resolvedOwner) throw new Error("WALLET_NOT_CONNECTED");
+
+  const ton = Number(String(tonAmount).replace(",", "."));
+  if (!Number.isFinite(ton) || ton <= 0) throw new Error("Некоректна сума TON");
+  if (Number(CONFIG.MIN_BUY_TON) > 0 && ton < Number(CONFIG.MIN_BUY_TON)) {
+    throw new Error(`Мінімальна покупка: ${CONFIG.MIN_BUY_TON} TON`);
+  }
+
+  const presaleAddrRaw = (CONFIG.PRESALE_ADDRESS || "").trim();
+  if (!presaleAddrRaw) throw new Error("Вкажи PRESALE_ADDRESS у config.js");
+  let presaleAddr;
+  try {
+    presaleAddr = new TonWeb.utils.Address(presaleAddrRaw);
+  } catch {
+    throw new Error("Невірний PRESALE_ADDRESS (TON-адреса)");
+  }
+
+  // реферал
+  let cleanRef = null;
+  if (typeof refAddr === "string" && isTonAddress(refAddr)) cleanRef = refAddr.trim();
+  if (cleanRef && CONFIG.REF_SELF_BAN === true) {
+    const buyerBase64 = new TonWeb.utils.Address(resolvedOwner).toString(true, true, true);
+    if (buyerBase64 === cleanRef) cleanRef = null;
+  }
+
+  // payload-коментар
+  const buyerB64 = toBase64Url(resolvedOwner);
+  const refB64   = cleanRef ? toBase64Url(cleanRef) : "-";
+  const ts       = Date.now();
+  const nonce    = (Math.floor(Math.random() * 1e9) >>> 0);
+  const note     = buildSafeComment({ buyerB64, refB64, ts, nonce });
+
+  const cell = new TonWeb.boc.Cell();
+  cell.bits.writeUint(0, 32);
+  cell.bits.writeString(note);
+  const payloadB64 = u8ToBase64(await cell.toBoc(false));
+
+  // адресат → стандартний EQ (bounceable)
+  const toAddrB64 = presaleAddr.toString(true, true, false);
+  const amountNano = TonWeb.utils.toNano(String(ton)).toString();
+
+  try {
+    console.log("[MAGT TON TX] to:", toAddrB64, "ton:", ton, "note:", note);
+  } catch {}
+
+  return {
+    validUntil: Math.floor(Date.now() / 1000) + 300,
+    messages: [
+      {
+        address: toAddrB64,
+        amount: amountNano,
+        payload: payloadB64,
+      },
+    ],
+  };
+}
+
+// Зручний варіант
+export async function buildTonTxUsingConnected(tonAmount, refAddr) {
+  return buildTonPurchaseTx(null, tonAmount, refAddr);
+}
+
 /* ============================================
- * Читання балансу джеттон-гаманця (units) з ретраями
+ * Читання балансу джеттон-гаманця (units) з ретраями — сумісність
  * ============================================ */
 async function readJettonBalanceUnits(TonWeb, provider, jettonMasterB64, userAddr) {
   const JettonMinter = TonWeb.token.jetton.JettonMinter;
@@ -166,7 +241,7 @@ async function readJettonBalanceUnits(TonWeb, provider, jettonMasterB64, userAdd
 }
 
 /* ============================================
- * Підбір правильного майстра USDT
+ * Підбір правильного майстра USDT — сумісність
  * ============================================ */
 async function pickUsdtMasterForAmount(usdAmount) {
   if (!window.TonWeb) throw new Error("TonWeb не завантажено");
@@ -237,7 +312,7 @@ async function pickUsdtMasterForAmount(usdAmount) {
 }
 
 /* ============================================
- * USDT transfer (TonConnect)
+ * USDT transfer (TonConnect) — лишено для сумісності старих розділів
  * ============================================ */
 export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   if (!window.TonWeb) throw new Error("TonWeb не завантажено");
@@ -261,7 +336,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
     jw: userJettonWallet,
   } = await pickUsdtMasterForAmount(numAmount);
 
-  // адреса отримувача (пресейл)
+  // адреса отримувача (пресейл owner для USDT)
   let presaleOwner;
   try {
     presaleOwner = new TonWeb.utils.Address(CONFIG.PRESALE_OWNER_ADDRESS);
@@ -342,25 +417,6 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
 
   const payloadB64 = u8ToBase64(await body.toBoc(false));
 
-  // Логи
-  try {
-    console.log(
-      "[MAGT TX] picked USDT master:",
-      new TonWeb.utils.Address(usdtMasterB64).toString(true, true, true)
-    );
-    console.log(
-      "[MAGT TX] userJettonWallet:",
-      userJettonWalletAddr.toString(true, true, true)
-    );
-    console.log(
-      "[MAGT TX] presaleJettonWallet:",
-      presaleJettonWalletAddr.toString(true, true, true)
-    );
-    console.log("[MAGT TX] jetAmount (USDT units):", jetAmountBig.toString());
-    console.log("[MAGT TX] openTon:", openTon.toString(), "forwardTon:", forwardTon.toString());
-    console.log("[MAGT TX] note:", note);
-  } catch {}
-
   // ВАЖЛИВО: адреса одержувача → EQ (bounceable)
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
@@ -375,7 +431,7 @@ export async function buildUsdtTransferTx(ownerUserAddr, usdAmount, refAddr) {
   };
 }
 
-/* Зручний варіант */
+/* Зручний варіант — сумісність */
 export async function buildUsdtTxUsingConnected(usdAmount, refAddr) {
   return buildUsdtTransferTx(null, usdAmount, refAddr);
 }
@@ -416,7 +472,6 @@ export async function buildMagtTransferTx(opts = {}) {
   let prov = null;
   for (const p of providerSeq(TonWeb)) {
     try {
-      // невеликий "пінг": просто створення Address/контракту — не кидає запит
       prov = p;
       break;
     } catch {}
@@ -450,7 +505,7 @@ export async function buildMagtTransferTx(opts = {}) {
     forwardPayload: noteCell,
   });
 
-  // 4) stateInit: якщо гаманець ще «спить», багатьом апкам так надійніше
+  // 4) stateInit
   let stateInitB64 = null;
   try {
     if (typeof jw.createStateInit === "function") {
@@ -461,7 +516,6 @@ export async function buildMagtTransferTx(opts = {}) {
 
   const payloadB64 = u8ToBase64(await body.toBoc(false));
 
-  // повертаємо tx для TonConnect
   return {
     validUntil: Math.floor(Date.now() / 1000) + 300,
     messages: [{
@@ -689,8 +743,8 @@ export async function pushPurchaseToBackend({ usd, tokens, address, ref }) {
 function pushDemoPurchase({ usd, tokens, address, ref }) {
   const feed = demoFeed();
   feed.unshift({
-    asset: "USDT",
-    amountUsd: Number(usd) || 0,
+    asset: "TON",
+    amountUsd: Number(usd) || 0,        // якщо не рахуєш USD — буде 0 (ок для демо)
     magt: Number(tokens) || 0,
     addr: String(address || ""),
     ref: (ref && String(ref)) || null,

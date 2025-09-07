@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Magic Time — Presale TON + USDT</title>
-  <meta name="description" content="Офіційний пресейл Magic Time (MAGT) у мережі TON з оплатою USDT (Jetton)">
+
+  <title>Magic Time — Presale TON</title>
+  <meta name="description" content="Офіційний пресейл Magic Time (MAGT) у мережі TON. Оплата напряму в TON.">
   <meta name="theme-color" content="#0a0a0a">
 
   <!-- не кешувати HTML -->
@@ -16,14 +17,13 @@
   <link rel="icon" type="image/png" href="/assets/favicon.png?v=17">
   <link rel="shortcut icon" href="/assets/favicon.png?v=17" type="image/png">
 
-  <!-- ⚡ Tailwind CDN (основний) -->
+  <!-- ⚡ Tailwind CDN (швидкий старт; для продакшна краще CLI/PostCSS) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- ✅ Tailwind config у зовнішньому файлі -->
+  <!-- Tailwind конфіг -->
   <script src="/assets/tw-config.js?v=17"></script>
 
-  <!-- Локальні стилі -->
+  <!-- стилі -->
   <link rel="stylesheet" href="/assets/styles.css?v=18">
-  <!-- 🔒 Винесені inline-стилі -->
   <link rel="stylesheet" href="/assets/inline.css?v=17">
 
   <!-- бібліотеки -->
@@ -31,10 +31,10 @@
   <script src="https://cdn.jsdelivr.net/npm/tonweb@0.0.66/dist/tonweb.min.js"></script>
 
   <!-- === API override БЕЗ гонок: має виконатися ДО модулів === -->
-  <!-- якщо треба підмінити бекенд у рантаймі, цей файл виставляє window.API_BASE_OVERRIDE -->
+  <!-- якщо потрібно тимчасово підмінити бекенд — цей файл виставляє window.API_BASE_OVERRIDE -->
   <script src="/js/api-override.js?v=17"></script>
 
-  <!-- noscript-стилі окремо -->
+  <!-- noscript-стилі -->
   <noscript>
     <style>
       [data-js], template { display:none !important; }
@@ -123,40 +123,40 @@
     </section>
 
     <!-- Наші проєкти (заглушка) -->
-<section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" id="tokenomics" aria-labelledby="projects-title">
-  <h2 id="projects-title" class="text-lg font-semibold">Наші проєкти <span class="opacity-70">(скоро)</span></h2>
+    <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft" id="tokenomics" aria-labelledby="projects-title">
+      <h2 id="projects-title" class="text-lg font-semibold">Наші проєкти <span class="opacity-70">(скоро)</span></h2>
 
-  <ol class="mt-4 grid sm:grid-cols-3 gap-3">
-    <li>
-      <a href="#" class="block rounded-2xl border border-white/10 bg-white/5 px-4 py-5
-                        text-sm text-neutral-300 pointer-events-none select-none
-                        blur-sm opacity-60">
-        <div class="font-semibold">1. Проєкт</div>
-        <div class="text-xs opacity-80">скоро</div>
-      </a>
-    </li>
-    <li>
-      <a href="#" class="block rounded-2xl border border-white/10 bg-white/5 px-4 py-5
-                        text-sm text-neutral-300 pointer-events-none select-none
-                        blur-sm opacity-60">
-        <div class="font-semibold">2. Проєкт</div>
-        <div class="text-xs opacity-80">скоро</div>
-      </a>
-    </li>
-    <li>
-      <a href="#" class="block rounded-2xl border border-white/10 bg-white/5 px-4 py-5
-                        text-sm text-neutral-300 pointer-events-none select-none
-                        blur-sm opacity-60">
-        <div class="font-semibold">3. Проєкт</div>
-        <div class="text-xs opacity-80">скоро</div>
-      </a>
-    </li>
-  </ol>
+      <ol class="mt-4 grid sm:grid-cols-3 gap-3">
+        <li>
+          <a href="#" class="block rounded-2xl border border-white/10 bg-white/5 px-4 py-5
+                            text-sm text-neutral-300 pointer-events-none select-none
+                            blur-sm opacity-60">
+            <div class="font-semibold">1. Проєкт</div>
+            <div class="text-xs opacity-80">скоро</div>
+          </a>
+        </li>
+        <li>
+          <a href="#" class="block rounded-2xl border border-white/10 bg-white/5 px-4 py-5
+                            text-sm text-neutral-300 pointer-events-none select-none
+                            blur-sm opacity-60">
+            <div class="font-semibold">2. Проєкт</div>
+            <div class="text-xs opacity-80">скоро</div>
+          </a>
+        </li>
+        <li>
+          <a href="#" class="block rounded-2xl border border-white/10 bg-white/5 px-4 py-5
+                            text-sm text-neutral-300 pointer-events-none select-none
+                            blur-sm opacity-60">
+            <div class="font-semibold">3. Проєкт</div>
+            <div class="text-xs opacity-80">скоро</div>
+          </a>
+        </li>
+      </ol>
 
-  <p class="mt-3 text-xs text-neutral-400">
-    Тут з’являться посилання на наші нові продукти одразу після релізу.
-  </p>
-</section>
+      <p class="mt-3 text-xs text-neutral-400">
+        Тут з’являться посилання на наші нові продукти одразу після релізу.
+      </p>
+    </section>
 
     <!-- ===== 4) Живий фід покупок ===== -->
     <section class="glass rounded-3xl p-6 lg:p-8 shadow-soft">
