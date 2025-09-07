@@ -10,6 +10,9 @@ const API_BASE =
   (CONFIG && CONFIG.API_BASE != null) ? CONFIG.API_BASE :
   (IS_LOCAL ? "http://127.0.0.1:8787" : "");
 
+/* опційне вимкнення my-stats, щоб не спамити 404 */
+const DISABLE_MY_STATS = !!(window.CONFIG_OVERRIDE && window.CONFIG_OVERRIDE.DISABLE_MY_STATS);
+
 /* ===================== helpers ===================== */
 
 // універсальні форматери — не покладаємось на сигнатуру utils.fmt
@@ -148,6 +151,7 @@ const MY_STATS_ENDPOINT =
 
 let _myStatsTimer = null;
 async function fetchMyStats(addrB64) {
+  if (DISABLE_MY_STATS) return null;
   if (!addrB64 || !MY_STATS_ENDPOINT) return null;
   try {
     const url = `${MY_STATS_ENDPOINT}?wallet=${encodeURIComponent(addrB64)}&t=${Date.now()}`;
@@ -175,6 +179,7 @@ async function refreshMyStats(addrB64) {
 }
 function startMyStatsPolling(addrB64) {
   clearInterval(_myStatsTimer);
+  if (DISABLE_MY_STATS) return;
   if (!addrB64) return;
   refreshMyStats(addrB64);
   _myStatsTimer = setInterval(() => refreshMyStats(addrB64), 20000);
@@ -292,7 +297,7 @@ export function refreshButtons() {
   // Інакше працюємо по USD (старий режим)
   const usd = Number(usdEl?.value || 0);
   const ok = !!agree?.checked && usd >= (CONFIG.MIN_BUY_USDT || 1);
-  if (ui.btnBuy) ui.btnBuy.disabled = !ок;
+  if (ui.btnBuy) ui.btnBuy.disabled = !ok;   // <— FIX: латинське ok
   if (ui.btnClaim) ui.btnClaim.disabled = true;
 }
 

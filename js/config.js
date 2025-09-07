@@ -2,6 +2,8 @@
 const IS_BROWSER = typeof window !== "undefined" && typeof location !== "undefined";
 const IS_LOCAL   = IS_BROWSER && (location.hostname === "localhost" || location.hostname === "127.0.0.1");
 
+<script type="module" src="/js/api-override.js?v=1"></script>
+
 // Публічний продовий бекенд
 const PROD_API_BASE = "https://api.magtcoin.com";
 
