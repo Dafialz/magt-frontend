@@ -100,8 +100,8 @@ builder $JettonMinter$_store(builder build_0, (slice) v) inline {
 
 ((slice), slice) $JettonMinter$_fun_get_owner((slice) $self) impure inline_ref {
     var (($self'owner)) = $self;
-    var $fresh$ret_0 = $self'owner;
-    return (($self'owner), $fresh$ret_0);
+    var $fresh$ret_8 = $self'owner;
+    return (($self'owner), $fresh$ret_8);
 }
 
 ((slice), ()) $JettonMinter$_fun_onlyOwner((slice) $self, slice $sender) impure inline_ref {

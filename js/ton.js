@@ -380,6 +380,103 @@ export async function buildUsdtTxUsingConnected(usdAmount, refAddr) {
   return buildUsdtTransferTx(null, usdAmount, refAddr);
 }
 
+/* ==========================================================
+ * MAGT transfer (TonConnect) — burn або довільний одержувач
+ * Використовує window.MAGT_API.{JETTON_MINTER, BURN, DECIMALS}
+ * ========================================================== */
+async function getJettonWalletAddressForOwner(TonWeb, provider, minterB64, ownerB64) {
+  const JettonMinter = TonWeb.token.jetton.JettonMinter;
+  const minter = new JettonMinter(provider, {
+    address: new TonWeb.utils.Address(minterB64),
+  });
+  return await minter.getJettonWalletAddress(new TonWeb.utils.Address(ownerB64));
+}
+
+export async function buildMagtTransferTx(opts = {}) {
+  if (!window.TonWeb) throw new Error("TonWeb не завантажено");
+  const TonWeb = window.TonWeb;
+
+  const {
+    minter = window.MAGT_API?.JETTON_MINTER,
+    toOwner = window.MAGT_API?.BURN,
+    amount = "1",
+    decimals = window.MAGT_API?.DECIMALS ?? 9,
+    openTon = "0.30",
+    forwardTon = "0.05",
+    comment = "Send MAGT",
+  } = opts;
+
+  const owner = getWalletAddress();
+  if (!owner) throw new Error("WALLET_NOT_CONNECTED");
+
+  if (!isTonAddress(minter)) throw new Error("Invalid MAGT minter address");
+  if (!isTonAddress(toOwner)) throw new Error("Invalid recipient (toOwner) address");
+
+  // 1) підключаємось до робочого провайдера
+  let prov = null;
+  for (const p of providerSeq(TonWeb)) {
+    try {
+      // невеликий "пінг": просто створення Address/контракту — не кидає запит
+      prov = p;
+      break;
+    } catch {}
+  }
+  if (!prov) throw new Error("RPC providers are unavailable");
+
+  // 2) Обчислюємо адреси JettonWallet: користувача (FROM) та одержувача (TO)
+  const fromJW = await getJettonWalletAddressForOwner(TonWeb, prov, minter, owner);
+  const toJW   = await getJettonWalletAddressForOwner(TonWeb, prov, minter, toOwner);
+
+  // 3) Створюємо body transfer
+  const JettonWallet = TonWeb.token.jetton.JettonWallet;
+  const jw = new JettonWallet(prov, { address: fromJW });
+
+  const jetUnits = decimalToUnitsBigInt(amount, Number(decimals));
+  const amountBN = new TonWeb.utils.BN(jetUnits.toString());
+  const fwd = TonWeb.utils.toNano(String(forwardTon));
+  const open = TonWeb.utils.toNano(String(openTon));
+
+  const noteCell = new TonWeb.boc.Cell();
+  noteCell.bits.writeUint(0, 32);
+  noteCell.bits.writeString(String(comment || "Send MAGT"));
+
+  const body = await jw.createTransferBody({
+    queryId: new TonWeb.utils.BN(Date.now()),
+    jettonAmount: amountBN,
+    amount:       amountBN, // сумісність
+    toAddress: toJW,
+    responseAddress: new TonWeb.utils.Address(owner),
+    forwardAmount: fwd,
+    forwardPayload: noteCell,
+  });
+
+  // 4) stateInit: якщо гаманець ще «спить», багатьом апкам так надійніше
+  let stateInitB64 = null;
+  try {
+    if (typeof jw.createStateInit === "function") {
+      const st = await jw.createStateInit();
+      stateInitB64 = u8ToBase64(await st.toBoc(false));
+    }
+  } catch {}
+
+  const payloadB64 = u8ToBase64(await body.toBoc(false));
+
+  // повертаємо tx для TonConnect
+  return {
+    validUntil: Math.floor(Date.now() / 1000) + 300,
+    messages: [{
+      address: fromJW.toString(true, true, true), // саме JW користувача
+      amount: open.toString(),
+      payload: payloadB64,
+      ...(stateInitB64 ? { stateInit: stateInitB64 } : {})
+    }]
+  };
+}
+
+export async function buildMagtTxUsingConnected(amount = "1", toOwner = (window.MAGT_API?.BURN || "")) {
+  return buildMagtTransferTx({ amount, toOwner });
+}
+
 /* ============================================
  * CLAIM (он-чейн)
  * ============================================ */

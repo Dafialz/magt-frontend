@@ -113,20 +113,20 @@ builder $JettonWallet$_store(builder build_0, (slice, slice, int) v) inline {
 
 ((slice, slice, int), slice) $JettonWallet$_fun_get_owner((slice, slice, int) $self) impure inline_ref {
     var (($self'owner, $self'minter, $self'balance)) = $self;
-    var $fresh$ret_1 = $self'owner;
-    return (($self'owner, $self'minter, $self'balance), $fresh$ret_1);
+    var $fresh$ret_9 = $self'owner;
+    return (($self'owner, $self'minter, $self'balance), $fresh$ret_9);
 }
 
 ((slice, slice, int), slice) $JettonWallet$_fun_get_minter((slice, slice, int) $self) impure inline_ref {
     var (($self'owner, $self'minter, $self'balance)) = $self;
-    var $fresh$ret_2 = $self'minter;
-    return (($self'owner, $self'minter, $self'balance), $fresh$ret_2);
+    var $fresh$ret_10 = $self'minter;
+    return (($self'owner, $self'minter, $self'balance), $fresh$ret_10);
 }
 
 ((slice, slice, int), int) $JettonWallet$_fun_get_balance((slice, slice, int) $self) impure inline_ref {
     var (($self'owner, $self'minter, $self'balance)) = $self;
-    var $fresh$ret_3 = $self'balance;
-    return (($self'owner, $self'minter, $self'balance), $fresh$ret_3);
+    var $fresh$ret_11 = $self'balance;
+    return (($self'owner, $self'minter, $self'balance), $fresh$ret_11);
 }
 
 ((slice, slice, int), ()) $JettonWallet$_fun_onlyOwner((slice, slice, int) $self, slice $sender) impure inline_ref {
