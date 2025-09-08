@@ -149,22 +149,7 @@ function addrFromUiAccount(ui){
   return b64 || deepFindAddress(ui, 8) || null;
 }
 
-/* ====== БІЛЬШЕ НЕ ЧИТАЄМО ніякі localStorage кеші ====== */
-
 /* =============== монтування кнопки =============== */
-function ensureFallbackContainer() {
-  let el = document.getElementById("tonconnect-fallback");
-  if (!el) {
-    el = document.createElement("div");
-    el.id = "tonconnect-fallback";
-    el.style.position = "fixed";
-    el.style.right = "16px";
-    el.style.bottom = "16px";
-    el.style.zIndex = "9999";
-    document.body.appendChild(el);
-  }
-  return el;
-}
 
 /** Ховаємо всі НЕпотрібні слоти (залишаємо лише кнопку в шапці) */
 function hideExtraSlots() {
@@ -180,28 +165,40 @@ function hideExtraSlots() {
   });
 }
 
-/** Вибираємо ЄДИНИЙ корінь для кнопки — тільки #tonconnect у хедері */
-function pickMountRoot() {
-  hideExtraSlots(); // гарантуємо, що дублікати не з’являться
-  try { refreshUiRefs(); } catch {}
-  const headerRoot = document.getElementById("tonconnect");
-  if (headerRoot instanceof HTMLElement) return headerRoot;
-  // Якщо з якоїсь причини в DOM ще немає #tonconnect — тимчасово рендеримо у fallback
-  return ensureFallbackContainer();
+/** Чекаємо появу ЄДИНОГО кореня — #tonconnect у хедері */
+function waitForHeaderRoot(timeoutMs = 8000) {
+  const start = performance.now();
+  return new Promise((resolve) => {
+    (function tick() {
+      hideExtraSlots();
+      try { refreshUiRefs(); } catch {}
+      const headerRoot = document.getElementById("tonconnect");
+      if (headerRoot instanceof HTMLElement) return resolve(headerRoot);
+      if (performance.now() - start > timeoutMs) return resolve(null);
+      setTimeout(tick, 120);
+    })();
+  });
 }
 
 async function mountPrimaryAt(root) {
   if (primaryUi) return primaryUi;
+  if (!root) return null;
+
   await waitTonLib();
   if (!window.TON_CONNECT_UI) return null;
 
+  // при повторному рендері очищаємо контейнер від усього зайвого
+  try { root.innerHTML = ""; } catch {}
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
+
   const ui = new window.TON_CONNECT_UI.TonConnectUI({
     manifestUrl: `${location.origin}/tonconnect-manifest.json`,
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
+    // критично: НЕ відновлюємо попереднє підключення
     restoreConnection: false
   });
+
   primaryUi = ui;
   window.__tcui = ui;
   root.dataset.tcMounted = "1";
@@ -210,12 +207,18 @@ async function mountPrimaryAt(root) {
 }
 
 export async function mountTonButtons() {
-  const root = pickMountRoot();
-  if (!root) return [];
+  const root = await waitForHeaderRoot();
+  if (!root) { log("no #tonconnect root found; skip mount"); return []; }
   const created = [];
   if (!primaryUi) {
     const ui = await mountPrimaryAt(root).catch(()=>null);
     if (ui) created.push(ui);
+  } else {
+    // Якщо вже змонтовано, переконаймося, що кнопка саме в #tonconnect
+    const headerRoot = document.getElementById("tonconnect");
+    if (headerRoot && !headerRoot.dataset.tcMounted) {
+      await mountPrimaryAt(headerRoot).catch(()=>null);
+    }
   }
   return created;
 }
