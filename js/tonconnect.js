@@ -184,6 +184,43 @@ function waitForHeaderRoot(timeoutMs = 8000) {
   });
 }
 
+/** UX-підстраховка: якщо модалка закрилась і підключення немає — знову показуємо QR */
+function attachUxFallback(ui) {
+  if (!ui || ui.__magtUxHooked) return;
+  ui.__magtUxHooked = true;
+
+  let fallbackTimer = null;
+
+  const ensureModalWithHint = () => {
+    try { ui.openModal?.(); } catch {}
+    setTimeout(() => {
+      try {
+        const box = document.querySelector(".tc-modal__body");
+        if (box && !box.querySelector(".tc-hint")) {
+          const hint = document.createElement("div");
+          hint.className = "tc-hint";
+          hint.style.cssText = "margin-top:12px;font-size:12px;opacity:.8;text-align:center;";
+          hint.textContent = "Не бачиш вікна гаманця на комп’ютері? Проскануй QR у Tonkeeper на телефоні або встанови розширення.";
+          box.appendChild(hint);
+        }
+      } catch {}
+    }, 100);
+  };
+
+  try {
+    ui.onModalStateChange?.((s) => log("modal:", s));
+  } catch {}
+
+  // Якщо статус не підключений, і користувач «пішов» з модалки — повертаємо QR
+  ui.__magtScheduleFallback = () => {
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    fallbackTimer = setTimeout(() => {
+      // немає адреси — повертаємо модалку
+      if (!getWalletAddress()) ensureModalWithHint();
+    }, 2500);
+  };
+}
+
 async function mountPrimaryAt(root) {
   if (primaryUi) return primaryUi;
   if (!root) return null;
@@ -195,11 +232,14 @@ async function mountPrimaryAt(root) {
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
 
   const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: `${location.origin}/tonconnect-manifest.json`,
+    // абсолютна адреса маніфеста, щоб уникнути проблем із прев’ю/редіректами
+    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json",
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
     restoreConnection: true
   });
+
+  attachUxFallback(ui);
 
   primaryUi = ui;
   window.__tcui = ui;
@@ -276,6 +316,8 @@ export async function openConnectModal() {
     if (msg.includes("already connected")) return;
     log("openConnectModal error:", e);
   }
+  // якщо користувач клацнув плитку і нічого не відбулося — повернемо QR
+  try { ui.__magtScheduleFallback?.(); } catch {}
 }
 
 export async function initTonConnect({ onConnect, onDisconnect } = {}) {
@@ -288,6 +330,10 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
       ui.__magtHooked = true;
       try {
         ui.onStatusChange?.((wallet) => {
+          // Якщо модалка закрилась і підключення немає, заплануємо повернення QR
+          if (!wallet || !wallet?.account?.address) {
+            try { ui.__magtScheduleFallback?.(); } catch {}
+          }
           // беремо адресу з параметра події
           const fromEvent = addrFromWalletObj(wallet);
           const fallback  = addrFromUiAccount(ui);
