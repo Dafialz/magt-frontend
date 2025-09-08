@@ -1,444 +1,348 @@
-// /js/tonconnect.js
-// Публічне API: initTonConnect({ onConnect, onDisconnect }), mountTonButtons(),
-// getWalletAddress(), getTonConnect(), openConnectModal(), forceDisconnect(), forgetCachedWallet()
+// /js/app.js
+import { CONFIG } from "./config.js";
+import { ui, refreshUiRefs } from "./state.js";
+import {
+  initStaticUI,
+  bindEvents,
+  detectRefInUrl,
+  recalc,
+  refreshButtons,
+  setOwnRefLink,
+  initRefBonusHandlers,
+  toast,
+} from "./ui.js";
+import { initTonConnect, getWalletAddress, getTonConnect, mountTonButtons } from "./tonconnect.js";
+import { onBuyClick } from "./buy.js";
+import { refreshClaimSection, startClaimPolling, stopClaimPolling } from "./claim.js";
+import { api } from "./utils.js";
 
-import { ui as UI, refreshUiRefs } from "./state.js";
+/* ================= Balance fallback (якщо claim.js недоступний) ================= */
+const $ = (s) => document.querySelector(s);
 
-let primaryUi = null;
-let readyPromise = null;
-let cachedBase64Addr = null;
-let connectedOnce = false;
+function renderBalance(amount) {
+  const claimInfo = $("#claim-info");
+  const badge = $("#claim-badge");
+  const wrap = $("#claim-wrap");
+  if (!claimInfo || !badge || !wrap) return;
 
-// додаткові інстанси для мобільних контейнерів
-let mobileInlineUi = null;
-let mobileDrawerUi = null;
+  const n = Number(amount || 0);
+  badge.textContent = Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n);
 
-const DBG = (() => {
-  try { return !!JSON.parse(localStorage.getItem("magt_debug") || "false"); } catch { return false; }
-})();
-const log = (...a) => { if (DBG) { try { console.log("[TC]", ...a); } catch {} } };
-
-/* =============== helpers =============== */
-function isB64(a) {
-  if (typeof a !== "string") return false;
-  const s = a.trim();
-  return !!s && (s.startsWith("EQ") || s.startsWith("UQ")) && /^[A-Za-z0-9_-]{48,68}$/.test(s);
+  const has = n > 0;
+  claimInfo.classList.toggle("hidden", !has);
+  wrap.classList.toggle("hidden", !has);
 }
-function isHexLike(a) {
-  if (typeof a !== "string") return false;
-  const s = a.trim();
-  return !!s && (s.startsWith("0:") || /^[0-9a-fA-F:]{48,90}$/.test(s));
-}
-function normalizeToBase64(addr) {
-  const a = (addr || "").trim();
-  if (!a) return null;
-  if (isB64(a)) return a;
+
+async function fetchBalance(addr) {
+  if (!addr) return;
   try {
-    if (window.TonWeb?.utils?.Address) {
-      const A = window.TonWeb.utils.Address;
-      return new A(a).toString(true, true, true);
-    }
-  } catch {}
-  return null;
-}
-async function ensureBase64(addr) {
-  const a = (addr || "").trim();
-  if (!a) return null;
-  if (isB64(a)) return a;
-
-  let b64 = normalizeToBase64(a);
-  if (b64) return b64;
-
-  if (isHexLike(a)) {
-    try {
-      if (!window.TonWeb) {
-        await import("https://unpkg.com/tonweb@0.0.66/dist/tonweb.min.js");
-      }
-      const A = window.TonWeb.utils.Address;
-      b64 = new A(a).toString(true, true, true);
-      if (isB64(b64)) return b64;
-    } catch (e) { log("ensureBase64 convert failed:", e); }
-  }
-  return null;
-}
-function shortAddr(a) { return a ? (a.slice(0,4) + "…" + a.slice(-4)) : ""; }
-
-async function waitTonLib(timeoutMs = 15000) {
-  const start = performance.now();
-  return new Promise((resolve, reject) => {
-    (function tick() {
-      if (window.TON_CONNECT_UI) return resolve();
-      if (performance.now() - start > timeoutMs) return reject(new Error("TON_CONNECT_UI not loaded"));
-      setTimeout(tick, 60);
-    })();
-  });
-}
-
-function dispatchAddress(addr) {
-  try {
-    window.dispatchEvent(new CustomEvent("magt:address", { detail: { address: addr || null } }));
-    log("dispatch magt:address =", addr);
+    const url = api(`/api/balance?wallet=${encodeURIComponent(addr)}`);
+    if (!url) return;
+    const res = await fetch(url, { cache: "no-store" });
+    const data = await res.json().catch(() => null);
+    if (!data || data.ok === false) return;
+    const amount = data.magt ?? data.claimable ?? 0;
+    renderBalance(amount);
   } catch {}
 }
 
-/** Головний синк адреси. Зберігаємо тільки EQ/UQ. */
-async function syncAddress(addr, { onConnect, onDisconnect } = {}, source = "unknown") {
-  let base64 = normalizeToBase64(addr);
-  if (!base64 && isHexLike(addr)) {
-    base64 = await ensureBase64(addr);
-    if (base64) return syncAddress(base64, { onConnect, onDisconnect }, source + "/hex->b64");
-  }
-  if (!base64 && isB64(addr)) base64 = addr?.trim() || null;
-
-  if (base64) {
-    const changed = cachedBase64Addr !== base64;
-    cachedBase64Addr = base64;
-    try { window.__magtAddr = base64; } catch {}
-    if (changed) {
-      log("address set from:", source, base64, "UI:", shortAddr(base64));
-      dispatchAddress(base64);
-      try { (await import("./ui.js")).setOwnRefLink(base64); } catch {}
-    }
-    if (!connectedOnce && typeof onConnect === "function") {
-      connectedOnce = true;
-      try { onConnect(base64); } catch {}
-    }
-  } else {
-    if (cachedBase64Addr !== null) {
-      cachedBase64Addr = null;
-      try { window.__magtAddr = null; } catch {}
-      log("address cleared");
-      dispatchAddress(null);
-      try { (await import("./ui.js")).setOwnRefLink(""); } catch {}
-    }
-    if (connectedOnce && typeof onDisconnect === "function") {
-      connectedOnce = false;
-      try { onDisconnect(); } catch {}
-    }
-  }
+let _pollTimer = null;
+function startBalancePolling(addr) {
+  stopBalancePolling();
+  renderBalance(0);
+  fetchBalance(addr);
+  _pollTimer = setInterval(() => fetchBalance(addr), Number(CONFIG.CLAIM_POLL_INTERVAL_MS || 15000));
+}
+function stopBalancePolling() {
+  if (_pollTimer) clearInterval(_pollTimer), (_pollTimer = null);
+  renderBalance(0);
 }
 
-function deepFindAddress(obj, maxDepth = 8) {
+/* ================== Referral bootstrap ================== */
+function refreshReferralUi() {
   try {
-    const seen = new WeakSet();
-    const st = [{ o: obj, d: 0 } ];
-    while (st.length) {
-      const { o, d } = st.pop();
-      if (!o || typeof o !== "object") continue;
-      if (seen.has(o)) continue;
-      seen.add(o);
-      const raw = o?.account?.address ?? o?.wallet?.account?.address ?? o?.address;
-      if (raw) {
-        const b64 = normalizeToBase64(raw) || (isHexLike(raw) ? null : raw);
-        if (b64) return b64;
-      }
-      if (d >= maxDepth) continue;
-      for (const k of Object.keys(o)) {
-        const v = o[k];
-        if (v && typeof v === "object") st.push({ o: v, d: d + 1 });
-      }
-    }
+    detectRefInUrl();
+    initRefBonusHandlers();
+    recalc();
   } catch {}
-  return null;
 }
-function addrFromUiAccount(ui){
-  const raw =
-    ui?.account?.address ||
-    ui?.state?.account?.address ||
-    ui?.connector?.wallet?.account?.address ||
-    ui?.tonConnect?.account?.address ||
-    ui?._wallet?.account?.address ||
+
+/* ===== РЕЗЕРВНИЙ ПОЛІНГ адреси з TonConnectUI (якщо події не прийшли) ===== */
+let _addrPoll = null;
+function tryExtractAddrFromUi(uiObj) {
+  const u = uiObj || getTonConnect?.() || window.__tcui || null;
+  if (!u) return null;
+  const cand =
+    u?.account?.address ||
+    u?.wallet?.account?.address ||
+    u?.state?.account?.address ||
+    u?.state?.wallet?.account?.address ||
+    u?.connector?.wallet?.account?.address ||
+    u?.connector?.account?.address ||
+    u?.tonConnect?.account?.address ||
+    u?._wallet?.account?.address ||
     null;
-  const b64 = normalizeToBase64(raw);
-  return b64 || deepFindAddress(ui, 8) || null;
+  return typeof cand === "string" && cand.trim() ? cand.trim() : null;
 }
-function addrFromWalletObj(w){
-  const raw = w?.account?.address || null;
-  return normalizeToBase64(raw) || null;
-}
-
-/* =============== монтування кнопок =============== */
-
-/** Раніше тут ховали ще мобільні контейнери — тепер залишаємо їх видимими */
-function hideExtraSlots() {
-  const ids = ["tonconnect-hero"]; // тільки hero-плейсхолдер, мобільні НЕ чіпаємо
-  ids.forEach((id) => {
-    const n = document.getElementById(id);
-    if (n) {
-      n.innerHTML = "";
-      n.style.display = "none";
-      n.setAttribute("aria-hidden", "true");
-      n.dataset.tcHidden = "1";
+function startAddrPolling() {
+  if (_addrPoll) return;
+  let ticks = 0;
+  _addrPoll = setInterval(() => {
+    ticks++;
+    const a = getWalletAddress?.() || tryExtractAddrFromUi();
+    if (a) {
+      try { setOwnRefLink(a); } catch {}
+      stopAddrPolling();
     }
-  });
+    if (ticks > 50) stopAddrPolling(); // ~60 сек максимум
+  }, 1200);
+}
+function stopAddrPolling() {
+  if (_addrPoll) clearInterval(_addrPoll), (_addrPoll = null);
 }
 
-/** Чекаємо появу кореня в хедері */
-function waitForHeaderRoot(timeoutMs = 8000) {
-  const start = performance.now();
-  return new Promise((resolve) => {
-    (function tick() {
-      hideExtraSlots();
-      try { refreshUiRefs(); } catch {}
-      const headerRoot = document.getElementById("tonconnect");
-      if (headerRoot instanceof HTMLElement) return resolve(headerRoot);
-      if (performance.now() - start > timeoutMs) return resolve(null);
-      setTimeout(tick, 120);
-    })();
-  });
-}
-
-/** UX-підстраховка: якщо модалка закрилась і підключення немає — знову показуємо QR */
-function attachUxFallback(ui) {
-  if (!ui || ui.__magtUxHooked) return;
-  ui.__magtUxHooked = true;
-
-  let fallbackTimer = null;
-
-  const ensureModalWithHint = () => {
-    try { ui.openModal?.(); } catch {}
+/* ===== Невеликий гарантований ретрай після ініціалізації ===== */
+function scheduleRefLinkRetries() {
+  const attempts = [1000, 2000, 4000];
+  attempts.forEach((ms) => {
     setTimeout(() => {
-      try {
-        const box = document.querySelector(".tc-modal__body");
-        if (box && !box.querySelector(".tc-hint")) {
-          const hint = document.createElement("div");
-          hint.className = "tc-hint";
-          hint.style.cssText = "margin-top:12px;font-size:12px;opacity:.8;text-align:center;";
-          hint.textContent = "Не бачиш вікна гаманця? Проскануй QR у Tonkeeper/MyTonWallet або встанови розширення.";
-          box.appendChild(hint);
-        }
-      } catch {}
-    }, 100);
-  };
-
-  try {
-    ui.onModalStateChange?.((s) => log("modal:", s));
-  } catch {}
-
-  ui.__magtScheduleFallback = () => {
-    if (fallbackTimer) clearTimeout(fallbackTimer);
-    fallbackTimer = setTimeout(() => {
-      if (!getWalletAddress()) ensureModalWithHint();
-    }, 2500);
-  };
+      const a = getWalletAddress?.() || tryExtractAddrFromUi();
+      if (a) { try { setOwnRefLink(a); } catch {} }
+    }, ms);
+  });
 }
 
-const RETURN_URL = `${location.origin}/`;
-const TWA_RETURN_URL = `${location.origin}/`; // якщо з’явиться TWA-бот — заміниш
+/* ===== Локальний страховий байндинг інпутів → recalc() ===== */
+function wireCalcInput() {
+  const tonEl = document.getElementById("tonIn");
+  if (tonEl && !tonEl.__calcBound) {
+    ["input","change"].forEach(ev => tonEl.addEventListener(ev, () => { try { recalc(); } catch {} }));
+    tonEl.__calcBound = true;
+  }
+  const usdEl = document.getElementById("usdtIn"); // fallback для старого шаблону
+  if (usdEl && !usdEl.__calcBound) {
+    ["input","change"].forEach(ev => usdEl.addEventListener(ev, () => { try { recalc(); } catch {} }));
+    usdEl.__calcBound = true;
+  }
+}
 
-async function mountPrimaryAt(root) {
-  if (primaryUi) return primaryUi;
-  if (!root) return null;
+/* ===== Mobile nav (burger) ===== */
+function initMobileNav() {
+  const nav = document.querySelector('nav[data-nav]');
+  if (!nav || nav.__navBound) return;
 
-  await waitTonLib();
-  if (!window.TON_CONNECT_UI) return null;
+  const btn = nav.querySelector('label[for="nav-burger"], #nav-btn');
+  const panel = nav.querySelector('#mobile-panel');
+  const checkbox = nav.querySelector('#nav-burger');
 
-  try { root.innerHTML = ""; } catch {}
-  const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
+  if (!btn || !panel) return;
 
-  const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json",
-    buttonRootId: id,
-    uiPreferences: { theme: "DARK", borderRadius: "m" },
-    restoreConnection: true,
-    actionsConfiguration: { returnUrl: RETURN_URL, twaReturnUrl: TWA_RETURN_URL }
+  const setAria = () => btn.setAttribute('aria-expanded', panel.classList.contains('hidden') ? 'false' : 'true');
+  const open  = () => { panel.classList.remove('hidden'); if (checkbox) checkbox.checked = true;  setAria(); };
+  const close = () => { panel.classList.add('hidden');   if (checkbox) checkbox.checked = false; setAria(); };
+
+  const onBtn = (e) => { e.preventDefault(); panel.classList.contains('hidden') ? open() : close(); };
+  btn.addEventListener('click', onBtn);
+  btn.addEventListener('touchstart', onBtn, { passive:false });
+
+  // закриття при кліку по пункту меню
+  panel.addEventListener('click', (e) => {
+    if (e.target.closest('a,button,summary')) close();
   });
 
-  attachUxFallback(ui);
+  // ігноруємо кліки в TonConnect/діалогах
+  const isInsideTonConnectOrDialog = (t) => {
+    return !!(
+      t.closest('.tc-modal, .tc-root, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"], [role="dialog"], dialog, .modal, .overlay')
+    );
+  };
 
-  primaryUi = ui;
-  window.__tcui = ui;
-  root.dataset.tcMounted = "1";
-  log("TonConnectUI mounted at #" + id);
-  return ui;
-}
-
-/** Монтуємо другі інстанси кнопки в мобільні слоти (той самий стейт, інший контейнер) */
-async function mountSecondaryAt(rootOrId, existingRefName = "mobile") {
-  await waitTonLib();
-  if (!window.TON_CONNECT_UI) return null;
-
-  const root = typeof rootOrId === "string" ? document.getElementById(rootOrId) : rootOrId;
-  if (!root || !(root instanceof HTMLElement)) return null;
-
-  // не перезатираємо, якщо вже є TonConnectUI в цьому контейнері
-  if (root.dataset.tcMounted === "1") return null;
-
-  const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
-  try { root.innerHTML = ""; } catch {}
-
-  const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json",
-    buttonRootId: id,
-    uiPreferences: { theme: "DARK", borderRadius: "m" },
-    restoreConnection: true,
-    actionsConfiguration: { returnUrl: RETURN_URL, twaReturnUrl: TWA_RETURN_URL }
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (nav.contains(t)) return;
+    if (isInsideTonConnectOrDialog(t)) return;
+    close();
   });
 
-  root.dataset.tcMounted = "1";
-  log(`TonConnectUI mounted (secondary:${existingRefName}) at #${id}`);
-  return ui;
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  window.addEventListener('hashchange', () => close());
+  window.addEventListener('resize', () => { if (window.innerWidth >= 768) close(); });
+
+  setAria();
+  nav.__navBound = true;
 }
 
-export async function mountTonButtons() {
-  const root = await waitForHeaderRoot();
-  if (!root) { log("no #tonconnect root found; skip mount"); return []; }
+/* ================= Handlers ================= */
+function afterConnected(base64Addr) {
+  try { setOwnRefLink(base64Addr); } catch {}
+  refreshReferralUi();
+  refreshButtons();
 
-  const created = [];
-
-  // ГОЛОВНА кнопка в хедері
-  if (!primaryUi) {
-    const ui = await mountPrimaryAt(root).catch(() => null);
-    if (ui) created.push(ui);
-  } else {
-    const headerRoot = document.getElementById("tonconnect");
-    if (headerRoot && !headerRoot.dataset.tcMounted) {
-      const ui = await mountPrimaryAt(headerRoot).catch(() => null);
-      if (ui) created.push(ui);
-    }
-  }
-
-  // МОБІЛЬНА інлайн-кнопка (біля бургера)
-  const inlineRoot = document.getElementById("tonconnect-mobile-inline");
-  if (inlineRoot && !inlineRoot.dataset.tcMounted) {
-    mobileInlineUi = await mountSecondaryAt(inlineRoot, "inline").catch(() => null);
-    if (mobileInlineUi) created.push(mobileInlineUi);
-  }
-
-  // МОБІЛЬНА кнопка всередині дроуера
-  const drawerRoot = document.getElementById("tonconnect-mobile");
-  if (drawerRoot && !drawerRoot.dataset.tcMounted) {
-    mobileDrawerUi = await mountSecondaryAt(drawerRoot, "drawer").catch(() => null);
-    if (mobileDrawerUi) created.push(mobileDrawerUi);
-  }
-
-  return created;
-}
-
-/* =============== public API =============== */
-export function getWalletAddress() {
-  return isB64(cachedBase64Addr) ? cachedBase64Addr : (cachedBase64Addr || null);
-}
-export function getTonConnect() {
-  return primaryUi || window.__tcui || null;
-}
-
-function _isConnected(ui) {
-  if (!ui) return false;
-  return Boolean(
-    ui?.account?.address ||
-    ui?.state?.account?.address ||
-    ui?.wallet?.account?.address ||
-    ui?.connector?.wallet?.account?.address ||
-    ui?.tonConnect?.account?.address ||
-    ui?._wallet?.account?.address
-  );
-}
-
-export async function forceDisconnect() {
-  const ui = (primaryUi || window.__tcui);
-  try { await ui?.disconnect?.(); } catch {}
+  let usedClaimModule = false;
   try {
-    const prefixes = ["tonconnect", "ton-connect", "tonconnect-ui"];
-    for (const p of prefixes) {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (k && k.toLowerCase().includes(p)) localStorage.removeItem(k);
-      }
-      for (let i = sessionStorage.length - 1; i >= 0; i--) {
-        const k = sessionStorage.key(i);
-        if (k && k.toLowerCase().includes(p)) sessionStorage.removeItem(k);
-      }
+    if (typeof refreshClaimSection === "function") {
+      refreshClaimSection().catch(() => {});
+      usedClaimModule = true;
+    }
+    if (typeof startClaimPolling === "function") {
+      startClaimPolling();
+      usedClaimModule = true;
     }
   } catch {}
-  await syncAddress(null, {}, "forceDisconnect");
+  if (!usedClaimModule) startBalancePolling(base64Addr);
 }
 
-export async function forgetCachedWallet() {
-  await forceDisconnect();
+function afterDisconnected() {
+  ui.refYourLink?.classList.add("hidden");
+  refreshButtons();
+  let usedClaimModule = false;
+  try {
+    if (typeof stopClaimPolling === "function") {
+      stopClaimPolling();
+      usedClaimModule = true;
+    }
+  } catch {}
+  if (!usedClaimModule) stopBalancePolling();
 }
 
-export async function openConnectModal() {
-  await mountTonButtons().catch(() => {});
-  const ui = (primaryUi || window.__tcui);
-  if (!ui) return;
-  try { await ui.openModal?.(); } catch (e) {
-    const msg = String(e?.message || e || "").toLowerCase();
-    if (msg.includes("already connected")) return;
-    log("openConnectModal error:", e);
+/* ===== антидубль прив’язки подій після інʼєкції partials ===== */
+const getUserUsdtBalance = async () => 0;
+
+function bindRuntimeEventsOnce() {
+  if (window.__magtEventsBound) return;
+  bindEvents({
+    onBuyClick,
+    onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick?.()),
+    getUserUsdtBalance,
+  });
+  wireCalcInput();
+  window.__magtEventsBound = true;
+}
+
+/* ================= Re-init after partials ================= */
+async function reinitAfterPartials() {
+  try {
+    refreshUiRefs();
+    initStaticUI();
+
+    await mountTonButtons().catch(()=>{});
+    window.__magtEventsBound = false;
+    bindRuntimeEventsOnce();
+
+    initMobileNav();
+
+    wireCalcInput();
+    refreshReferralUi();
+    recalc();
+    refreshButtons();
+
+    const a = getWalletAddress?.() || tryExtractAddrFromUi();
+    if (a) setOwnRefLink(a);
+    else startAddrPolling();
+  } catch (e) {
+    console.warn("[reinitAfterPartials] fail:", e);
   }
-  try { ui.__magtScheduleFallback?.(); } catch {}
+}
+window.addEventListener("partials:loaded", reinitAfterPartials);
+window.addEventListener("partials:main-ready", reinitAfterPartials);
+
+window.addEventListener("popstate", () => {
+  refreshReferralUi();
+  recalc();
+});
+
+/* ======= Головний хук: глобальна подія з tonconnect.js ======= */
+if (!window.__magtAddrHooked) {
+  window.addEventListener("magt:address", (ev) => {
+    const a = ev?.detail?.address || null;
+    if (a && typeof a === "string") {
+      try { setOwnRefLink(a); } catch {}
+      const usedClaim = typeof startClaimPolling === "function";
+      if (!usedClaim) fetchBalance(a);
+      stopAddrPolling();
+    } else {
+      afterDisconnected();
+      startAddrPolling();
+    }
+  });
+  window.__magtAddrHooked = true;
 }
 
-export async function initTonConnect({ onConnect, onDisconnect } = {}) {
-  if (readyPromise) return readyPromise;
-  readyPromise = (async () => {
-    await mountTonButtons().catch(() => {});
+/* ===== оновлюємо баланс після покупки + тост із деталями ===== */
+window.addEventListener("magt:purchase", (ev) => {
+  const a = getWalletAddress?.() || tryExtractAddrFromUi();
+  if (a) {
+    fetchBalance(a);
+    try { refreshClaimSection?.(); } catch {}
+  }
 
-    async function bindOn(ui) {
-      if (!ui || ui.__magtHooked) return;
-      ui.__magtHooked = true;
-      try {
-        ui.onStatusChange?.((wallet) => {
-          if (!wallet || !wallet?.account?.address) {
-            try { ui.__magtScheduleFallback?.(); } catch {}
-          }
-          const fromEvent = addrFromWalletObj(wallet);
-          const fallback  = addrFromUiAccount(ui);
-          const raw = fromEvent || fallback || null;
-          log("statusChange:", wallet, "addr:", raw);
-          syncAddress(raw, { onConnect, onDisconnect }, "statusChange");
-        });
-        log("subscribed to onStatusChange");
-      } catch (e) { log("onStatusChange subscribe error:", e); }
+  try {
+    const level = ev?.detail?.level ?? (ui.level?.textContent || "—");
+    const tokens = Number(ev?.detail?.tokens ?? 0);
+
+    const tonAmount  = Number(ev?.detail?.ton ?? 0);
+    const priceTon   = Number(ev?.detail?.priceTon ?? window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
+
+    if (tokens > 0 && priceTon > 0 && tonAmount >= 0) {
+      toast(`Купівля: ${Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(tokens)} MAGT по ${priceTon.toFixed(6)} TON (рівень ${level})`);
+      return;
     }
 
-    if (primaryUi) await bindOn(primaryUi);
+    const pUsd = Number((ev?.detail?.price) ?? CONFIG.PRICE_USD);
+    const usd = Number((ev?.detail?.usd) ?? (ui.usdtIn?.value || 0));
+    const tokensUsd = pUsd > 0 ? usd / pUsd : 0;
+    if (tokensUsd > 0 && isFinite(tokensUsd) && pUsd > 0) {
+      toast(`Купівля: ${Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(tokensUsd)} MAGT по $${pUsd.toFixed(6)} (рівень ${level})`);
+    }
+  } catch {}
+});
 
+/* ================= Boot ================= */
+async function bootOnce() {
+  refreshUiRefs();
+  initStaticUI();
+
+  bindRuntimeEventsOnce();
+  wireCalcInput();
+
+  initMobileNav();
+
+  refreshReferralUi();
+  recalc();
+  refreshButtons();
+
+  await initTonConnect({
+    onConnect: (addr) => afterConnected(addr),
+    onDisconnect: () => afterDisconnected(),
+  });
+
+  const a = getWalletAddress?.() || tryExtractAddrFromUi();
+  if (a) {
+    try { setOwnRefLink(a); } catch {}
+    let usedClaim = false;
     try {
-      const w = await primaryUi?.getWallet?.();
-      const addr = addrFromWalletObj(w) || addrFromUiAccount(primaryUi);
-      await syncAddress(addr || null, { onConnect, onDisconnect }, "getWallet/immediate");
-    } catch {
-      await syncAddress(null, { onConnect, onDisconnect }, "no-addr-initial");
-    }
+      if (typeof startClaimPolling === "function") { startClaimPolling(); usedClaim = true; }
+      if (typeof refreshClaimSection === "function") { refreshClaimSection(); usedClaim = true; }
+    } catch {}
+    if (!usedClaim) startBalancePolling(a);
+  } else {
+    startAddrPolling();
+  }
 
-    if (primaryUi && !primaryUi.__magtPoll) {
-      primaryUi.__magtPoll = setInterval(async () => {
-        try {
-          const w = await primaryUi.getWallet?.();
-        const fromEvent = addrFromWalletObj(w);
-          const fromUi = fromEvent || addrFromUiAccount(primaryUi);
-          if (fromUi && fromUi !== cachedBase64Addr) {
-            syncAddress(fromUi, { onConnect, onDisconnect }, "ui.account/poll");
-          }
-        } catch {}
-      }, 1200);
-    }
-
-    if (cachedBase64Addr) dispatchAddress(cachedBase64Addr);
-    return primaryUi || null;
-  })();
-  return readyPromise;
+  scheduleRefLinkRetries();
 }
 
-/* =============== авто-ініт =============== */
-function autoInit() { initTonConnect().catch((e) => log("init failed:", e)); }
-function autoMount(){ mountTonButtons().catch((e) => log("mount failed:", e)); }
-
+/* ================= Autostart ================= */
 if (document.readyState === "loading") {
-  window.addEventListener("DOMContentLoaded", () => { autoMount(); autoInit(); });
+  window.addEventListener("DOMContentLoaded", () => {
+    bootOnce().catch((e) => console.warn("[boot] failed:", e));
+  });
 } else {
-  autoMount(); autoInit();
+  bootOnce().catch((e) => console.warn("[boot] failed:", e));
 }
 
-/* =============== debug helpers =============== */
-try { window.getWalletAddress = getWalletAddress; } catch {}
-try { window.getTonConnect   = getTonConnect;   } catch {}
-try { window.forceDisconnect = forceDisconnect; } catch {}
-try { window.forgetCachedWallet = forgetCachedWallet; } catch {}
-try { window.magtSetAddr = (addr) => { dispatchAddress(addr || null); }; } catch {}
-setTimeout(() => {
-  try { if (cachedBase64Addr) dispatchAddress(cachedBase64Addr); } catch {}
-}, 0);
-try { window.debugTC = () => ({ ui: getTonConnect(), addr: getTonConnect()?.account?.address || null, cached: getWalletAddress() }); } catch {}
+/* ================= Debug ================= */
+window.magt = Object.assign(window.magt || {}, {
+  buyNow: onBuyClick,
+});
+try { if (!window.recalc) window.recalc = recalc; } catch {}
