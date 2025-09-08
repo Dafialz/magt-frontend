@@ -105,6 +105,39 @@ export function getPriceTon() {
   return Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
 }
 
+/* ========= поточний рівень/ціна з CONFIG.LEVELS (fallback) ========= */
+function tierInfoFromSold(soldRaw) {
+  const tiers = Array.isArray(CONFIG.LEVELS) ? CONFIG.LEVELS : [];
+  const sold = Math.max(0, Number(soldRaw || 0));
+
+  // дефолт
+  let level = 1;
+  let price = Number(CONFIG.PRICE_TON || 0);
+  let remainingInTier = Math.max(0, Number(CONFIG.TOTAL_SUPPLY || 0) - sold);
+
+  if (!tiers.length) {
+    return { level, price, remainingInTier };
+  }
+
+  let cum = 0;
+  for (let i = 0; i < tiers.length; i++) {
+    const qty = Number(tiers[i]?.qty ?? tiers[i]?.tokens ?? 0);
+    const p   = Number(tiers[i]?.price ?? tiers[i]?.ton ?? tiers[i]?.priceTon ?? 0);
+    const end = cum + (qty > 0 ? qty : 0);
+    if (sold < end) {
+      level = i + 1;
+      if (p > 0) price = p;
+      remainingInTier = Math.max(0, end - sold);
+      return { level, price, remainingInTier };
+    }
+    cum = end;
+  }
+  const last = tiers[tiers.length - 1];
+  const pLast = Number(last?.price ?? last?.ton ?? last?.priceTon ?? 0);
+  if (pLast > 0) price = pLast;
+  return { level: tiers.length, price, remainingInTier: 0 };
+}
+
 /* ============================================
  * Абсолютні ендпоінти
  * ============================================ */
@@ -637,22 +670,29 @@ export async function getPresaleStats() {
           data.raisedUsd ?? data.raised_usd ?? data.raised ?? 0
         ) || 0;
 
-        // якщо бекенд віддає ціну в TON — прокидаємо в глобал
-        const priceTon =
+        // ціна від бекенду (якщо є)
+        let priceTon =
           Number(data.priceTon ?? data.price_ton ?? data.current_price_ton ?? 0) || 0;
-        if (priceTon > 0) {
-          try { window.__CURRENT_PRICE_TON = priceTon; } catch {}
+
+        // fallback: визначаємо ціну/рівень від локальних LEVELS
+        let level = 1;
+        if (!(priceTon > 0)) {
+          const info = tierInfoFromSold(soldMag);
+          priceTon = Number(info.price || 0) || Number(CONFIG.PRICE_TON || 0) || 0;
+          level = Number(info.level || 1);
+        } else {
+          // якщо бек повернув ціну, рівень теж можемо прикинути з LEVELS
+          level = tierInfoFromSold(soldMag).level || 1;
         }
 
-        // так само ціна в USD (на випадок, якщо бек віддає її динамічно)
-        const priceUsd =
-          Number(data.priceUsd ?? data.price_usd ?? data.current_price_usd ?? 0) || 0;
-        if (priceUsd > 0) {
-          try { window.__CURRENT_PRICE_USD = priceUsd; } catch {}
-        }
+        // прокидаємо в глобали (щоб UI одразу бачив)
+        try {
+          if (priceTon > 0) window.__CURRENT_PRICE_TON = priceTon;
+          window.__CURRENT_LEVEL = level;
+        } catch {}
 
         const raisedUsd = raisedRaw + (Number(CONFIG.RAISED_OFFSET_USD) || 0);
-        return { soldMag, totalMag, raisedUsd };
+        return { soldMag, totalMag, raisedUsd, priceTon, level };
       }
     } catch (e) {
       console.warn("stats API fail:", e);
@@ -665,7 +705,18 @@ export async function getPresaleStats() {
   const raisedUsd =
     feed.reduce((s, it) => s + (Number(it.amountUsd ?? it.usd ?? 0) || 0), 0) +
     (Number(CONFIG.RAISED_OFFSET_USD) || 0);
-  return { soldMag, totalMag: CONFIG.TOTAL_SUPPLY, raisedUsd };
+
+  // локальний розрахунок ціни/рівня
+  const info = tierInfoFromSold(soldMag);
+  const priceTon = Number(info.price || 0) || Number(CONFIG.PRICE_TON || 0) || 0;
+  const level = Number(info.level || 1);
+
+  try {
+    if (priceTon > 0) window.__CURRENT_PRICE_TON = priceTon;
+    window.__CURRENT_LEVEL = level;
+  } catch {}
+
+  return { soldMag, totalMag: CONFIG.TOTAL_SUPPLY, raisedUsd, priceTon, level };
 }
 
 export async function getRecentPurchases(limit = 20) {
@@ -738,7 +789,7 @@ export async function pushPurchaseToBackend({ usd, tokens, address, ref }) {
 }
 
 /* ============================================
- * DEMO запис покупок
+ * DEMО запис покупок
  * ============================================ */
 function pushDemoPurchase({ usd, tokens, address, ref }) {
   const feed = demoFeed();
