@@ -117,7 +117,7 @@ async function syncAddress(addr, { onConnect, onDisconnect } = {}, source = "unk
 function deepFindAddress(obj, maxDepth = 8) {
   try {
     const seen = new WeakSet();
-    const st = [{ o: obj, d: 0 }];
+    const st = [{ o: obj, d: 0 } ];
     while (st.length) {
       const { o, d } = st.pop();
       if (!o || typeof o !== "object") continue;
@@ -195,8 +195,8 @@ async function mountPrimaryAt(root) {
     manifestUrl: `${location.origin}/tonconnect-manifest.json`,
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
-    // критично: НЕ відновлюємо попереднє підключення
-    restoreConnection: false
+    // важливо: не чіпаємо існуючий стан підключення
+    restoreConnection: true
   });
 
   primaryUi = ui;
@@ -271,10 +271,9 @@ export async function openConnectModal() {
   await mountTonButtons().catch(()=>{});
   const ui = (primaryUi || window.__tcui);
   if (!ui) return;
-  // якщо раптом має статус підключення — спершу скинемо, щоб точно не взяв чужий кеш
-  if (_isConnected(ui)) {
-    await forceDisconnect().catch(()=>{});
-  }
+
+  // ❌ Раніше тут був примусовий disconnect при вже встановленому з'єднанні.
+  //    Прибрано, щоб не рвати підключення. Просто відкриваємо модалку.
   try { await ui.openModal?.(); } catch (e) {
     const msg = String(e?.message || e || "").toLowerCase();
     if (msg.includes("already connected")) return;
@@ -287,7 +286,7 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
   readyPromise = (async () => {
     await mountTonButtons().catch(()=>{});
 
-    // НІЯКИХ теплих кешів із LS — тільки те, що повертає сам UI
+    // НІЯКИХ теплих кешів самостійно — тільки те, що повертає UI
     async function bindOn(ui) {
       if (!ui || ui.__magtHooked) return;
       ui.__magtHooked = true;
