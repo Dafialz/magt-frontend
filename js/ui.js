@@ -313,7 +313,12 @@ function enforceTonUnitsInHero(priceTonShown) {
   const priceSpan = document.getElementById("ui-price");
   const container = priceSpan?.parentElement || null;
   if (container && priceSpan) {
-    container.innerHTML = `<span id="ui-price">${Number(priceTonShown || 0).toFixed(6)}</span> <span class="opacity-70">TON</span>`;
+    const p = Number(priceTonShown || 0);
+    if (p > 0) {
+      container.innerHTML = `<span id="ui-price">${p.toFixed(6)}</span> <span class="opacity-70">TON</span>`;
+    } else {
+      container.innerHTML = `<span id="ui-price">—</span> <span class="opacity-70">TON</span>`;
+    }
   }
 }
 
@@ -332,16 +337,17 @@ function patchGoalTextStatic() {
 /* ===== підпис під “Отримаєш … MAGT” ===== */
 function updatePriceUnder(){
   const levelTxt = ui.level?.textContent || "1";
-  const priceTon = Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
+  const p = Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
 
   const wrap = document.getElementById("price-under-output");
+  const priceHtml = (p > 0) ? p.toFixed(6) : "—";
   if (wrap) {
-    wrap.innerHTML = `Ціна зараз: <span id="price-now">${(priceTon || 0).toFixed(6)}</span> • Рівень <span id="level-now">${levelTxt}</span>`;
+    wrap.innerHTML = `Ціна зараз: <span id="price-now">${priceHtml}</span> • Рівень <span id="level-now">${levelTxt}</span>`;
     return;
   }
   const pn = document.getElementById("price-now");
   const ln = document.getElementById("level-now");
-  if (pn) pn.textContent = (priceTon || 0).toFixed(6);
+  if (pn) pn.textContent = priceHtml;
   if (ln) ln.textContent = levelTxt;
 }
 
@@ -542,9 +548,11 @@ export function initStaticUI() {
   const y = document.querySelector("#year");
   if (y) y.textContent = new Date().getFullYear();
 
-  // Початкова ціна/одиниці як TON
-  if (ui.price) ui.price.textContent = (Number(CONFIG.PRICE_TON || 0)).toFixed(6);
-  enforceTonUnitsInHero(Number(CONFIG.PRICE_TON || 0));
+  // Початкова ціна/одиниці як TON: не показуємо "0 TON" – ставимо "—", поки не прийдуть стати
+  const priceInit = Number(window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
+  if (ui.price) ui.price.textContent = (priceInit > 0) ? priceInit.toFixed(6) : "—";
+  enforceTonUnitsInHero(priceInit);
+
   if (ui.level) ui.level.textContent = "1";
 
   // Патч статичного тексту "Ціль"
