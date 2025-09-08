@@ -151,9 +151,19 @@ function initMobileNav() {
     if (e.target.closest('a,button,summary')) close();
   });
 
-  // кліки поза панеллю — закривають
+  // ------- ВАЖЛИВО: не закривати при кліках у TonConnect-модалці / діалогах -------
+  const isInsideTonConnectOrDialog = (t) => {
+    return !!(
+      t.closest('.tc-modal, .tc-root, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"], [role="dialog"], dialog, .modal, .overlay')
+    );
+  };
+
+  // кліки поза панеллю — закривають, але ігноруємо TonConnect/діалоги
   document.addEventListener('click', (e) => {
-    if (!nav.contains(e.target)) close();
+    const t = e.target;
+    if (nav.contains(t)) return;
+    if (isInsideTonConnectOrDialog(t)) return;
+    close();
   });
 
   // Esc / зміна якоря / ресайз на десктоп — закрити

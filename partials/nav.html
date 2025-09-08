@@ -112,6 +112,12 @@
       function setAria() { if (label) label.setAttribute('aria-expanded', burger.checked ? 'true' : 'false'); }
       function closeMenu() { if (burger.checked) { burger.checked = false; setAria(); } }
 
+      /* 0) Хелпер: визначаємо кліки всередині TonConnect-модалки/діалогів */
+      function isInsideTonConnectOrDialog(node) {
+        if (!node) return false;
+        return !!node.closest('.tc-modal, .tc-root, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"], [role="dialog"], dialog, .modal, .overlay');
+      }
+
       /* 1) НЕ закриваємо меню коли користувач лише відкриває dropdown мов */
       langSummary?.addEventListener('click', (e) => e.stopPropagation());
       langDetails?.addEventListener('click', (e) => e.stopPropagation());
@@ -122,13 +128,16 @@
         if (t) closeMenu();
       });
 
-      /* 3) Клік поза панеллю (і не по label) */
-      document.addEventListener('click', (e) => {
+      /* 3) Клік (і touch) поза панеллю (і не по label), але ІГНОРУЄМО TonConnect/діалоги */
+      function onDocTap(e) {
         if (!burger.checked) return;
         const t = e.target;
         if (t.closest('#mobile-panel') || t.closest('label[for="nav-burger"]')) return;
+        if (isInsideTonConnectOrDialog(t)) return;
         closeMenu();
-      });
+      }
+      document.addEventListener('click', onDocTap, true);
+      document.addEventListener('touchstart', onDocTap, { passive: true, capture: true });
 
       /* 4) Esc або зміна хеша */
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
