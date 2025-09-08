@@ -1,11 +1,10 @@
 // /js/partials.js
 
 function applyI18nSafe() {
-  // Викликаємо наш i18n одразу після інжекту partials
   try {
     if (window.__i18n) {
       const cur = window.__i18n.lang || "uk";
-      window.__i18n.setLang(cur); // це й зробить translateAll()
+      window.__i18n.setLang(cur);
     }
   } catch (e) {}
 }
@@ -31,16 +30,9 @@ function dispatchAddress(addr) {
 async function emitAddrFromTcui(ui) {
   try {
     if (!ui || typeof ui.getWallet !== "function") return false;
-    const w = await ui.getWallet(); // повертає { account: { address }, ... } або null
-    const addr =
-      w?.account?.address ||
-      ui?.wallet?.account?.address ||
-      ui?.account?.address ||
-      null;
-    if (addr) {
-      dispatchAddress(addr);
-      return true;
-    }
+    const w = await ui.getWallet();
+    const addr = w?.account?.address || ui?.wallet?.account?.address || ui?.account?.address || null;
+    if (addr) { dispatchAddress(addr); return true; }
   } catch {}
   return false;
 }
@@ -49,17 +41,20 @@ async function emitAddrFromTcui(ui) {
  * Монтаж TonConnect-кнопки ПРИБРАНО з partials:
  * сінглтон/кнопки монтує /js/tonconnect.js, щоб уникнути дублювань.
  */
-function mountTonButtonsIfAny(root = document) {
-  // важливо: нічого не робимо, все керує tonconnect.js
+function mountTonButtonsIfAny(_root = document) {
   return;
 }
 
 /* Короткий ретрі-луп (залишено як no-op для сумісності) */
-function ensureAddressReady(ui, windowKey = "__magtAddrRetry") {
-  // більше не потрібен тут; логіка в tonconnect.js
+function ensureAddressReady(_ui, _windowKey = "__magtAddrRetry") {
   return;
 }
 
+/**
+ * Акуратне завантаження partial у контейнер.
+ * Особливий кейс: для slot-nav ми зберігаємо живий вузол #tonconnect,
+ * щоб не переривати роботу TonConnectUI та відкриту модалку.
+ */
 async function loadInto(id, url, { mode = "replace", retries = 1, timeout = 8000 } = {}) {
   const host = document.getElementById(id);
   if (!host) return false;
@@ -76,17 +71,54 @@ async function loadInto(id, url, { mode = "replace", retries = 1, timeout = 8000
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const html = await res.text();
 
+      // === ПІДГОТОВКА ДО ПЕРЕЗАПИСУ ДЛЯ NAV ===
+      let preservedTc = null;
+      let tcWasMounted = false;
+
+      if (id === "slot-nav") {
+        const currentTc = host.querySelector("#tonconnect");
+        if (currentTc) {
+          // якщо кнопка вже змонтована – зберігаємо живий вузол
+          tcWasMounted = !!(currentTc.dataset.tcMounted || window.__tcui);
+          if (tcWasMounted) {
+            preservedTc = currentTc; // реальний DOM-вузол з внутрішнім станом
+          }
+        }
+      }
+
       if (mode === "append") {
         host.insertAdjacentHTML("beforeend", html);
       } else {
         const next = html.trim();
         const prev = host.innerHTML.trim();
+
+        // тільки якщо контент реально змінився
         if (next !== prev) {
-          if (id === "slot-main" && host.dataset.widgetsInjected) {
-            delete host.dataset.widgetsInjected;
+          // тимчасовий «якір», щоб вставити збережений вузол на те саме місце
+          let tcAnchor = null;
+          if (preservedTc) {
+            tcAnchor = document.createComment("TC_PRESERVED_ANCHOR");
+            try { preservedTc.replaceWith(tcAnchor); } catch {}
           }
+
           host.innerHTML = next;
           runScriptsFrom(host);
+
+          // після оновлення DOM намагаємось знайти новий контейнер для #tonconnect
+          if (preservedTc) {
+            // якщо в новому шаблоні теж є #tonconnect — підміняємо його нашим «живим»
+            const newSlot = host.querySelector("#tonconnect");
+            if (newSlot) {
+              try { newSlot.replaceWith(preservedTc); } catch { host.prepend(preservedTc); }
+            } else if (tcAnchor && tcAnchor.parentNode) {
+              try { tcAnchor.replaceWith(preservedTc); } catch { host.prepend(preservedTc); }
+            } else {
+              // крайній випадок: просто додаємо у кінець навігації
+              host.appendChild(preservedTc);
+            }
+            // позначимо, що в контейнері вже змонтовано
+            preservedTc.dataset.tcMounted = "1";
+          }
         }
       }
 
@@ -101,6 +133,7 @@ async function loadInto(id, url, { mode = "replace", retries = 1, timeout = 8000
         window.dispatchEvent(new CustomEvent("partials:nav-ready", { detail: { id, url, attempt } }));
       }
       window.dispatchEvent(new CustomEvent("partials:loaded", { detail: { id, url, attempt } }));
+
       return true;
     } catch (e) {
       clearTimeout(t);
@@ -121,10 +154,9 @@ function ensureWidgetsInjected() {
   const host = document.getElementById("slot-main");
   const tpl  = document.getElementById("widgets-tpl");
   if (!host || !tpl) return;
-  // якщо вже є ключові вузли — просто ре-ініт
+
   if (host.querySelector("#sec-sale") || host.querySelector("#sale-bar")) {
     if (typeof window.__reinitWidgets === "function") window.__reinitWidgets();
-    // повідомимо слухачів (i18n вже чекає на це)
     window.dispatchEvent(new Event("widgets:ready"));
     return;
   }
@@ -135,7 +167,7 @@ function ensureWidgetsInjected() {
 }
 
 let emittedMainReady = false;
-let emittedAllReady = false;
+let emittedAllReady  = false;
 
 async function boot() {
   await loadInto("slot-nav",  "/partials/nav.html",  { retries: 1 });
