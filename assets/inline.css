@@ -27,3 +27,17 @@ html{scroll-behavior:smooth}
 .container-xl{ max-width:72rem; margin-inline:auto; padding-inline:1rem; }
 header, main, footer { position:relative; z-index:10; }
 .glass{background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10)}
+
+/* === Hard fix for page background === */
+html, body {
+  min-height: 100%;
+  background-color: #050510;
+}
+
+body {
+  background-image: url("/assets/bg.png?v=2");
+  background-size: cover;
+  background-position: center top;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
