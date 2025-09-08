@@ -4,7 +4,7 @@
 
 # ========= Headers =========
 
-# Довгий кеш для статичних картинок
+# Довгий кеш для статичних картинок/стилів/скриптів у /assets
 [[headers]]
   for = "/assets/*"
   [headers.values]
@@ -13,21 +13,6 @@
 # Динамічні ресурси без кешу
 [[headers]]
   for = "/js/*"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-
-[[headers]]
-  for = "/styles.css"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-
-[[headers]]
-  for = "/inline.css"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-
-[[headers]]
-  for = "/tw-config.js"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
@@ -59,7 +44,7 @@
     Content-Type = "application/json; charset=utf-8"
     Cache-Control = "public, max-age=300"
 
-# Базові безпекові заголовки
+# Базові безпекові заголовки (глобально)
 [[headers]]
   for = "/*"
   [headers.values]
@@ -68,14 +53,14 @@
     Referrer-Policy              = "strict-origin-when-cross-origin"
     Permissions-Policy           = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), usb=()"
     Strict-Transport-Security    = "max-age=31536000; includeSubDomains; preload"
-    # ВАЖЛИВО для TonConnect: дозволяємо попапи/редиректи гаманців
+    # Для TonConnect: дозволяємо попапи/редиректи гаманців
     Cross-Origin-Opener-Policy   = "same-origin-allow-popups"
-    # І робимо CORP м’якшим, щоб міст TonConnect працював
+    # М’якший CORP, щоб працювали мости TonConnect
     Cross-Origin-Resource-Policy = "cross-origin"
 
 # ========= Redirects =========
 
-# --- DO NOT rewrite static assets ---
+# --- ВИНЯТКИ: не переписуємо статичні директорії ---
 [[redirects]]
   from = "/assets/*"
   to   = "/assets/:splat"
@@ -94,22 +79,6 @@
 [[redirects]]
   from = "/i18n/*"
   to   = "/i18n/:splat"
-  status = 200
-
-# окремі файли в корені
-[[redirects]]
-  from = "/styles.css"
-  to   = "/styles.css"
-  status = 200
-
-[[redirects]]
-  from = "/inline.css"
-  to   = "/inline.css"
-  status = 200
-
-[[redirects]]
-  from = "/tw-config.js"
-  to   = "/tw-config.js"
   status = 200
 
 # SPA rewrite (після винятків!)
