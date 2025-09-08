@@ -17,7 +17,7 @@
   <link rel="icon" type="image/png" href="/assets/favicon.png?v=17">
   <link rel="shortcut icon" href="/assets/favicon.png?v=17" type="image/png">
 
-  <!-- ⚡ Tailwind CDN (швидкий старт; для продакшна краще CLI/PostCSS) -->
+  <!-- ⚡ Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Tailwind конфіг -->
   <script src="/assets/tw-config.js?v=17"></script>
@@ -31,7 +31,6 @@
   <script src="https://cdn.jsdelivr.net/npm/tonweb@0.0.66/dist/tonweb.min.js"></script>
 
   <!-- === API override БЕЗ гонок: має виконатися ДО модулів === -->
-  <!-- якщо потрібно тимчасово підмінити бекенд — цей файл виставляє window.API_BASE_OVERRIDE -->
   <script src="/js/api-override.js?v=17"></script>
 
   <!-- noscript-стилі -->
@@ -206,7 +205,22 @@
   <script type="module" src="/js/partials.js?v=17"></script>
   <script type="module" src="/js/i18n.js?v=17"></script>
   <script type="module" src="/js/accordion.js?v=17"></script>
-  <script type="module" src="/js/tonconnect.js?v=17"></script>
+
+  <!-- ⚠️ TonConnect підвантажуємо ПІСЛЯ того, як partials вставили nav/hero,
+       щоб кнопка змонтувалась в #tonconnect і не створювалася плаваюча копія -->
+  <script type="module">
+    const importOnce = () => {
+      if (window.__tcImported) return;
+      window.__tcImported = true;
+      import('/js/tonconnect.js?v=17').catch(()=>{});
+    };
+    // коли частини підвантажені — імпортуємо TonConnect
+    window.addEventListener('partials:loaded', importOnce, { once: true });
+    window.addEventListener('partials:main-ready', importOnce, { once: true });
+    // запасний варіант: якщо з будь-якої причини події не прийшли — підстрахуємося
+    window.addEventListener('DOMContentLoaded', () => setTimeout(importOnce, 0), { once: true });
+  </script>
+
   <script type="module" src="/js/ui.js?v=17"></script>
   <script type="module" src="/js/widgets.js?v=17"></script>
   <script type="module" src="/js/app.js?v=17"></script>
