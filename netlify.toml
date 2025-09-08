@@ -30,10 +30,7 @@
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
-# ⚠️ спеціально для TonConnect-маніфесту:
-#   - дозволяємо CORS з будь-якого джерела
-#   - вимикаємо глобальний CORP=same-origin (ставимо cross-origin)
-#   - короткий кеш, щоб зміни підхоплювались швидко
+# ⚠️ Спеціально для TonConnect-маніфесту
 [[headers]]
   for = "/tonconnect-manifest.json"
   [headers.values]
@@ -42,6 +39,7 @@
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, OPTIONS"
     Access-Control-Allow-Headers = "*"
+    # маніфест має бути доступний гаманцям
     Cross-Origin-Resource-Policy = "cross-origin"
 
 # локалізаційні JSON
@@ -60,8 +58,10 @@
     Referrer-Policy              = "strict-origin-when-cross-origin"
     Permissions-Policy           = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
     Strict-Transport-Security    = "max-age=31536000; includeSubDomains; preload"
-    Cross-Origin-Opener-Policy   = "same-origin"
-    Cross-Origin-Resource-Policy = "same-origin"
+    # ВАЖЛИВО: дозволяємо попапи/редиректи для гаманців
+    Cross-Origin-Opener-Policy   = "same-origin-allow-popups"
+    # робимо CORP м'якшим, щоб не ламати містки TonConnect
+    Cross-Origin-Resource-Policy = "cross-origin"
 
 # ========= Redirects =========
 # SPA rewrite
