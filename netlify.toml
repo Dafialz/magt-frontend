@@ -3,11 +3,15 @@
   publish = "."
 
 # ========= Headers =========
+# Статика (іконки тощо) — кешуємо і даємо CORS, щоб гаманці могли забрати іконку
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+    Access-Control-Allow-Origin = "*"
+    Vary = "Origin"
 
+# JS та інша динаміка — без кешу
 [[headers]]
   for = "/js/*"
   [headers.values]
@@ -28,29 +32,36 @@
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
+# TonConnect manifest — обов’язково CORS
 [[headers]]
   for = "/tonconnect-manifest.json"
   [headers.values]
     Content-Type = "application/json; charset=utf-8"
     Cache-Control = "public, max-age=60"
     Access-Control-Allow-Origin = "*"
+    Vary = "Origin"
 
+# Локалізація
 [[headers]]
   for = "/i18n/*"
   [headers.values]
     Content-Type = "application/json; charset=utf-8"
     Cache-Control = "public, max-age=300"
+    Access-Control-Allow-Origin = "*"
+    Vary = "Origin"
 
+# Глобальні безпекові заголовки (без COOP/CORP, щоб не блокувати TonConnect)
 [[headers]]
   for = "/*"
   [headers.values]
-    X-Content-Type-Options      = "nosniff"
-    X-Frame-Options             = "SAMEORIGIN"
-    Referrer-Policy             = "strict-origin-when-cross-origin"
-    Permissions-Policy          = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
-    Strict-Transport-Security   = "max-age=31536000; includeSubDomains; preload"
-    Cross-Origin-Opener-Policy  = "same-origin"
-    Cross-Origin-Resource-Policy= "same-origin"
+    X-Content-Type-Options       = "nosniff"
+    X-Frame-Options              = "SAMEORIGIN"
+    Referrer-Policy              = "strict-origin-when-cross-origin"
+    Permissions-Policy           = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+    Strict-Transport-Security    = "max-age=31536000; includeSubDomains; preload"
+    # ❌ Прибрано, щоб не ламати міждоменну взаємодію TonConnect:
+    # Cross-Origin-Opener-Policy   = "same-origin"
+    # Cross-Origin-Resource-Policy = "same-origin"
 
 # ========= Redirects =========
 # SPA rewrite
