@@ -126,6 +126,26 @@ function wireCalcInput() {
   }
 }
 
+/* ===== ГЛОБАЛЬНИЙ ЩИТ ДЛЯ TONCONNECT-МОДАЛКИ (kill будь-які document-click) ===== */
+function stopClicksInsideTonConnect() {
+  if (window.__magtStopperBound) return;
+  const isInsideTonConnectOrDialog = (t) => !!(
+    t.closest?.('.tc-modal, .tc-root, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"], [role="dialog"], dialog, .modal, .overlay')
+  );
+  const guard = (e) => {
+    const t = e.target;
+    if (isInsideTonConnectOrDialog(t)) {
+      // повністю гасимо спливання, навіть для вже підвішених слухачів
+      e.stopImmediatePropagation?.();
+      e.stopPropagation?.();
+      // не заважаємо самій TonConnect UI — не ставимо preventDefault
+    }
+  };
+  document.addEventListener('click', guard, true);       // capture
+  document.addEventListener('touchstart', guard, { capture: true, passive: true });
+  window.__magtStopperBound = true;
+}
+
 /* ===== Mobile nav (burger) ===== */
 function initMobileNav() {
   // шукаємо саме наш header-nav
@@ -151,7 +171,7 @@ function initMobileNav() {
     if (e.target.closest('a,button,summary')) close();
   });
 
-  // ------- ВАЖЛИВО: не закривати при кліках у TonConnect-модалці / діалогах -------
+  // ------- ігноруємо кліки в TonConnect/діалогах -------
   const isInsideTonConnectOrDialog = (t) => {
     return !!(
       t.closest('.tc-modal, .tc-root, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"], [role="dialog"], dialog, .modal, .overlay')
@@ -168,7 +188,7 @@ function initMobileNav() {
 
   // Esc / зміна якоря / ресайз на десктоп — закрити
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-  window.addEventListener('hashchange', close);
+  window.addEventListener('hashchange', () => close());
   window.addEventListener('resize', () => { if (window.innerWidth >= 768) close(); });
 
   setAria();
@@ -227,17 +247,18 @@ function bindRuntimeEventsOnce() {
 async function reinitAfterPartials() {
   try {
     refreshUiRefs();
-    // ✅ КРИТИЧНО: перевстановити статику для нових partials (ціль/прогрес/ціна/залишок)
     initStaticUI();
 
     await mountTonButtons().catch(()=>{});
-    window.__magtEventsBound = false; // дозволимо перев’язати події для свіжого DOM
+    window.__magtEventsBound = false;
     bindRuntimeEventsOnce();
 
-    // ⬇️ мобільне меню після підвантаження partial'ів
+    // ГЛОБАЛЬНИЙ щит — ще раз (на випадок динамічного DOM)
+    stopClicksInsideTonConnect();
+
     initMobileNav();
 
-    wireCalcInput();   // ← важливо: повторно страхуємо інпут
+    wireCalcInput();
     refreshReferralUi();
     recalc();
     refreshButtons();
@@ -283,7 +304,6 @@ window.addEventListener("magt:purchase", (ev) => {
     try { refreshClaimSection?.(); } catch {}
   }
 
-  // універсальний тост: спочатку намагаємось відобразити TON-купівлю
   try {
     const level = ev?.detail?.level ?? (ui.level?.textContent || "—");
     const tokens = Number(ev?.detail?.tokens ?? 0);
@@ -296,7 +316,6 @@ window.addEventListener("magt:purchase", (ev) => {
       return;
     }
 
-    // fallback на USD-режим (старі івенти)
     const pUsd = Number((ev?.detail?.price) ?? CONFIG.PRICE_USD);
     const usd = Number((ev?.detail?.usd) ?? (ui.usdtIn?.value || 0));
     const tokensUsd = pUsd > 0 ? usd / pUsd : 0;
@@ -312,8 +331,12 @@ async function bootOnce() {
   initStaticUI();
 
   bindRuntimeEventsOnce();
-  wireCalcInput(); // ← відразу після старту
-  initMobileNav(); // ⬅️ ініціалізуємо бургер одразу
+  wireCalcInput();
+
+  // Увімкнемо глобальний щит ще до будь-яких інших слухачів
+  stopClicksInsideTonConnect();
+
+  initMobileNav();
 
   refreshReferralUi();
   recalc();
@@ -337,7 +360,6 @@ async function bootOnce() {
     startAddrPolling();
   }
 
-  // гарантійний ретрай
   scheduleRefLinkRetries();
 }
 
@@ -354,6 +376,4 @@ if (document.readyState === "loading") {
 window.magt = Object.assign(window.magt || {}, {
   buyNow: onBuyClick,
 });
-
-// зручно дебажити в консолі
 try { if (!window.recalc) window.recalc = recalc; } catch {}
