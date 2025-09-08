@@ -150,7 +150,6 @@ function addrFromUiAccount(ui){
 }
 
 /* ====== БІЛЬШЕ НЕ ЧИТАЄМО ніякі localStorage кеші ====== */
-// Випиляли extractFromLocalStorage() та весь код, який його викликав.
 
 /* =============== монтування кнопки =============== */
 function ensureFallbackContainer() {
@@ -166,16 +165,31 @@ function ensureFallbackContainer() {
   }
   return el;
 }
-function pickMountRoot() {
-  try { refreshUiRefs(); } catch {}
-  if (Array.isArray(UI.tcContainers) && UI.tcContainers.length) {
-    for (const el of UI.tcContainers) {
-      if (el && el instanceof HTMLElement) return el;
+
+/** Ховаємо всі НЕпотрібні слоти (залишаємо лише кнопку в шапці) */
+function hideExtraSlots() {
+  const ids = ["tonconnect-hero", "tonconnect-mobile-inline", "tonconnect-mobile"];
+  ids.forEach((id) => {
+    const n = document.getElementById(id);
+    if (n) {
+      n.innerHTML = "";
+      n.style.display = "none";
+      n.setAttribute("aria-hidden", "true");
+      n.dataset.tcHidden = "1";
     }
-  }
-  if (UI.tcPrimary && UI.tcPrimary instanceof HTMLElement) return UI.tcPrimary;
+  });
+}
+
+/** Вибираємо ЄДИНИЙ корінь для кнопки — тільки #tonconnect у хедері */
+function pickMountRoot() {
+  hideExtraSlots(); // гарантуємо, що дублікати не з’являться
+  try { refreshUiRefs(); } catch {}
+  const headerRoot = document.getElementById("tonconnect");
+  if (headerRoot instanceof HTMLElement) return headerRoot;
+  // Якщо з якоїсь причини в DOM ще немає #tonconnect — тимчасово рендеримо у fallback
   return ensureFallbackContainer();
 }
+
 async function mountPrimaryAt(root) {
   if (primaryUi) return primaryUi;
   await waitTonLib();
@@ -186,7 +200,6 @@ async function mountPrimaryAt(root) {
     manifestUrl: `${location.origin}/tonconnect-manifest.json`,
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
-    // критично: НЕ відновлюємо попереднє підключення
     restoreConnection: false
   });
   primaryUi = ui;
@@ -290,7 +303,6 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
     if (accAddr) {
       await syncAddress(accAddr, { onConnect, onDisconnect }, "ui.account/immediate");
     } else {
-      // Жодних snapshot із localStorage — нехай користувач підключиться вручну
       await syncAddress(null, { onConnect, onDisconnect }, "no-addr-initial");
     }
 
