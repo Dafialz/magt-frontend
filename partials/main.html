@@ -94,7 +94,6 @@
       <svg id="tok-chart" viewBox="0 0 120 120" class="w-28 h-28" aria-hidden="true"></svg>
       <div id="tok-legend" class="text-sm"></div>
     </div>
-    <!-- Примітку прибрано -->
   </div>
 </section>
 
@@ -284,83 +283,3 @@
     </div>
   </div>
 </section>
-
-<!-- ================== MOBILE DRAWER (бургер-меню) ================== -->
-<div id="mb-backdrop" class="mobile-backdrop" hidden></div>
-
-<nav id="mb-drawer" class="mobile-drawer" aria-hidden="true" aria-label="Mobile menu" hidden>
-  <div class="drawer-head">
-    <div class="font-semibold">Magic Time</div>
-    <button type="button" id="mb-close" class="touch-target btn-secondary" aria-label="Close menu">✕</button>
-  </div>
-
-  <div class="mobile-menu flex-1 overflow-auto">
-    <div class="p-3 space-y-2">
-      <div id="mb-tonconnect-slot"></div>
-      <div id="mb-lang-slot" class="mt-2"></div>
-    </div>
-
-    <a href="#tokenomics" data-i18n="nav.tokenomics">Токеноміка</a>
-    <a href="#roadmap" data-i18n="nav.roadmap">Дорожня карта</a>
-    <a href="#faq" data-i18n="nav.faq">FAQ</a>
-  </div>
-</nav>
-
-<script>
-  (function () {
-    const drawer = document.getElementById('mb-drawer');
-    const backdrop = document.getElementById('mb-backdrop');
-    const closeBtn = document.getElementById('mb-close');
-    const burger = document.getElementById('btn-menu') || document.querySelector('[data-menu-toggle]');
-
-    function setOpen(open) {
-      const on = !!open;
-      drawer.toggleAttribute('hidden', !on);
-      backdrop.toggleAttribute('hidden', !on);
-      drawer.classList.toggle('open', on);
-      backdrop.classList.toggle('open', on);
-      drawer.setAttribute('aria-hidden', String(!on));
-      document.documentElement.style.overflow = on ? 'hidden' : '';
-    }
-
-    function openMenu() {
-      try {
-        const slotTc = document.getElementById('mb-tonconnect-slot');
-        const slotLang = document.getElementById('mb-lang-slot');
-        if (slotTc && !slotTc.firstChild) {
-          const tc = document.getElementById('tc-btn') || document.getElementById('tc-inline');
-          if (tc) slotTc.appendChild(tc.cloneNode(true));
-        }
-        if (slotLang && !slotLang.firstChild) {
-          const lang = document.querySelector('[data-lang-switch]');
-          if (lang) slotLang.appendChild(lang.cloneNode(true));
-        }
-      } catch {}
-      setOpen(true);
-    }
-
-    function closeMenu() { setOpen(false); }
-
-    backdrop && backdrop.addEventListener('click', closeMenu);
-    closeBtn && closeBtn.addEventListener('click', closeMenu);
-
-    if (burger) {
-      burger.addEventListener('click', (e) => {
-        e.preventDefault();
-        const isOpen = drawer.classList.contains('open');
-        if (isOpen) closeMenu(); else openMenu();
-      }, { passive: true });
-    }
-
-    // Закриття по Esc
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && drawer.classList.contains('open')) closeMenu();
-    });
-
-    // Автоматично закриваємо при переході по якорю
-    document.addEventListener('click', (e) => {
-      const a = e.target.closest('a[href^="#"]');
-      if (a && drawer.classList.contains('open')) closeMenu();
-    });
-  })();
-</script>
