@@ -207,9 +207,7 @@ function attachUxFallback(ui) {
     }, 100);
   };
 
-  try {
-    ui.onModalStateChange?.((s) => log("modal:", s));
-  } catch {}
+  try { ui.onModalStateChange?.((s) => log("modal:", s)); } catch {}
 
   ui.__magtScheduleFallback = () => {
     if (fallbackTimer) clearTimeout(fallbackTimer);
@@ -229,12 +227,12 @@ async function mountPrimaryAt(root) {
   try { root.innerHTML = ""; } catch {}
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
 
-  // важливо: явна адреса повернення для мобільних і десктопних гаманців
+  // Явні адреси повернення (критично для відкриття гаманця)
   const RETURN_URL = `${location.origin}/`;
-  const TWA_RETURN_URL = `${location.origin}/`; // якщо буде TWA — заміниш на url бота
+  const TWA_RETURN_URL = `${location.origin}/`; // якщо з’явиться TWA-бот — заміниш
 
   const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json",
+    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json", // абсолютна адреса
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
     restoreConnection: true,
@@ -249,7 +247,7 @@ async function mountPrimaryAt(root) {
   primaryUi = ui;
   window.__tcui = ui;
   root.dataset.tcMounted = "1";
-  log("TonConnectUI mounted at #"+id);
+  log("TonConnectUI mounted at #" + id);
   return ui;
 }
 
@@ -258,12 +256,12 @@ export async function mountTonButtons() {
   if (!root) { log("no #tonconnect root found; skip mount"); return []; }
   const created = [];
   if (!primaryUi) {
-    const ui = await mountPrimaryAt(root).catch(()=>null);
+    const ui = await mountPrimaryAt(root).catch(() => null);
     if (ui) created.push(ui);
   } else {
     const headerRoot = document.getElementById("tonconnect");
     if (headerRoot && !headerRoot.dataset.tcMounted) {
-      await mountPrimaryAt(headerRoot).catch(()=>null);
+      await mountPrimaryAt(headerRoot).catch(() => null);
     }
   }
   return created;
@@ -313,7 +311,7 @@ export async function forgetCachedWallet() {
 }
 
 export async function openConnectModal() {
-  await mountTonButtons().catch(()=>{});
+  await mountTonButtons().catch(() => {});
   const ui = (primaryUi || window.__tcui);
   if (!ui) return;
   try { await ui.openModal?.(); } catch (e) {
@@ -327,7 +325,7 @@ export async function openConnectModal() {
 export async function initTonConnect({ onConnect, onDisconnect } = {}) {
   if (readyPromise) return readyPromise;
   readyPromise = (async () => {
-    await mountTonButtons().catch(()=>{});
+    await mountTonButtons().catch(() => {});
 
     async function bindOn(ui) {
       if (!ui || ui.__magtHooked) return;
