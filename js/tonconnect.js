@@ -9,6 +9,10 @@ let readyPromise = null;
 let cachedBase64Addr = null;
 let connectedOnce = false;
 
+// додаткові інстанси для мобільних контейнерів
+let mobileInlineUi = null;
+let mobileDrawerUi = null;
+
 const DBG = (() => {
   try { return !!JSON.parse(localStorage.getItem("magt_debug") || "false"); } catch { return false; }
 })();
@@ -153,11 +157,11 @@ function addrFromWalletObj(w){
   return normalizeToBase64(raw) || null;
 }
 
-/* =============== монтування кнопки =============== */
+/* =============== монтування кнопок =============== */
 
-/** Ховаємо всі НЕпотрібні слоти (залишаємо лише кнопку в шапці) */
+/** Раніше тут ховали ще мобільні контейнери — тепер залишаємо їх видимими */
 function hideExtraSlots() {
-  const ids = ["tonconnect-hero", "tonconnect-mobile-inline", "tonconnect-mobile"];
+  const ids = ["tonconnect-hero"]; // тільки hero-плейсхолдер, мобільні НЕ чіпаємо
   ids.forEach((id) => {
     const n = document.getElementById(id);
     if (n) {
@@ -169,7 +173,7 @@ function hideExtraSlots() {
   });
 }
 
-/** Чекаємо появу ЄДИНОГО кореня — #tonconnect у хедері */
+/** Чекаємо появу кореня в хедері */
 function waitForHeaderRoot(timeoutMs = 8000) {
   const start = performance.now();
   return new Promise((resolve) => {
@@ -207,7 +211,9 @@ function attachUxFallback(ui) {
     }, 100);
   };
 
-  try { ui.onModalStateChange?.((s) => log("modal:", s)); } catch {}
+  try {
+    ui.onModalStateChange?.((s) => log("modal:", s));
+  } catch {}
 
   ui.__magtScheduleFallback = () => {
     if (fallbackTimer) clearTimeout(fallbackTimer);
@@ -216,6 +222,9 @@ function attachUxFallback(ui) {
     }, 2500);
   };
 }
+
+const RETURN_URL = `${location.origin}/`;
+const TWA_RETURN_URL = `${location.origin}/`; // якщо з’явиться TWA-бот — заміниш
 
 async function mountPrimaryAt(root) {
   if (primaryUi) return primaryUi;
@@ -227,19 +236,12 @@ async function mountPrimaryAt(root) {
   try { root.innerHTML = ""; } catch {}
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
 
-  // Явні адреси повернення (критично для відкриття гаманця)
-  const RETURN_URL = `${location.origin}/`;
-  const TWA_RETURN_URL = `${location.origin}/`; // якщо з’явиться TWA-бот — заміниш
-
   const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json", // абсолютна адреса
+    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json",
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
     restoreConnection: true,
-    actionsConfiguration: {
-      returnUrl: RETURN_URL,
-      twaReturnUrl: TWA_RETURN_URL
-    }
+    actionsConfiguration: { returnUrl: RETURN_URL, twaReturnUrl: TWA_RETURN_URL }
   });
 
   attachUxFallback(ui);
@@ -251,19 +253,65 @@ async function mountPrimaryAt(root) {
   return ui;
 }
 
+/** Монтуємо другі інстанси кнопки в мобільні слоти (той самий стейт, інший контейнер) */
+async function mountSecondaryAt(rootOrId, existingRefName = "mobile") {
+  await waitTonLib();
+  if (!window.TON_CONNECT_UI) return null;
+
+  const root = typeof rootOrId === "string" ? document.getElementById(rootOrId) : rootOrId;
+  if (!root || !(root instanceof HTMLElement)) return null;
+
+  // не перезатираємо, якщо вже є TonConnectUI в цьому контейнері
+  if (root.dataset.tcMounted === "1") return null;
+
+  const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
+  try { root.innerHTML = ""; } catch {}
+
+  const ui = new window.TON_CONNECT_UI.TonConnectUI({
+    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json",
+    buttonRootId: id,
+    uiPreferences: { theme: "DARK", borderRadius: "m" },
+    restoreConnection: true,
+    actionsConfiguration: { returnUrl: RETURN_URL, twaReturnUrl: TWA_RETURN_URL }
+  });
+
+  root.dataset.tcMounted = "1";
+  log(`TonConnectUI mounted (secondary:${existingRefName}) at #${id}`);
+  return ui;
+}
+
 export async function mountTonButtons() {
   const root = await waitForHeaderRoot();
   if (!root) { log("no #tonconnect root found; skip mount"); return []; }
+
   const created = [];
+
+  // ГОЛОВНА кнопка в хедері
   if (!primaryUi) {
     const ui = await mountPrimaryAt(root).catch(() => null);
     if (ui) created.push(ui);
   } else {
     const headerRoot = document.getElementById("tonconnect");
     if (headerRoot && !headerRoot.dataset.tcMounted) {
-      await mountPrimaryAt(headerRoot).catch(() => null);
+      const ui = await mountPrimaryAt(headerRoot).catch(() => null);
+      if (ui) created.push(ui);
     }
   }
+
+  // МОБІЛЬНА інлайн-кнопка (біля бургера)
+  const inlineRoot = document.getElementById("tonconnect-mobile-inline");
+  if (inlineRoot && !inlineRoot.dataset.tcMounted) {
+    mobileInlineUi = await mountSecondaryAt(inlineRoot, "inline").catch(() => null);
+    if (mobileInlineUi) created.push(mobileInlineUi);
+  }
+
+  // МОБІЛЬНА кнопка всередині дроуера
+  const drawerRoot = document.getElementById("tonconnect-mobile");
+  if (drawerRoot && !drawerRoot.dataset.tcMounted) {
+    mobileDrawerUi = await mountSecondaryAt(drawerRoot, "drawer").catch(() => null);
+    if (mobileDrawerUi) created.push(mobileDrawerUi);
+  }
+
   return created;
 }
 
@@ -359,7 +407,7 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
       primaryUi.__magtPoll = setInterval(async () => {
         try {
           const w = await primaryUi.getWallet?.();
-          const fromEvent = addrFromWalletObj(w);
+        const fromEvent = addrFromWalletObj(w);
           const fromUi = fromEvent || addrFromUiAccount(primaryUi);
           if (fromUi && fromUi !== cachedBase64Addr) {
             syncAddress(fromUi, { onConnect, onDisconnect }, "ui.account/poll");
