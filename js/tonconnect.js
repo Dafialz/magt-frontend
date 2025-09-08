@@ -148,6 +148,10 @@ function addrFromUiAccount(ui){
   const b64 = normalizeToBase64(raw);
   return b64 || deepFindAddress(ui, 8) || null;
 }
+function addrFromWalletObj(w){
+  const raw = w?.account?.address || null;
+  return normalizeToBase64(raw) || null;
+}
 
 /* =============== монтування кнопки =============== */
 
@@ -187,7 +191,6 @@ async function mountPrimaryAt(root) {
   await waitTonLib();
   if (!window.TON_CONNECT_UI) return null;
 
-  // при повторному рендері очищаємо контейнер від усього зайвого
   try { root.innerHTML = ""; } catch {}
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
 
@@ -195,7 +198,6 @@ async function mountPrimaryAt(root) {
     manifestUrl: `${location.origin}/tonconnect-manifest.json`,
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
-    // важливо: не чіпаємо існуючий стан підключення
     restoreConnection: true
   });
 
@@ -214,7 +216,6 @@ export async function mountTonButtons() {
     const ui = await mountPrimaryAt(root).catch(()=>null);
     if (ui) created.push(ui);
   } else {
-    // Якщо вже змонтовано, переконаймося, що кнопка саме в #tonconnect
     const headerRoot = document.getElementById("tonconnect");
     if (headerRoot && !headerRoot.dataset.tcMounted) {
       await mountPrimaryAt(headerRoot).catch(()=>null);
@@ -246,7 +247,6 @@ function _isConnected(ui) {
 export async function forceDisconnect() {
   const ui = (primaryUi || window.__tcui);
   try { await ui?.disconnect?.(); } catch {}
-  // на всякий випадок — стираємо можливі ключі SDK
   try {
     const prefixes = ["tonconnect", "ton-connect", "tonconnect-ui"];
     for (const p of prefixes) {
@@ -271,9 +271,6 @@ export async function openConnectModal() {
   await mountTonButtons().catch(()=>{});
   const ui = (primaryUi || window.__tcui);
   if (!ui) return;
-
-  // ❌ Раніше тут був примусовий disconnect при вже встановленому з'єднанні.
-  //    Прибрано, щоб не рвати підключення. Просто відкриваємо модалку.
   try { await ui.openModal?.(); } catch (e) {
     const msg = String(e?.message || e || "").toLowerCase();
     if (msg.includes("already connected")) return;
@@ -286,14 +283,17 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
   readyPromise = (async () => {
     await mountTonButtons().catch(()=>{});
 
-    // НІЯКИХ теплих кешів самостійно — тільки те, що повертає UI
     async function bindOn(ui) {
       if (!ui || ui.__magtHooked) return;
       ui.__magtHooked = true;
       try {
-        ui.onStatusChange?.(() => {
-          const raw = addrFromUiAccount(ui) || null;
-          syncAddress(raw, { onConnect, onDisconnect }, "statusChange/ui.account");
+        ui.onStatusChange?.((wallet) => {
+          // беремо адресу з параметра події
+          const fromEvent = addrFromWalletObj(wallet);
+          const fallback  = addrFromUiAccount(ui);
+          const raw = fromEvent || fallback || null;
+          log("statusChange:", wallet, "addr:", raw);
+          syncAddress(raw, { onConnect, onDisconnect }, "statusChange");
         });
         log("subscribed to onStatusChange");
       } catch (e) { log("onStatusChange subscribe error:", e); }
@@ -301,18 +301,22 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
 
     if (primaryUi) await bindOn(primaryUi);
 
-    const accAddr = primaryUi ? addrFromUiAccount(primaryUi) : null;
-    if (accAddr) {
-      await syncAddress(accAddr, { onConnect, onDisconnect }, "ui.account/immediate");
-    } else {
+    // миттєвий стан через getWallet()
+    try {
+      const w = await primaryUi?.getWallet?.();
+      const addr = addrFromWalletObj(w) || addrFromUiAccount(primaryUi);
+      await syncAddress(addr || null, { onConnect, onDisconnect }, "getWallet/immediate");
+    } catch {
       await syncAddress(null, { onConnect, onDisconnect }, "no-addr-initial");
     }
 
-    // Легка періодична перевірка лише з UI (без LS)
+    // легкий полінг тільки для страховки
     if (primaryUi && !primaryUi.__magtPoll) {
-      primaryUi.__magtPoll = setInterval(() => {
+      primaryUi.__magtPoll = setInterval(async () => {
         try {
-          const fromUi = addrFromUiAccount(primaryUi);
+          const w = await primaryUi.getWallet?.();
+          const fromEvent = addrFromWalletObj(w);
+          const fromUi = fromEvent || addrFromUiAccount(primaryUi);
           if (fromUi && fromUi !== cachedBase64Addr) {
             syncAddress(fromUi, { onConnect, onDisconnect }, "ui.account/poll");
           }
@@ -341,12 +345,8 @@ try { window.getWalletAddress = getWalletAddress; } catch {}
 try { window.getTonConnect   = getTonConnect;   } catch {}
 try { window.forceDisconnect = forceDisconnect; } catch {}
 try { window.forgetCachedWallet = forgetCachedWallet; } catch {}
-try {
-  window.magtSetAddr = (addr) => { dispatchAddress(addr || null); };
-} catch {}
+try { window.magtSetAddr = (addr) => { dispatchAddress(addr || null); }; } catch {}
 setTimeout(() => {
-  try {
-    if (cachedBase64Addr) dispatchAddress(cachedBase64Addr);
-  } catch {}
+  try { if (cachedBase64Addr) dispatchAddress(cachedBase64Addr); } catch {}
 }, 0);
 try { window.debugTC = () => ({ ui: getTonConnect(), addr: getTonConnect()?.account?.address || null, cached: getWalletAddress() }); } catch {}
