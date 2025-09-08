@@ -36,7 +36,8 @@ async function ensureTonWeb() {
   return window.TonWeb;
 }
 
-function mapTonConnectError(e) {
+/* <-- ВАЖЛИВО: тепер експортована функція */
+export function mapTonConnectError(e) {
   const raw = e?.message || String(e) || "";
   const msg = raw.toLowerCase();
   if (msg.includes("wallet_not_connected") || msg.includes("wallet not connected")) return "Підключи гаманець і спробуй ще раз.";
@@ -45,6 +46,7 @@ function mapTonConnectError(e) {
   if (msg.includes("network") || msg.includes("rpc") || msg.includes("failed to fetch")) return "Мережна помилка RPC. Спробуй ще раз.";
   return "Скасовано або помилка відправки.";
 }
+/* --> */
 
 /* ===== локальний CLAIM бейдж (як і раніше) ===== */
 function bumpLocalClaim(tokens) {

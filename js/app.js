@@ -12,7 +12,7 @@ import {
   toast,
 } from "./ui.js";
 import { initTonConnect, getWalletAddress, getTonConnect, mountTonButtons } from "./tonconnect.js";
-import { onBuyClick, getUserUsdtBalance, showDebugJettonInfo } from "./buy.js";
+import { onBuyClick } from "./buy.js";
 import { refreshClaimSection, startClaimPolling, stopClaimPolling } from "./claim.js";
 import { api } from "./utils.js";
 
@@ -199,12 +199,15 @@ function afterDisconnected() {
 }
 
 /* ===== антидубль прив’язки подій після інʼєкції partials ===== */
+// TON-only: заглушка для застарілої MAX/USDT логіки
+const getUserUsdtBalance = async () => 0;
+
 function bindRuntimeEventsOnce() {
   if (window.__magtEventsBound) return;
   bindEvents({
     onBuyClick,
     onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick?.()),
-    getUserUsdtBalance, // лишили для сумісності з USD-режимом (кнопка MAX)
+    getUserUsdtBalance, // stub для сумісності
   });
   wireCalcInput(); // страховка на випадок, якщо форма підвантажилася пізніше
   window.__magtEventsBound = true;
@@ -339,7 +342,6 @@ if (document.readyState === "loading") {
 
 /* ================= Debug ================= */
 window.magt = Object.assign(window.magt || {}, {
-  showDebugJettonInfo,
   buyNow: onBuyClick,
 });
 
