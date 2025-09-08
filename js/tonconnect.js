@@ -264,7 +264,7 @@ async function mountPrimaryAt(root) {
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
 
   const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json",
+    manifestUrl: "/tonconnect-manifest.json",
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
     restoreConnection: true,
@@ -295,7 +295,7 @@ async function mountSecondaryAt(rootOrId, existingRefName = "mobile") {
   try { root.innerHTML = ""; } catch {}
 
   const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json",
+    manifestUrl: "/tonconnect-manifest.json",
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
     restoreConnection: true,
