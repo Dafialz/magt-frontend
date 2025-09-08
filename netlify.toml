@@ -22,6 +22,16 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
 
 [[headers]]
+  for = "/inline.css"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/tw-config.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
   for = "/partials/*"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
@@ -64,7 +74,45 @@
     Cross-Origin-Resource-Policy = "cross-origin"
 
 # ========= Redirects =========
-# SPA rewrite
+
+# --- DO NOT rewrite static assets ---
+[[redirects]]
+  from = "/assets/*"
+  to   = "/assets/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/js/*"
+  to   = "/js/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/partials/*"
+  to   = "/partials/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/i18n/*"
+  to   = "/i18n/:splat"
+  status = 200
+
+# окремі файли в корені
+[[redirects]]
+  from = "/styles.css"
+  to   = "/styles.css"
+  status = 200
+
+[[redirects]]
+  from = "/inline.css"
+  to   = "/inline.css"
+  status = 200
+
+[[redirects]]
+  from = "/tw-config.js"
+  to   = "/tw-config.js"
+  status = 200
+
+# SPA rewrite (після винятків!)
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
