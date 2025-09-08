@@ -194,6 +194,7 @@ function attachUxFallback(ui) {
   ui.__magtUxHooked = true;
 
   let fallbackTimer = null;
+  let reopenGuard = { ts: 0, count: 0 }; // анти-лупка
 
   const ensureModalWithHint = () => {
     try { ui.openModal?.(); } catch {}
@@ -211,10 +212,36 @@ function attachUxFallback(ui) {
     }, 100);
   };
 
-  try {
-    ui.onModalStateChange?.((s) => log("modal:", s));
-  } catch {}
+  function scheduleImmediateReopen(delay = 500) {
+    const now = Date.now();
+    // якщо пройшло >10с — обнуляємо лічильник
+    if (now - reopenGuard.ts > 10000) reopenGuard = { ts: now, count: 0 };
+    reopenGuard.count++;
+    reopenGuard.ts = now;
+    if (reopenGuard.count > 4) { // не більше 4 автопроб за 10с
+      log("reopen guard tripped; skip");
+      return;
+    }
+    setTimeout(() => {
+      if (!getWalletAddress()) ensureModalWithHint();
+    }, delay);
+  }
 
+  try {
+    // деякі версії TonConnectUI дають boolean, інші — об'єкт/рядок
+    ui.onModalStateChange?.((s) => {
+      const isOpen = (s === true) || (s === "opened") || (s?.open === true);
+      log("modal state:", s);
+      if (!isOpen && !getWalletAddress()) {
+        // модал закрили без конекту → одразу повертаємо
+        scheduleImmediateReopen(300);
+      }
+    });
+  } catch (e) {
+    log("onModalStateChange hook error:", e);
+  }
+
+  // резервний «повільний» фолбек: якщо статус-чейндж без адреси — відкриваємо з паузою
   ui.__magtScheduleFallback = () => {
     if (fallbackTimer) clearTimeout(fallbackTimer);
     fallbackTimer = setTimeout(() => {
@@ -274,6 +301,8 @@ async function mountSecondaryAt(rootOrId, existingRefName = "mobile") {
     restoreConnection: true,
     actionsConfiguration: { returnUrl: RETURN_URL, twaReturnUrl: TWA_RETURN_URL }
   });
+
+  attachUxFallback(ui);
 
   root.dataset.tcMounted = "1";
   log(`TonConnectUI mounted (secondary:${existingRefName}) at #${id}`);
@@ -407,7 +436,7 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
       primaryUi.__magtPoll = setInterval(async () => {
         try {
           const w = await primaryUi.getWallet?.();
-        const fromEvent = addrFromWalletObj(w);
+          const fromEvent = addrFromWalletObj(w);
           const fromUi = fromEvent || addrFromUiAccount(primaryUi);
           if (fromUi && fromUi !== cachedBase64Addr) {
             syncAddress(fromUi, { onConnect, onDisconnect }, "ui.account/poll");
