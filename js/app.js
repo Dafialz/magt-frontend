@@ -17,8 +17,7 @@ import { refreshClaimSection, startClaimPolling, stopClaimPolling } from "./clai
 import { api } from "./utils.js";
 
 /* =================== ГЛОБАЛЬНИЙ ЩИТ ДЛЯ TONCONNECT (bubbling) =================== */
-/* Версія тільки на bubbling: дозволяємо клікам усередині модалки дійти до цілей,
-   але не даємо цим подіям «вилізти» у зовнішні глобальні хендлери. */
+/* Дозволяємо клікам усередині модалки дійти до цілей, але не даємо їм «вилізти» назовні. */
 (function setupTonConnectGlobalShieldOnce() {
   if (window.__magtTcGlobalShieldInstalled) return;
   window.__magtTcGlobalShieldInstalled = true;
@@ -58,7 +57,7 @@ import { api } from "./utils.js";
     } catch { return false; }
   }
 
-  // Лише bubbling! Це блокує зовнішні глобальні обробники, але не ламає кнопки в модалці
+  // Лише bubbling — не ламаємо взаємодію всередині TonConnect
   const absorb = (e) => {
     if (isInsideTonConnect(e)) {
       e.stopPropagation();
@@ -69,7 +68,7 @@ import { api } from "./utils.js";
   document.addEventListener("pointerdown", absorb, { capture: false, passive: true });
   document.addEventListener("touchstart", absorb, { capture: false, passive: true });
 
-  // Для Esc залишаємо capture, але лише гасимо «назовні», не заважаючи самій модалці
+  // Для Esc: блокуємо розповсюдження назовні, але не заважаємо самій модалці
   const onKey = (e) => {
     if (e.key === "Escape" && tcOverlayOpen()) {
       e.stopPropagation();
