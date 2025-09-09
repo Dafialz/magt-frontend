@@ -16,6 +16,25 @@ import { onBuyClick } from "./buy.js";
 import { refreshClaimSection, startClaimPolling, stopClaimPolling } from "./claim.js";
 import { api } from "./utils.js";
 
+/* ======================================================================
+   ГЛОБАЛЬНА ІЗОЛЯЦІЯ ПОДІЙ ДЛЯ TONCONNECT
+   ----------------------------------------------------------------------
+   У capture-фазі відтинаємо кліки/тачі, що походять з елементів TonConnect.
+   Це заважає нашим document-level хендлерам випадково закривати модалку.
+   ====================================================================== */
+(function isolateTonConnectEvents() {
+  const stopIfInsideTC = (e) => {
+    const t = e.target;
+    if (t && t.closest && t.closest('.tc-root, .tc-modal, .tc-overlay, [data-tc-widget], [id^="tc-"]')) {
+      // Блокуємо подальше розповсюдження до глобальних хендлерів
+      e.stopImmediatePropagation();
+      // e.preventDefault(); // зазвичай не потрібно; залишено на випадок крайніх кейсів
+    }
+  };
+  document.addEventListener('click',      stopIfInsideTC, true);
+  document.addEventListener('touchstart', stopIfInsideTC, true);
+})();
+
 /* ================= Balance fallback (якщо claim.js недоступний) ================= */
 const $ = (s) => document.querySelector(s);
 
@@ -150,13 +169,12 @@ function initMobileNav() {
     if (e.target.closest('a,button,summary')) close();
   });
 
-  // ігноруємо кліки всередині TonConnect UI
-const isInsideTonConnectOrDialog = (t) => {
-  return !!(
-    t.closest('.tc-root, .tc-modal, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"]')
-  );
-};
+  // ВУЗЬКА перевірка на TonConnect
+  const isInsideTonConnectOrDialog = (t) => {
+    return !!(t && t.closest && t.closest('.tc-root, .tc-modal, .tc-overlay, [data-tc-widget], [id^="tc-"]'));
+  };
 
+  // Закриваємо меню при кліку поза панеллю, але ігноруємо кліки всередині TonConnect
   document.addEventListener('click', (e) => {
     const t = e.target;
     if (nav.contains(t)) return;
