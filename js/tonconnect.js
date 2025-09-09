@@ -46,102 +46,6 @@ function setCached(addr){
   }
 }
 
-/* -------------------- Супер-guard проти передчасного закриття -------------------- */
-function attachHardModalGuard(ui){
-  if (!ui || ui.__mtHardGuard) return;
-  ui.__mtHardGuard = true;
-
-  // Активний захист: доки немає адреси, але не довше 20с з моменту першого відкриття
-  let guardActive = false;
-  let guardStart = 0;
-  const GUARD_LIMIT_MS = 20000;
-
-  const guardOn = () => { guardActive = true; guardStart = Date.now(); };
-  const guardOff = () => { guardActive = false; };
-
-  const guardAllowed = () => {
-    if (!guardActive) return false;
-    if (cachedB64) { guardOff(); return false; }
-    if (Date.now() - guardStart > GUARD_LIMIT_MS) { guardOff(); return false; }
-    return true;
-  };
-
-  // 1) Перехоплюємо закриття через API
-  try {
-    const origClose = ui.closeModal?.bind(ui);
-    if (origClose) {
-      ui.closeModal = async (...args) => {
-        if (guardAllowed()) {
-          log("closeModal blocked by guard");
-          return; // ігноруємо
-        }
-        return origClose(...args);
-      };
-    }
-  } catch {}
-
-  // 2) Глобальні перехоплювачі кліків/клавіш, що можуть закрити модалку
-  const shouldBlockEvent = (t) => {
-    if (!guardAllowed()) return false;
-    // backdrop / overlay / кнопка закриття / сам діалог
-    return !!(
-      t.closest('.tc-overlay, .tc-modal') ||
-      t.closest('[class*="tc-"][aria-label="Close"], .tc-modal__close, [data-testid="modal-close"]')
-    );
-  };
-
-  const onClickCapture = (e) => {
-    if (shouldBlockEvent(e.target)) {
-      e.stopImmediatePropagation();
-      e.preventDefault();
-      // Підстрахуємося і відкриємо знову
-      try { ui.openModal?.(); } catch {}
-    }
-  };
-
-  const onKeydownCapture = (e) => {
-    if (!guardAllowed()) return;
-    if (e.key === "Escape") {
-      e.stopImmediatePropagation();
-      e.preventDefault();
-      try { ui.openModal?.(); } catch {}
-    }
-  };
-
-  document.addEventListener("click", onClickCapture, true);
-  document.addEventListener("touchstart", onClickCapture, { passive: true, capture: true });
-  document.addEventListener("keydown", onKeydownCapture, true);
-
-  // 3) Відслідковуємо стан модалки і автоматично її утримуємо відкритою
-  try {
-    ui.onModalStateChange?.((s) => {
-      const isOpen = (s === true) || (s === "opened") || (s?.open === true);
-      log("modal state:", s);
-      if (isOpen) {
-        if (!cachedB64) guardOn();
-      } else {
-        if (guardAllowed()) {
-          // миттєво повертаємо
-          try { ui.openModal?.(); } catch {}
-        }
-      }
-    });
-  } catch (e) { log("onModalStateChange hook error:", e); }
-
-  // 4) Фолбек на будь-яке “тихе” закриття
-  ui.__mtScheduleFallback = () => {
-    setTimeout(() => {
-      if (guardAllowed()) {
-        try { ui.openModal?.(); } catch {}
-      }
-    }, 300);
-  };
-
-  // 5) При появі адреси – відключаємо guard
-  const stopGuardWhenAddress = () => { if (cachedB64) guardOff(); else setTimeout(stopGuardWhenAddress, 300); };
-  stopGuardWhenAddress();
-}
-
 /* ---------------------- Пошук контейнера для кнопки ---------------------- */
 function pickFirstAvailableRoot(){
   const ids = ["tonconnect", "tonconnect-mobile-inline", "tonconnect-mobile"];
@@ -165,13 +69,44 @@ async function mountAt(root){
     manifestUrl: MANIFEST_URL,
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
-    restoreConnection: true
+    restoreConnection: true,
     // actionsConfiguration: { returnUrl: RETURN_URL }
   };
 
   const ui = new window.TON_CONNECT_UI.TonConnectUI(cfg);
 
-  attachHardModalGuard(ui);
+  // М’який локер: під час перших секунд після відкриття не даємо модалці “сплигнути”
+  // (без глобальних listener-ів — лише проксі closeModal всередині інстансу)
+  (function attachSoftGuard(u){
+    if (!u || u.__mtSoftGuard) return;
+    u.__mtSoftGuard = true;
+
+    let lockUntil = 0;
+    try {
+      u.onModalStateChange?.((s) => {
+        const isOpen = (s === true) || (s === "opened") || (s?.open === true);
+        if (isOpen) {
+          // 3 секунди "м'якого" лок-вікна після відкриття
+          lockUntil = Date.now() + 3000;
+        }
+      });
+    } catch {}
+
+    try {
+      const origClose = u.closeModal?.bind(u);
+      if (origClose) {
+        u.closeModal = async (...args) => {
+          // Якщо вже підключились — дозволяємо закриття
+          if (cachedB64) return origClose(...args);
+          // Якщо минуло лок-вікно — теж дозволяємо
+          if (Date.now() > lockUntil) return origClose(...args);
+          // Інакше просто ігноруємо спробу раннього закриття
+          log("soft-guard: prevent early close");
+          return;
+        };
+      }
+    } catch {}
+  })(ui);
 
   root.dataset.tcMounted = "1";
   primaryUi = ui;
@@ -235,6 +170,7 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
 
     window.__tcui = ui;
 
+    // Головний хук зміни статусу — тут ловимо адресу або дисконект
     try {
       ui.onStatusChange?.((wallet)=>{
         const addr = wallet?.account?.address || null;
@@ -250,12 +186,14 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
           setCached(null);
           try { onDisconnect && onDisconnect(); } catch{}
         } else {
-          try { ui.__mtScheduleFallback?.(); } catch {}
+          // Якщо підключення не сталося — просто нічого не робимо (без агресивних reopen)
+          log("status: no wallet / not connected");
         }
       });
       log("subscribed onStatusChange");
     } catch(e){ log("onStatusChange error:", e); }
 
+    // Спробуємо відновити попередній стан
     try {
       const w = await ui.getWallet?.();
       const addr = w?.account?.address;
