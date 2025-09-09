@@ -50,9 +50,10 @@ import { getPresaleStats } from "./ton.js";
       // Не робимо preventDefault, щоб не ламати взаємодію всередині модалки
     }
   };
-  document.addEventListener("click", absorb, true);
-  document.addEventListener("pointerdown", absorb, { capture: true, passive: true });
-  document.addEventListener("touchstart", absorb, { capture: true, passive: true });
+  // 👇 Переведено на bubbling (capture:false), щоб не перехоплювати внутрішні кліки TonConnect
+  document.addEventListener("click", absorb, false);
+  document.addEventListener("pointerdown", absorb, { capture: false, passive: true });
+  document.addEventListener("touchstart", absorb, { capture: false, passive: true });
 
   // 2) Esc: якщо відкрита TonConnect-модалка — не віддаємо Esc іншим слухачам
   const onKey = (e) => {
@@ -61,7 +62,8 @@ import { getPresaleStats } from "./ton.js";
       // Не блокуємо всередині TonConnect — вона сама обробить Esc
     }
   };
-  document.addEventListener("keydown", onKey, true);
+  // 👇 Також на bubbling
+  document.addEventListener("keydown", onKey, false);
 })();
 
 /* ===== БАЗА ДЛЯ API ===== */
