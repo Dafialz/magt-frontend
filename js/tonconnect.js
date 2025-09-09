@@ -15,10 +15,13 @@ let readyPromise = null;
 const DBG = (() => { try { return !!JSON.parse(localStorage.getItem("magt_debug") || "false"); } catch { return false; } })();
 const log = (...a) => { if (DBG) { try { console.log("[TC]", ...a); } catch {} } };
 
+// Використовуємо стабільний маніфест та мінімальну конфіг без twaReturnUrl
 const MANIFEST_URL = "https://magtcoin.com/tonconnect-manifest.json";
-const RETURN_URL   = location.origin + "/";
+// Деякі гаманці коректніше працюють без явного returnUrl (особливо у розширеннях)
+// Якщо потрібно — розкоментуй рядок нижче
+// const RETURN_URL   = location.origin + "/";
 
-function isB64(s){ return typeof s === "string" && /^(EQ|UQ)[A-Za-z0-9_-]{46,68}$/.test(s.trim()); }
+function isB64(s){ return typeof s === "string" && /^(EQ|UQ)[A-Za-z0-9_-]{46,68}$/.test((s||"").trim()); }
 function short(a){ return a ? a.slice(0,4)+"…"+a.slice(-4) : ""; }
 
 function dispatchAddress(addr){
@@ -56,10 +59,8 @@ function attachModalGuard(ui){
 
   function canReopen() {
     const now = Date.now();
-    if (now - lastTick > 10000) { // якщо було 10с паузи — обнуляємо лічильник
-      reopenCount = 0;
-    }
-    return reopenCount < 3; // не більше 3 автоспроб за «сесію»
+    if (now - lastTick > 10000) reopenCount = 0; // «вікно» 10с
+    return reopenCount < 3; // не більше 3 автоспроб
   }
 
   function tryReopen(delay = 350){
@@ -67,19 +68,16 @@ function attachModalGuard(ui){
     reopenCount++;
     lastTick = Date.now();
     setTimeout(() => {
-      // якщо досі нема адреси — обережно відкриваємо знову
-      if (!getWalletAddress()) {
+      if (!getWalletAddress()) { // лише якщо ще не підключено
         try { ui.openModal?.(); } catch {}
       }
     }, delay);
   }
 
-  // Хук на зміни стану модалки (в різних версіях тип може відрізнятися)
   try {
     ui.onModalStateChange?.((s) => {
       const isOpen = (s === true) || (s === "opened") || (s?.open === true);
       log("modal state:", s);
-      // Модалка закрита, а адреси ще нема → одна м’яка автоспроба
       if (!isOpen && !getWalletAddress()) {
         tryReopen(320);
       }
@@ -88,7 +86,7 @@ function attachModalGuard(ui){
     log("onModalStateChange hook error:", e);
   }
 
-  // Запасний метод: модалка може закритися «тихо» — дозволимо плановий фолбек
+  // Запасний «м’який» фолбек (може викликатись із onStatusChange)
   ui.__mtScheduleFallback = () => {
     setTimeout(() => { if (!getWalletAddress()) tryReopen(0); }, 700);
   };
@@ -109,19 +107,22 @@ async function mountAt(root){
   await waitTonLib();
   if (!root || !(root instanceof HTMLElement)) return null;
 
-  // щоб не плодити інстанси в одному root
+  // не плодимо інстанси в тому ж root
   if (root.dataset.tcMounted === "1" && primaryUi) return primaryUi;
 
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
   try { root.innerHTML = ""; } catch {}
 
-  const ui = new window.TON_CONNECT_UI.TonConnectUI({
+  const cfg = {
     manifestUrl: MANIFEST_URL,
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
-    restoreConnection: true,
-    actionsConfiguration: { returnUrl: RETURN_URL }
-  });
+    restoreConnection: true
+  };
+  // Якщо потрібен явний повернення у мобільних — раскоментуй:
+  // cfg.actionsConfiguration = { returnUrl: RETURN_URL };
+
+  const ui = new window.TON_CONNECT_UI.TonConnectUI(cfg);
 
   attachModalGuard(ui);
 
@@ -129,7 +130,7 @@ async function mountAt(root){
   primaryUi = ui;
   window.__tcui = ui;
 
-  log("TonConnectUI mounted at #" + id);
+  log("TonConnectUI mounted at #"+id);
   return ui;
 }
 
@@ -155,7 +156,7 @@ export function getWalletAddress(){ return isB64(cachedB64) ? cachedB64 : (cache
 export async function openConnectModal(){
   await mountTonButtons().catch(()=>{});
   const ui = getTonConnect();
-  try { await ui?.openModal?.(); } catch(e){ log("openModal err", e); }
+  try { await ui?.openModal?.(); } catch(e){ log("openModal err:", e); }
 }
 
 export async function forceDisconnect(){
@@ -187,7 +188,7 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
 
     window.__tcui = ui;
 
-    // 1) підписка на зміни
+    // 1) підписка на зміни статусу
     try {
       ui.onStatusChange?.((wallet)=>{
         const addr = wallet?.account?.address || null;
@@ -197,7 +198,7 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
         } else {
           const was = cachedB64;
           setCached(null);
-          // якщо відбувся «відкат» без адреси — дозволь фолбеку делікатно показати модалку
+          // якщо закрили без підключення — м’яко дозволяємо фолбеку підняти модалку
           try { ui.__mtScheduleFallback?.(); } catch {}
           if (was && onDisconnect) { try { onDisconnect(); } catch{} }
         }
