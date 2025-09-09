@@ -1,7 +1,8 @@
 {
-  "url": "https://magtcoin.com",
+  "version": "2",
   "name": "Magic Time",
-  "iconUrl": "https://magtcoin.com/assets/logo.png?v=3",
+  "url": "https://magtcoin.com",
+  "iconUrl": "https://magtcoin.com/assets/logo.png",
   "termsOfUseUrl": "https://magtcoin.com/terms.html",
   "privacyPolicyUrl": "https://magtcoin.com/privacy.html"
 }
