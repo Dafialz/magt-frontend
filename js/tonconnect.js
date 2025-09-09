@@ -15,15 +15,15 @@ let readyPromise = null;
 const DBG = (() => { try { return !!JSON.parse(localStorage.getItem("magt_debug") || "false"); } catch { return false; } })();
 const log = (...a) => { if (DBG) { try { console.log("[TC]", ...a); } catch {} } };
 
+const MANIFEST_URL = "https://magtcoin.com/tonconnect-manifest.json";
+const RETURN_URL   = location.origin + "/";
+
 function isB64(s){ return typeof s === "string" && /^(EQ|UQ)[A-Za-z0-9_-]{46,68}$/.test(s.trim()); }
 function short(a){ return a ? a.slice(0,4)+"…"+a.slice(-4) : ""; }
 
 function dispatchAddress(addr){
   try { window.dispatchEvent(new CustomEvent("magt:address",{detail:{address:addr||null}})); } catch{}
-  try {
-    // якщо ui.setOwnRefLink існує як глобальна – підстрахуємо реф-посилання
-    if (typeof window.setOwnRefLink === "function") window.setOwnRefLink(addr || "");
-  } catch {}
+  try { if (typeof window.setOwnRefLink === "function") window.setOwnRefLink(addr || ""); } catch {}
 }
 
 async function waitTonLib(timeoutMs=15000){
@@ -46,37 +46,33 @@ function setCached(addr){
   }
 }
 
-/* ======================= Mount (тільки один інстанс) ======================= */
-
-async function waitHeaderRoot(timeoutMs=8000){
-  const t0 = performance.now();
-  return new Promise((res)=>{
-    (function loop(){
-      const el = document.getElementById("tonconnect");
-      if (el instanceof HTMLElement) return res(el);
-      if (performance.now()-t0 > timeoutMs) return res(null);
-      setTimeout(loop,120);
-    })();
-  });
+/* ============ Пошук першого доступного контейнера під кнопку ============ */
+function pickFirstAvailableRoot(){
+  const ids = ["tonconnect", "tonconnect-mobile-inline", "tonconnect-mobile"];
+  for (const id of ids){
+    const el = document.getElementById(id);
+    if (el instanceof HTMLElement) return el;
+  }
+  return null;
 }
 
-async function mountPrimaryAt(root){
+/* =========================== Монтування (один раз) =========================== */
+async function mountAt(root){
   await waitTonLib();
   if (!root || !(root instanceof HTMLElement)) return null;
 
-  // не монтуємо двічі в той самий контейнер
+  // щоб не плодити інстанси в одному root
   if (root.dataset.tcMounted === "1" && primaryUi) return primaryUi;
 
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
   try { root.innerHTML = ""; } catch {}
 
   const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json",
+    manifestUrl: MANIFEST_URL,
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
     restoreConnection: true,
-    // мінімально потрібний returnUrl (без twaReturnUrl)
-    actionsConfiguration: { returnUrl: location.origin + "/" }
+    actionsConfiguration: { returnUrl: RETURN_URL }
   });
 
   root.dataset.tcMounted = "1";
@@ -88,33 +84,21 @@ async function mountPrimaryAt(root){
 }
 
 export async function mountTonButtons(){
-  const headerRoot = await waitHeaderRoot();
-  if (!headerRoot) {
-    log("no #tonconnect root found; skip mount");
-    return [];
-  }
+  const root = pickFirstAvailableRoot();
+  if (!root) { log("no available root for TonConnect button yet"); return []; }
 
   const created = [];
-
-  // Монтуємо лише ГОЛОВНУ кнопку в хедері
   if (!primaryUi) {
-    const u = await mountPrimaryAt(headerRoot).catch(()=>null);
+    const u = await mountAt(root).catch(()=>null);
     if (u) created.push(u);
-  } else if (!headerRoot.dataset.tcMounted) {
-    // якщо partials перерендерили nav і стерли атрибут
-    const u = await mountPrimaryAt(headerRoot).catch(()=>null);
+  } else if (!root.dataset.tcMounted) {
+    const u = await mountAt(root).catch(()=>null);
     if (u) created.push(u);
   }
-
-  // ВАЖЛИВО: мобільні інстанси свідомо ВИМКНЕНО, щоб уникнути конфліктів
-  // const inline = document.getElementById("tonconnect-mobile-inline");
-  // const drawer = document.getElementById("tonconnect-mobile");
-
   return created;
 }
 
-/* ======================= Public ======================= */
-
+/* ============================== Public API ============================== */
 export function getTonConnect(){ return primaryUi || window.__tcui || null; }
 export function getWalletAddress(){ return isB64(cachedB64) ? cachedB64 : (cachedB64 || null); }
 
@@ -181,7 +165,7 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
   return readyPromise;
 }
 
-/* ======================= Remount hooks for partials ======================= */
+/* ===================== Перемонтування після partials ===================== */
 function hookPartialsRemount(){
   const rebind = () => { mountTonButtons().catch(()=>{}); };
   window.addEventListener("partials:loaded", rebind);
@@ -190,7 +174,7 @@ function hookPartialsRemount(){
 }
 hookPartialsRemount();
 
-/* ======================= Auto-init ======================= */
+/* ================================ Auto-init ================================ */
 (function auto(){
   const run = ()=>{ initTonConnect().catch(()=>{}); };
   if (document.readyState === "loading") {
@@ -198,7 +182,7 @@ hookPartialsRemount();
   } else run();
 })();
 
-/* ======================= Debug ======================= */
+/* ================================= Debug ================================= */
 try { window.getTonConnect = getTonConnect; } catch {}
 try { window.getWalletAddress = getWalletAddress; } catch {}
 try { window.openConnectModal = openConnectModal; } catch {}
