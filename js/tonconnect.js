@@ -46,6 +46,54 @@ function setCached(addr){
   }
 }
 
+/* ---------------- UX-guard: не давати модалці «зникнути» без підключення --- */
+function attachModalGuard(ui){
+  if (!ui || ui.__mtGuard) return;
+  ui.__mtGuard = true;
+
+  let reopenCount = 0;
+  let lastTick = 0;
+
+  function canReopen() {
+    const now = Date.now();
+    if (now - lastTick > 10000) { // якщо було 10с паузи — обнуляємо лічильник
+      reopenCount = 0;
+    }
+    return reopenCount < 3; // не більше 3 автоспроб за «сесію»
+  }
+
+  function tryReopen(delay = 350){
+    if (!canReopen()) return;
+    reopenCount++;
+    lastTick = Date.now();
+    setTimeout(() => {
+      // якщо досі нема адреси — обережно відкриваємо знову
+      if (!getWalletAddress()) {
+        try { ui.openModal?.(); } catch {}
+      }
+    }, delay);
+  }
+
+  // Хук на зміни стану модалки (в різних версіях тип може відрізнятися)
+  try {
+    ui.onModalStateChange?.((s) => {
+      const isOpen = (s === true) || (s === "opened") || (s?.open === true);
+      log("modal state:", s);
+      // Модалка закрита, а адреси ще нема → одна м’яка автоспроба
+      if (!isOpen && !getWalletAddress()) {
+        tryReopen(320);
+      }
+    });
+  } catch (e) {
+    log("onModalStateChange hook error:", e);
+  }
+
+  // Запасний метод: модалка може закритися «тихо» — дозволимо плановий фолбек
+  ui.__mtScheduleFallback = () => {
+    setTimeout(() => { if (!getWalletAddress()) tryReopen(0); }, 700);
+  };
+}
+
 /* ============ Пошук першого доступного контейнера під кнопку ============ */
 function pickFirstAvailableRoot(){
   const ids = ["tonconnect", "tonconnect-mobile-inline", "tonconnect-mobile"];
@@ -74,6 +122,8 @@ async function mountAt(root){
     restoreConnection: true,
     actionsConfiguration: { returnUrl: RETURN_URL }
   });
+
+  attachModalGuard(ui);
 
   root.dataset.tcMounted = "1";
   primaryUi = ui;
@@ -147,11 +197,13 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
         } else {
           const was = cachedB64;
           setCached(null);
+          // якщо відбувся «відкат» без адреси — дозволь фолбеку делікатно показати модалку
+          try { ui.__mtScheduleFallback?.(); } catch {}
           if (was && onDisconnect) { try { onDisconnect(); } catch{} }
         }
       });
       log("subscribed onStatusChange");
-    } catch(e){ log("onStatusChange error", e); }
+    } catch(e){ log("onStatusChange error:", e); }
 
     // 2) початкове відновлення
     try {
