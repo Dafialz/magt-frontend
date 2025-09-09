@@ -198,8 +198,9 @@ function initMobileNav() {
     guardedClose();
   };
 
-  document.addEventListener('click', onDocTap, true);
-  document.addEventListener('pointerdown', onDocTap, { passive: true, capture: true });
+  // Переведено на bubbling, щоб не перехоплювати події TonConnect раніше часу
+  document.addEventListener('click', onDocTap, false);
+  document.addEventListener('pointerdown', onDocTap, { passive: true, capture: false });
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -352,6 +353,9 @@ async function bootOnce() {
   refreshReferralUi();
   recalc();
   refreshButtons();
+
+  // Гарантуємо, що TonConnect-кнопка змонтована до ініціалізації
+  await mountTonButtons().catch(()=>{});
 
   await initTonConnect({
     onConnect: (addr) => afterConnected(addr),
