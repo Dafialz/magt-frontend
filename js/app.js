@@ -150,21 +150,56 @@ function initMobileNav() {
     if (e.target.closest('a,button,summary')) close();
   });
 
-  // ігноруємо кліки всередині TonConnect UI та будь-яких діалогів
+  // --- >>> Антизакриття під час TonConnect / будь-яких діалогів <<< ---
   const isInsideTonConnectOrDialog = (t) => !!(
-    t.closest('.tc-root, .tc-modal, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"], [role="dialog"], dialog, .modal, .overlay')
+    t.closest(
+      [
+        // TonConnect UI
+        '.tc-root', '.tc-modal', '.tc-overlay', '.tc-widget', '.tc-list', '.tc-wallets-modal',
+        '.tc-modal__body', '.tc-modal__backdrop',
+        '[data-tc-widget]', '[class*="ton-connect"]', '[class*="tonconnect"]', '[id^="tc-"]',
+        // загальні діалоги/оверлеї
+        '[role="dialog"]', '[aria-modal="true"]', 'dialog', '.modal', '.overlay'
+      ].join(', ')
+    )
   );
 
-  document.addEventListener('click', (e) => {
+  const hasAnyTonConnectOverlayOpen = () => {
+    const el = document.querySelector(
+      [
+        '.tc-modal', '.tc-overlay', '.tc-wallets-modal', '.tc-root [role="dialog"]',
+        '[aria-modal="true"]'
+      ].join(', ')
+    );
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+  };
+
+  // якщо відкрита TC-модалка — не закриваємо меню взагалі
+  const guardedClose = () => { if (!hasAnyTonConnectOverlayOpen()) close(); };
+
+  // обробники поза панеллю: не чіпаємо кліки всередині TC / діалогів
+  const onDocTap = (e) => {
     const t = e.target;
     if (nav.contains(t)) return;
     if (isInsideTonConnectOrDialog(t)) return;
-    close();
-  }, true); // capture=true, щоб спрацювати до “булькаючих” обробників
+    guardedClose();
+  };
 
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-  window.addEventListener('hashchange', () => close());
-  window.addEventListener('resize', () => { if (window.innerWidth >= 768) close(); });
+  // capture=true, щоб реагувати раніше за «булькаючі» хендлери
+  document.addEventListener('click', onDocTap, true);
+  document.addEventListener('mousedown', onDocTap, true);
+  document.addEventListener('touchstart', onDocTap, { passive: true, capture: true });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (hasAnyTonConnectOverlayOpen()) return; // Esc належить модалці — ігноруємо
+      guardedClose();
+    }
+  });
+  window.addEventListener('hashchange', () => guardedClose());
+  window.addEventListener('resize', () => { if (window.innerWidth >= 768) guardedClose(); });
 
   setAria();
   nav.__navBound = true;
