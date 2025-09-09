@@ -48,10 +48,7 @@
 
     <!-- Правий блок: мобільна TonConnect + бургер -->
     <div class="flex items-center gap-3 md:hidden">
-      <!-- МОБІЛЬНА інлайн-кнопка (видна навіть коли бургер закритий) -->
       <div id="tonconnect-mobile-inline" class="w-[150px] h-10"></div>
-
-      <!-- Бургер (label керує #nav-burger) -->
       <label for="nav-burger" class="p-2 rounded-lg hover:bg-white/10 cursor-pointer" aria-label="Open menu" aria-controls="mobile-panel" aria-expanded="false">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </label>
@@ -94,9 +91,7 @@
 
   <!-- Мінімальний CSS для мобільного меню -->
   <style>
-    /* показуємо панель, коли чекбокс увімкнено */
     #nav-burger:checked ~ #mobile-panel { display: block; }
-    /* невеликий фікс для iOS, щоб торк по label не виділяв текст */
     label[for="nav-burger"] { -webkit-tap-highlight-color: transparent; }
   </style>
 
@@ -112,10 +107,24 @@
       function setAria() { if (label) label.setAttribute('aria-expanded', burger.checked ? 'true' : 'false'); }
       function closeMenu() { if (burger.checked) { burger.checked = false; setAria(); } }
 
-      /* 0) Хелпер: визначаємо кліки всередині TonConnect-модалки/діалогів */
-      function isInsideTonConnectOrDialog(node) {
-        if (!node) return false;
-        return !!node.closest('.tc-modal, .tc-root, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"], [role="dialog"], dialog, .modal, .overlay');
+      /* --- коректне визначення кліків усередині TonConnect/діалогів (включно з shadow DOM) --- */
+      function isInsideTonOrDialogFromEvent(e){
+        const path = (typeof e.composedPath === 'function') ? e.composedPath() : [];
+        for (const n of path){
+          if (!n || !(n instanceof Node)) continue;
+          if (n.nodeType !== 1) continue; // тільки елементи
+          const el = /** @type {Element} */(n);
+
+          // прямі збіги
+          if (
+            el.matches?.('.tc-modal, .tc-root, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"], [role="dialog"], dialog, .modal, .overlay, tonconnect-ui, ton-connect-ui, tonconnect-ui-modal, ton-connect-ui-modal')
+          ) return true;
+
+          // якщо це хост shadow DOM із id/class TonConnect
+          const host = (el.shadowRoot && el.shadowRoot.host) ? el.shadowRoot.host : null;
+          if (host && (host.id?.startsWith?.('tc-') || (host.className && String(host.className).includes('ton-connect')))) return true;
+        }
+        return false;
       }
 
       /* 1) НЕ закриваємо меню коли користувач лише відкриває dropdown мов */
@@ -128,16 +137,19 @@
         if (t) closeMenu();
       });
 
-      /* 3) Клік (і touch) поза панеллю (і не по label), але ІГНОРУЄМО TonConnect/діалоги */
+      /* 3) Клік/тап поза панеллю (і не по label), але ІГНОРУЄМО TonConnect/діалоги (включно з shadow DOM) */
       function onDocTap(e) {
         if (!burger.checked) return;
         const t = e.target;
-        if (t.closest('#mobile-panel') || t.closest('label[for="nav-burger"]')) return;
-        if (isInsideTonConnectOrDialog(t)) return;
+        if (t.closest?.('#mobile-panel') || t.closest?.('label[for="nav-burger"]')) return;
+
+        // якщо відкрита TonConnect-модалка — нічого не чіпаємо
+        if (document.querySelector('.tc-modal, .tc-overlay, [id^="tc-"]') || isInsideTonOrDialogFromEvent(e)) return;
+
         closeMenu();
       }
       document.addEventListener('click', onDocTap, true);
-      document.addEventListener('touchstart', onDocTap, { passive: true, capture: true });
+      document.addEventListener('pointerdown', onDocTap, { passive: true, capture: true });
 
       /* 4) Esc або зміна хеша */
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
