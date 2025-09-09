@@ -24,13 +24,15 @@ function short(a){ return a ? a.slice(0,4)+"…"+a.slice(-4) : ""; }
 function dispatchAddress(addr){
   try { window.dispatchEvent(new CustomEvent("magt:address",{detail:{address:addr||null}})); } catch{}
   try { if (typeof window.setOwnRefLink === "function") window.setOwnRefLink(addr || ""); } catch {}
+  try { window.__magtAddr = addr || ""; } catch {}
 }
 
-async function waitTonLib(timeoutMs=15000){
+async function waitTonLib(timeoutMs=20000){
   const t0 = performance.now();
   return new Promise((res, rej)=>{
     (function tick(){
-      if (window.TON_CONNECT_UI) return res();
+      const ok = !!(window.TON_CONNECT_UI && window.TON_CONNECT_UI.TonConnectUI);
+      if (ok) return res();
       if (performance.now()-t0 > timeoutMs) return rej(new Error("TON_CONNECT_UI not loaded"));
       setTimeout(tick, 60);
     })();
@@ -86,8 +88,11 @@ async function mountAt(root){
       u.onModalStateChange?.((s) => {
         const isOpen = (s === true) || (s === "opened") || (s?.open === true);
         if (isOpen) {
-          // 3 секунди "м'якого" лок-вікна після відкриття
-          lockUntil = Date.now() + 3000;
+          // 3.5 секунди "м'якого" лок-вікна після відкриття (трохи довше для мобільних)
+          lockUntil = Date.now() + 3500;
+          log("modal opened (soft-lock)");
+        } else {
+          log("modal closed");
         }
       });
     } catch {}
@@ -98,9 +103,9 @@ async function mountAt(root){
         u.closeModal = async (...args) => {
           // Якщо вже підключились — дозволяємо закриття
           if (cachedB64) return origClose(...args);
-          // Якщо минуло лок-вікно — теж дозволяємо
+          // Якщо минув лок-вікно — теж дозволяємо
           if (Date.now() > lockUntil) return origClose(...args);
-          // Інакше просто ігноруємо спробу раннього закриття
+          // Інакше ігноруємо раннє закриття (не заважаємо внутрішнім клікам)
           log("soft-guard: prevent early close");
           return;
         };
@@ -138,7 +143,11 @@ export function getWalletAddress(){ return isB64(cachedB64) ? cachedB64 : (cache
 export async function openConnectModal(){
   await mountTonButtons().catch(()=>{});
   const ui = getTonConnect();
-  try { await ui?.openModal?.(); } catch(e){ log("openModal err:", e); }
+  try {
+    await ui?.openModal?.();
+    // невеличкий буст для soft-guard одразу після явного відкриття
+    try { ui.onModalStateChange?.("opened"); } catch {}
+  } catch(e){ log("openModal err:", e); }
 }
 
 export async function forceDisconnect(){
@@ -197,7 +206,12 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
     try {
       const w = await ui.getWallet?.();
       const addr = w?.account?.address;
-      if (addr && isB64(addr)) setCached(addr); else setCached(null);
+      if (addr && isB64(addr)) {
+        setCached(addr);
+        try { onConnect && onConnect(addr); } catch {}
+      } else {
+        setCached(null);
+      }
     } catch { setCached(null); }
 
     return ui;
