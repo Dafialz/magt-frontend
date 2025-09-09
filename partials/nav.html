@@ -139,17 +139,18 @@
 
       /* 3) Клік/тап поза панеллю (і не по label), але ІГНОРУЄМО TonConnect/діалоги (включно з shadow DOM) */
       function onDocTap(e) {
+        if (window.__tc_open) return;
         if (!burger.checked) return;
         const t = e.target;
         if (t.closest?.('#mobile-panel') || t.closest?.('label[for="nav-burger"]')) return;
 
         // якщо відкрита TonConnect-модалка — нічого не чіпаємо
-        if (window.__tc_open || document.querySelector('.tc-modal, .tc-overlay, [id^="tc-"]') || isInsideTonOrDialogFromEvent(e)) return;
+        if (document.querySelector('.tc-modal, .tc-overlay, [id^="tc-"]') || isInsideTonOrDialogFromEvent(e)) return;
 
         closeMenu();
       }
       document.addEventListener('click', onDocTap, false);
-      document.addEventListener('pointerdown', onDocTap, { passive: true });
+      document.addEventListener('pointerdown', onDocTap, { passive: true, capture: false });
 
       /* 4) Esc або зміна хеша */
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });

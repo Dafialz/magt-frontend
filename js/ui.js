@@ -32,7 +32,7 @@ import { getPresaleStats } from "./ton.js";
   const isInsideTonConnect = (e) => eventPathHasSelector(e, SEL_TC);
 
   const absorb = (e) => {
-    if (isInsideTonConnect(e)) {
+    if (window.__tc_open || isInsideTonConnect(e)) {
       // даємо TonConnect обробити подію, але не пускаємо вище
       e.stopPropagation();
     }
