@@ -87,12 +87,12 @@ async function mountAt(root){
     try {
       u.onModalStateChange?.((s) => {
         const isOpen = (s === true) || (s === "opened") || (s?.open === true);
-        if (isOpen) {
+        if (isOpen) { try { window.__tc_open = true; document.documentElement.classList.add('tc-open'); } catch {}
           // 3.5 секунди "м'якого" лок-вікна після відкриття (трохи довше для мобільних)
           lockUntil = Date.now() + 3500;
           log("modal opened (soft-lock)");
         } else {
-          log("modal closed");
+          log("modal closed"); try { window.__tc_open = false; document.documentElement.classList.remove('tc-open'); } catch {}
         }
       });
     } catch {}

@@ -171,14 +171,14 @@ function initMobileNav() {
       '[role="dialog"]', '[aria-modal="true"]', 'dialog', '.modal', '.overlay',
       'tonconnect-ui', 'ton-connect-ui', 'tonconnect-ui-modal', 'ton-connect-ui-modal'
     ].join(', ');
-    return eventPathHas(e, SEL);
+    if (window.__tc_open) return true; return eventPathHas(e, SEL);
   };
 
   const hasAnyTonConnectOverlayOpen = () => {
     const el = document.querySelector(
       '.tc-modal, .tc-overlay, .tc-wallets-modal, [aria-modal="true"], [role="dialog"]'
     );
-    if (!el) return false;
+    if (!el) return !!window.__tc_open;
     const style = window.getComputedStyle(el);
     return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
   };

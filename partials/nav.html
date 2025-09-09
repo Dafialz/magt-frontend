@@ -144,12 +144,12 @@
         if (t.closest?.('#mobile-panel') || t.closest?.('label[for="nav-burger"]')) return;
 
         // якщо відкрита TonConnect-модалка — нічого не чіпаємо
-        if (document.querySelector('.tc-modal, .tc-overlay, [id^="tc-"]') || isInsideTonOrDialogFromEvent(e)) return;
+        if (window.__tc_open || document.querySelector('.tc-modal, .tc-overlay, [id^="tc-"]') || isInsideTonOrDialogFromEvent(e)) return;
 
         closeMenu();
       }
       document.addEventListener('click', onDocTap, false);
-      document.addEventListener('pointerdown', onDocTap, { passive: true, capture: true });
+      document.addEventListener('pointerdown', onDocTap, { passive: true });
 
       /* 4) Esc або зміна хеша */
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
