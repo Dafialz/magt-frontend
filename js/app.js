@@ -14,15 +14,116 @@ import {
 import { initTonConnect, getWalletAddress, getTonConnect, mountTonButtons } from "./tonconnect.js";
 import { onBuyClick } from "./buy.js";
 import { refreshClaimSection, startClaimPolling, stopClaimPolling } from "./claim.js";
-import { api } from "./utils.js";
 
-/* ================= Balance fallback (якщо claim.js недоступний) ================= */
-const $ = (s) => document.querySelector(s);
+/* ================= utils ================= */
+function el(id) { return document.getElementById(id); }
+function qs(sel) { return document.querySelector(sel); }
+function qsa(sel) { return Array.from(document.querySelectorAll(sel)); }
 
-function renderBalance(amount) {
-  const claimInfo = $("#claim-info");
-  const badge = $("#claim-badge");
-  const wrap = $("#claim-wrap");
+function api(path) {
+  const ABS = (CONFIG && CONFIG.API_BASE_ABS) || "https://api.magtcoin.com";
+  const base = (CONFIG && CONFIG.API_BASE != null) ? CONFIG.API_BASE : "";
+  if (base) return base.replace(/\/+$/, "") + path;
+  return ABS.replace(/\/+$/, "") + path;
+}
+
+/* ================= Partials loader ================= */
+async function loadPartial(id, url) {
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error("loadPartial failed: " + url);
+    const html = await r.text();
+    const slot = document.getElementById(id);
+    if (slot) slot.innerHTML = html;
+  } catch (e) {
+    console.warn("Partial load error", url, e);
+  }
+}
+
+/* ================= Partials boot ================= */
+async function bootPartials() {
+  await Promise.all([
+    loadPartial("slot-nav", "/partials/nav.html?v=17"),
+    loadPartial("slot-hero", "/partials/hero.html?v=17"),
+    loadPartial("slot-main", "/partials/main.html?v=17"),
+    loadPartial("slot-footer", "/partials/footer.html?v=17"),
+  ]);
+
+  try { window.dispatchEvent(new CustomEvent("partials:loaded")); } catch {}
+  try { window.dispatchEvent(new CustomEvent("partials:nav-ready")); } catch {}
+  try { window.dispatchEvent(new CustomEvent("partials:main-ready")); } catch {}
+}
+
+/* ================= Mobile nav ================= */
+// --- TonConnect shield for global handlers ---
+const __TC_SEL = [
+  ".tc-root", ".tc-modal", ".tc-overlay", ".tc-wallets-modal", ".tc-modal__body", ".tc-modal__backdrop",
+  "[data-tc-widget]", '[class*="ton-connect"]', '[class*="tonconnect"]', '[id^="tc-"]',
+  "tonconnect-ui", "ton-connect-ui", "tonconnect-ui-modal", "ton-connect-ui-modal",
+  "[role='dialog'][data-tc-modal='1']"
+].join(", ");
+
+function __tcEventPathHasSelector(e){
+  try {
+    const path = (typeof e.composedPath === "function") ? e.composedPath() : [];
+    for (const n of path) {
+      if (n && n.nodeType === 1) {
+        const el = /** @type {Element} */(n);
+        if (el.matches?.(__TC_SEL)) return true;
+        const host = (el.shadowRoot && el.shadowRoot.host) ? el.shadowRoot.host : null;
+        if (host && host.matches?.(__TC_SEL)) return true;
+      }
+    }
+  } catch {}
+  return false;
+}
+function __tcOverlayOpen() {
+  try{
+    const el = document.querySelector(".tc-modal, .tc-overlay, .tc-wallets-modal, [aria-modal='true']");
+    if (!el) return false;
+    const st = window.getComputedStyle(el);
+    return st.display !== "none" && st.visibility !== "hidden" && st.opacity !== "0";
+  }catch{ return false; }
+}
+
+function setupMobileNav(){
+  const nav = document.getElementById("nav-panel");
+  const toggles = qsa("[data-nav-toggle]");
+  if (!nav || !toggles.length) return;
+
+  const open = () => {
+    nav.classList.remove("-translate-x-full");
+    document.body.classList.add("nav-open");
+  };
+  const close = () => {
+    nav.classList.add("-translate-x-full");
+    document.body.classList.remove("nav-open");
+  };
+
+  toggles.forEach(btn => btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    const isOpen = !nav.classList.contains("-translate-x-full");
+    isOpen ? close() : open();
+  }));
+
+  // кліки поза панеллю — закривають (але не коли клікаємо в TonConnect)
+  document.addEventListener('click', (e) => {
+    if (__tcEventPathHasSelector(e)) return; // ignore clicks inside TonConnect modal
+    if (!nav.contains(e.target)) close();
+  });
+
+  // Esc — теж закриває, якщо НЕ відкрита модалка TonConnect
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !__tcOverlayOpen()) close(); });
+
+  // закриваємо при навігації по якорях
+  qsa("#slot-nav a[href^='#']").forEach(a => a.addEventListener("click", () => close()));
+}
+
+/* ================= Claim badge ================= */
+function updateClaimBadge(amount) {
+  const claimInfo = el("claim-info");
+  const badge = el("claim-badge");
+  const wrap = el("claim-badge-wrap");
   if (!claimInfo || !badge || !wrap) return;
 
   const n = Number(amount || 0);
@@ -36,360 +137,72 @@ function renderBalance(amount) {
 async function fetchBalance(addr) {
   if (!addr) return;
   try {
-    const url = api(`/api/balance?wallet=${encodeURIComponent(addr)}`);
-    if (!url) return;
-    const res = await fetch(url, { cache: "no-store" });
-    const data = await res.json().catch(() => null);
-    if (!data || data.ok === false) return;
-    const amount = data.magt ?? data.claimable ?? 0;
-    renderBalance(amount);
+    const url = api(`/api/balance?wallet=${encodeURIComponent(addr)}`
+      + `&t=${Date.now()}`);
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) return;
+    const j = await r.json().catch(()=>null);
+    const n = Number(j?.amount || 0);
+    updateClaimBadge(n);
   } catch {}
 }
-
-let _pollTimer = null;
-function startBalancePolling(addr) {
-  stopBalancePolling();
-  renderBalance(0);
-  fetchBalance(addr);
-  _pollTimer = setInterval(() => fetchBalance(addr), Number(CONFIG.CLAIM_POLL_INTERVAL_MS || 15000));
-}
-function stopBalancePolling() {
-  if (_pollTimer) clearInterval(_pollTimer), (_pollTimer = null);
-  renderBalance(0);
-}
-
-/* ================== Referral bootstrap ================== */
-function refreshReferralUi() {
-  try {
-    detectRefInUrl();
-    initRefBonusHandlers();
-    recalc();
-  } catch {}
-}
-
-/* ===== РЕЗЕРВНИЙ ПОЛІНГ адреси з TonConnectUI (якщо події не прийшли) ===== */
-let _addrPoll = null;
-function tryExtractAddrFromUi(uiObj) {
-  const u = uiObj || getTonConnect?.() || window.__tcui || null;
-  if (!u) return null;
-  const cand =
-    u?.account?.address ||
-    u?.wallet?.account?.address ||
-    u?.state?.account?.address ||
-    u?.state?.wallet?.account?.address ||
-    u?.connector?.wallet?.account?.address ||
-    u?.connector?.account?.address ||
-    u?.tonConnect?.account?.address ||
-    u?._wallet?.account?.address ||
-    null;
-  return typeof cand === "string" && cand.trim() ? cand.trim() : null;
-}
-function startAddrPolling() {
-  if (_addrPoll) return;
-  let ticks = 0;
-  _addrPoll = setInterval(() => {
-    ticks++;
-    const a = getWalletAddress?.() || tryExtractAddrFromUi();
-    if (a) {
-      try { setOwnRefLink(a); } catch {}
-      stopAddrPolling();
-    }
-    if (ticks > 50) stopAddrPolling(); // ~60 сек максимум
-  }, 1200);
-}
-function stopAddrPolling() {
-  if (_addrPoll) clearInterval(_addrPoll), (_addrPoll = null);
-}
-
-/* ===== Невеликий гарантований ретрай після ініціалізації ===== */
-function scheduleRefLinkRetries() {
-  const attempts = [1000, 2000, 4000];
-  attempts.forEach((ms) => {
-    setTimeout(() => {
-      const a = getWalletAddress?.() || tryExtractAddrFromUi();
-      if (a) { try { setOwnRefLink(a); } catch {} }
-    }, ms);
-  });
-}
-
-/* ===== Локальний страховий байндинг інпутів → recalc() ===== */
-function wireCalcInput() {
-  const tonEl = document.getElementById("tonIn");
-  if (tonEl && !tonEl.__calcBound) {
-    ["input","change"].forEach(ev => tonEl.addEventListener(ev, () => { try { recalc(); } catch {} }));
-    tonEl.__calcBound = true;
-  }
-  const usdEl = document.getElementById("usdtIn"); // fallback для старого шаблону
-  if (usdEl && !usdEl.__calcBound) {
-    ["input","change"].forEach(ev => usdEl.addEventListener(ev, () => { try { recalc(); } catch {} }));
-    usdEl.__calcBound = true;
-  }
-}
-
-/* ===== Mobile nav (burger) ===== */
-function initMobileNav() {
-  const nav = document.querySelector('nav[data-nav]');
-  if (!nav || nav.__navBound) return;
-
-  const btn = nav.querySelector('label[for="nav-burger"], #nav-btn');
-  const panel = nav.querySelector('#mobile-panel');
-  const checkbox = nav.querySelector('#nav-burger');
-
-  if (!btn || !panel) return;
-
-  const setAria = () => btn.setAttribute('aria-expanded', panel.classList.contains('hidden') ? 'false' : 'true');
-  const open  = () => { panel.classList.remove('hidden'); if (checkbox) checkbox.checked = true;  setAria(); };
-  const close = () => { panel.classList.add('hidden');   if (checkbox) checkbox.checked = false; setAria(); };
-
-  const onBtn = (e) => { e.preventDefault(); panel.classList.contains('hidden') ? open() : close(); };
-  btn.addEventListener('click', onBtn);
-  btn.addEventListener('touchstart', onBtn, { passive:false });
-
-  // закриття при кліку по пункту меню
-  panel.addEventListener('click', (e) => {
-    if (e.target.closest('a,button,summary')) close();
-  });
-
-  // --- Антизакриття під час TonConnect / будь-яких діалогів (враховує shadow DOM) ---
-  const eventPathHas = (e, selector) => {
-    const path = (typeof e.composedPath === 'function') ? e.composedPath() : [];
-    for (const n of path) {
-      if (!n || !(n instanceof Node)) continue;
-      if (n.nodeType !== 1) continue;
-      const el = /** @type {Element} */(n);
-      if (el.matches?.(selector)) return true;
-      // якщо це хост shadow-root
-      const host = (el.shadowRoot && el.shadowRoot.host) ? el.shadowRoot.host : null;
-      if (host && (host.matches?.(selector))) return true;
-    }
-    return false;
-  };
-
-  const isInsideTonConnectOrDialogEvent = (e) => {
-    const SEL = [
-      // TonConnect UI
-      '.tc-root', '.tc-modal', '.tc-overlay', '.tc-wallets-modal', '[data-tc-widget]',
-      '[class*="ton-connect"]', '[class*="tonconnect"]', '[id^="tc-"]',
-      // generic dialogs
-      '[role="dialog"]', '[aria-modal="true"]', 'dialog', '.modal', '.overlay',
-      // custom elements (на деяких збірках TonConnect)
-      'tonconnect-ui', 'ton-connect-ui', 'tonconnect-ui-modal', 'ton-connect-ui-modal'
-    ].join(', ');
-    return eventPathHas(e, SEL);
-  };
-
-  const hasAnyTonConnectOverlayOpen = () => {
-    const el = document.querySelector(
-      '.tc-modal, .tc-overlay, .tc-wallets-modal, [aria-modal="true"], [role="dialog"]'
-    );
-    if (!el) return false;
-    const style = window.getComputedStyle(el);
-    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-  };
-
-  const guardedClose = () => {
-    if (!hasAnyTonConnectOverlayOpen()) close();
-  };
-
-  // обробники поза панеллю: не чіпаємо кліки всередині TC / діалогів
-  const onDocTap = (e) => {
-    if (!checkbox?.checked) return; // меню й так закрите
-    if (isInsideTonConnectOrDialogEvent(e)) return;
-
-    const t = e.target;
-    if (t?.closest?.('#mobile-panel') || t?.closest?.('label[for="nav-burger"]')) return;
-
-    guardedClose();
-  };
-
-  // capture=true, щоб реагувати раніше за «булькаючі» хендлери
-  document.addEventListener('click', onDocTap, true);
-  document.addEventListener('pointerdown', onDocTap, { passive: true, capture: true });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (hasAnyTonConnectOverlayOpen()) return; // Esc належить модалці
-      guardedClose();
-    }
-  });
-  window.addEventListener('hashchange', () => guardedClose());
-  window.addEventListener('resize', () => { if (window.innerWidth >= 768) guardedClose(); });
-
-  setAria();
-  nav.__navBound = true;
-}
-
-/* ================= Handlers ================= */
-function afterConnected(base64Addr) {
-  try { setOwnRefLink(base64Addr); } catch {}
-  refreshReferralUi();
-  refreshButtons();
-
-  let usedClaimModule = false;
-  try {
-    if (typeof refreshClaimSection === "function") {
-      refreshClaimSection().catch(() => {});
-      usedClaimModule = true;
-    }
-    if (typeof startClaimPolling === "function") {
-      startClaimPolling();
-      usedClaimModule = true;
-    }
-  } catch {}
-  if (!usedClaimModule) startBalancePolling(base64Addr);
-}
-
-function afterDisconnected() {
-  ui.refYourLink?.classList.add("hidden");
-  refreshButtons();
-  let usedClaimModule = false;
-  try {
-    if (typeof stopClaimPolling === "function") {
-      stopClaimPolling();
-      usedClaimModule = true;
-    }
-  } catch {}
-  if (!usedClaimModule) stopBalancePolling();
-}
-
-/* ===== антидубль прив’язки подій після інʼєкції partials ===== */
-const getUserUsdtBalance = async () => 0;
-
-function bindRuntimeEventsOnce() {
-  if (window.__magtEventsBound) return;
-  bindEvents({
-    onBuyClick,
-    onClaimClick: () => import("./claim.js").then((m) => m.onClaimClick?.()),
-    getUserUsdtBalance,
-  });
-  wireCalcInput();
-  window.__magtEventsBound = true;
-}
-
-/* ================= Re-init after partials ================= */
-async function reinitAfterPartials() {
-  try {
-    refreshUiRefs();
-    initStaticUI();
-
-    await mountTonButtons().catch(()=>{});
-    window.__magtEventsBound = false;
-    bindRuntimeEventsOnce();
-
-    initMobileNav();
-
-    wireCalcInput();
-    refreshReferralUi();
-    recalc();
-    refreshButtons();
-
-    const a = getWalletAddress?.() || tryExtractAddrFromUi();
-    if (a) setOwnRefLink(a);
-    else startAddrPolling();
-  } catch (e) {
-    console.warn("[reinitAfterPartials] fail:", e);
-  }
-}
-window.addEventListener("partials:loaded", reinitAfterPartials);
-window.addEventListener("partials:main-ready", reinitAfterPartials);
-
-window.addEventListener("popstate", () => {
-  refreshReferralUi();
-  recalc();
-});
-
-/* ======= Головний хук: глобальна подія з tonconnect.js ======= */
-if (!window.__magtAddrHooked) {
-  window.addEventListener("magt:address", (ev) => {
-    const a = ev?.detail?.address || null;
-    if (a && typeof a === "string") {
-      try { setOwnRefLink(a); } catch {}
-      const usedClaim = typeof startClaimPolling === "function";
-      if (!usedClaim) fetchBalance(a);
-      stopAddrPolling();
-    } else {
-      afterDisconnected();
-      startAddrPolling();
-    }
-  });
-  window.__magtAddrHooked = true;
-}
-
-/* ===== оновлюємо баланс після покупки + тост із деталями ===== */
-window.addEventListener("magt:purchase", (ev) => {
-  const a = getWalletAddress?.() || tryExtractAddrFromUi();
-  if (a) {
-    fetchBalance(a);
-    try { refreshClaimSection?.(); } catch {}
-  }
-
-  try {
-    const level = ev?.detail?.level ?? (ui.level?.textContent || "—");
-    const tokens = Number(ev?.detail?.tokens ?? 0);
-
-    const tonAmount  = Number(ev?.detail?.ton ?? 0);
-    const priceTon   = Number(ev?.detail?.priceTon ?? window.__CURRENT_PRICE_TON ?? CONFIG.PRICE_TON ?? 0);
-
-    if (tokens > 0 && priceTon > 0 && tonAmount >= 0) {
-      toast(`Купівля: ${Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(tokens)} MAGT по ${priceTon.toFixed(6)} TON (рівень ${level})`);
-      return;
-    }
-
-    const pUsd = Number((ev?.detail?.price) ?? CONFIG.PRICE_USD);
-    const usd = Number((ev?.detail?.usd) ?? (ui.usdtIn?.value || 0));
-    const tokensUsd = pUsd > 0 ? usd / pUsd : 0;
-    if (tokensUsd > 0 && isFinite(tokensUsd) && pUsd > 0) {
-      toast(`Купівля: ${Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(tokensUsd)} MAGT по $${pUsd.toFixed(6)} (рівень ${level})`);
-    }
-  } catch {}
-});
 
 /* ================= Boot ================= */
-async function bootOnce() {
-  refreshUiRefs();
+async function boot() {
+  await bootPartials();
+
+  try { refreshUiRefs(); } catch {}
+
   initStaticUI();
+  detectRefInUrl();
+  initRefBonusHandlers();
 
-  bindRuntimeEventsOnce();
-  wireCalcInput();
+  setupMobileNav();
 
-  initMobileNav();
-
-  refreshReferralUi();
-  recalc();
-  refreshButtons();
+  await mountTonButtons().catch(()=>{});
 
   await initTonConnect({
-    onConnect: (addr) => afterConnected(addr),
-    onDisconnect: () => afterDisconnected(),
+    onConnect: async (addr) => {
+      refreshButtons();
+      recalc();
+      try { await fetchBalance(addr); } catch {}
+      try { startClaimPolling(addr); } catch {}
+    },
+    onDisconnect: async () => {
+      refreshButtons();
+      recalc();
+      try { stopClaimPolling(); } catch {}
+      updateClaimBadge(0);
+    }
   });
 
-  const a = getWalletAddress?.() || tryExtractAddrFromUi();
-  if (a) {
-    try { setOwnRefLink(a); } catch {}
-    let usedClaim = false;
-    try {
-      if (typeof startClaimPolling === "function") { startClaimPolling(); usedClaim = true; }
-      if (typeof refreshClaimSection === "function") { refreshClaimSection(); usedClaim = true; }
-    } catch {}
-    if (!usedClaim) startBalancePolling(a);
-  } else {
-    startAddrPolling();
-  }
-
-  scheduleRefLinkRetries();
+  bindEvents({
+    onBuyClick,
+    onClaimClick: () => { try { refreshClaimSection(); } catch {} },
+    getUserUsdtBalance: async () => {
+      try {
+        const addr = getWalletAddress();
+        if (!addr) return null;
+        const url = api(`/api/usdt-balance?wallet=${encodeURIComponent(addr)}&t=${Date.now()}`);
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) return null;
+        const j = await r.json().catch(()=>null);
+        return Number(j?.balance || 0);
+      } catch { return null; }
+    }
+  });
 }
 
-/* ================= Autostart ================= */
-if (document.readyState === "loading") {
-  window.addEventListener("DOMContentLoaded", () => {
-    bootOnce().catch((e) => console.warn("[boot] failed:", e));
-  });
-} else {
-  bootOnce().catch((e) => console.warn("[boot] failed:", e));
+try {
+  if (document.readyState === "loading") {
+    window.addEventListener("DOMContentLoaded", boot, { once: true });
+  } else boot();
+} catch (e) {
+  console.warn("boot error", e);
 }
 
 /* ================= Debug ================= */
-window.magt = Object.assign(window.magt || {}, {
-  buyNow: onBuyClick,
-});
-try { if (!window.recalc) window.recalc = recalc; } catch {}
+try { window.refreshUiRefs = refreshUiRefs; } catch {}
+try { window.mountTonButtons = mountTonButtons; } catch {}
+try { window.getTonConnect = getTonConnect; } catch {}
+try { window.toast = toast; } catch {}
