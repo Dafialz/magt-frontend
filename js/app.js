@@ -16,68 +16,6 @@ import { onBuyClick } from "./buy.js";
 import { refreshClaimSection, startClaimPolling, stopClaimPolling } from "./claim.js";
 import { api } from "./utils.js";
 
-/* =================== ГЛОБАЛЬНИЙ ЩИТ ДЛЯ TONCONNECT (bubbling) =================== */
-/* Дозволяємо клікам усередині модалки дійти до цілей, але не даємо їм «вилізти» назовні. */
-(function setupTonConnectGlobalShieldOnce() {
-  if (window.__magtTcGlobalShieldInstalled) return;
-  window.__magtTcGlobalShieldInstalled = true;
-
-  const SEL_TC = [
-    ".tc-root", ".tc-modal", ".tc-overlay", ".tc-wallets-modal", ".tc-modal__body", ".tc-modal__backdrop",
-    "[data-tc-widget]", '[class*="ton-connect"]', '[class*="tonconnect"]', '[id^="tc-"]',
-    "tonconnect-ui", "ton-connect-ui", "tonconnect-ui-modal", "ton-connect-ui-modal",
-    "[role='dialog']", "[aria-modal='true']", "dialog", ".modal", ".overlay"
-  ].join(", ");
-
-  function eventPathHasSelector(e, selector) {
-    try {
-      const path = (typeof e.composedPath === "function") ? e.composedPath() : [];
-      for (const n of path) {
-        if (n && n.nodeType === 1) {
-          const el = /** @type {Element} */(n);
-          if (el.matches?.(selector)) return true;
-          const host = (el.shadowRoot && el.shadowRoot.host) ? el.shadowRoot.host : null;
-          if (host && host.matches?.(selector)) return true;
-        }
-      }
-    } catch {}
-    return false;
-  }
-
-  function isInsideTonConnect(e) {
-    return eventPathHasSelector(e, SEL_TC);
-  }
-
-  function tcOverlayOpen() {
-    try {
-      const el = document.querySelector(".tc-modal, .tc-overlay, .tc-wallets-modal, [aria-modal='true'], [role='dialog']");
-      if (!el) return false;
-      const st = window.getComputedStyle(el);
-      return st.display !== "none" && st.visibility !== "hidden" && st.opacity !== "0";
-    } catch { return false; }
-  }
-
-  // Лише bubbling — не ламаємо взаємодію всередині TonConnect
-  const absorb = (e) => {
-    if (isInsideTonConnect(e)) {
-      e.stopPropagation();
-      e.stopImmediatePropagation?.();
-    }
-  };
-  document.addEventListener("click", absorb, false);
-  document.addEventListener("pointerdown", absorb, { capture: false, passive: true });
-  document.addEventListener("touchstart", absorb, { capture: false, passive: true });
-
-  // Для Esc: блокуємо розповсюдження назовні, але не заважаємо самій модалці
-  const onKey = (e) => {
-    if (e.key === "Escape" && tcOverlayOpen()) {
-      e.stopPropagation();
-      e.stopImmediatePropagation?.();
-    }
-  };
-  document.addEventListener("keydown", onKey, true);
-})();
-
 /* ================= Balance fallback (якщо claim.js недоступний) ================= */
 const $ = (s) => document.querySelector(s);
 

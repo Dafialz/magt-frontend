@@ -4,6 +4,62 @@ import { ui, state, refreshUiRefs } from "./state.js";
 import { fmt as utilFmt, clamp, setBtnLoading } from "./utils.js";
 import { getPresaleStats } from "./ton.js";
 
+/* ===== ЛЕГКИЙ SHIELD для TonConnect (bubbling only) ===== */
+(function setupTonConnectBubblingShieldOnce() {
+  if (window.__magtTcBubblingShieldInstalled) return;
+  window.__magtTcBubblingShieldInstalled = true;
+
+  const SEL_TC = [
+    ".tc-root", ".tc-modal", ".tc-overlay", ".tc-wallets-modal", ".tc-modal__body", ".tc-modal__backdrop",
+    "[data-tc-widget]", '[class*="ton-connect"]', '[class*="tonconnect"]', '[id^="tc-"]',
+    "tonconnect-ui", "ton-connect-ui", "tonconnect-ui-modal", "ton-connect-ui-modal",
+    "[role='dialog']", "[aria-modal='true']", "dialog", ".modal", ".overlay"
+  ].join(", ");
+
+  function eventPathHasSelector(e, selector) {
+    try {
+      const path = (typeof e.composedPath === "function") ? e.composedPath() : [];
+      for (const n of path) {
+        if (!n || n.nodeType !== 1) continue;
+        const el = /** @type {Element} */(n);
+        if (el.matches?.(selector)) return true;
+        const host = (el.shadowRoot && el.shadowRoot.host) ? el.shadowRoot.host : null;
+        if (host && host.matches?.(selector)) return true;
+      }
+    } catch {}
+    return false;
+  }
+  const isInsideTonConnect = (e) => eventPathHasSelector(e, SEL_TC);
+
+  const absorb = (e) => {
+    if (isInsideTonConnect(e)) {
+      // даємо TonConnect обробити подію, але не пускаємо вище
+      e.stopPropagation();
+      e.stopImmediatePropagation?.();
+    }
+  };
+  // тільки bubbling — не ламаємо взаємодію всередині TonConnect
+  document.addEventListener("click", absorb, false);
+  document.addEventListener("pointerdown", absorb, { capture: false, passive: true });
+  document.addEventListener("touchstart", absorb, { capture: false, passive: true });
+
+  // Esc: блокуємо «втечу» назовні, але не заважаємо самій модалці
+  const onKey = (e) => {
+    if (e.key !== "Escape") return;
+    try {
+      const el = document.querySelector(".tc-modal, .tc-overlay, .tc-wallets-modal, [aria-modal='true'], [role='dialog']");
+      if (!el) return;
+      const st = getComputedStyle(el);
+      const open = st.display !== "none" && st.visibility !== "hidden" && st.opacity !== "0";
+      if (open) {
+        e.stopPropagation();
+        e.stopImmediatePropagation?.();
+      }
+    } catch {}
+  };
+  document.addEventListener("keydown", onKey, true);
+})();
+
 /* ===== БАЗА ДЛЯ API ===== */
 const IS_LOCAL = (location.hostname === "localhost" || location.hostname === "127.0.0.1");
 const API_BASE =
