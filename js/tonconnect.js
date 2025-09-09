@@ -157,6 +157,34 @@ function addrFromWalletObj(w){
   return normalizeToBase64(raw) || null;
 }
 
+/* =================== анти-закриття модалки =================== */
+let tcCaptureBound = false;
+function bindModalGuards(root = document) {
+  if (tcCaptureBound) return;
+  tcCaptureBound = true;
+
+  const stopIfInside = (e) => {
+    const t = e.target && (e.target.closest?.('.tc-modal, .tc-root, [data-tc-widget], [id^="tc-"]'));
+    if (t) {
+      // не даємо подіям “кліків поза елементом” дійти до глобальних хендлерів
+      e.stopPropagation();
+    }
+  };
+
+  // у захопленні, щоб випередити інші document-handlers
+  root.addEventListener('click', stopIfInside, true);
+  root.addEventListener('mousedown', stopIfInside, true);
+  root.addEventListener('touchstart', stopIfInside, { capture: true, passive: true });
+}
+
+function markTcOpen(open) {
+  try {
+    document.documentElement.dataset.tcOpen = open ? '1' : '';
+    document.body.classList.toggle('tc-open', !!open);
+    document.body.dataset.tcOpen = open ? '1' : '';
+  } catch {}
+}
+
 /* =============== монтування кнопок =============== */
 
 /** Раніше тут ховали ще мобільні контейнери — тепер залишаємо їх видимими */
@@ -193,6 +221,8 @@ function attachUxFallback(ui) {
   if (!ui || ui.__magtUxHooked) return;
   ui.__magtUxHooked = true;
 
+  bindModalGuards();
+
   let fallbackTimer = null;
   let reopenGuard = { ts: 0, count: 0 }; // анти-лупка
 
@@ -200,7 +230,7 @@ function attachUxFallback(ui) {
     try { ui.openModal?.(); } catch {}
     setTimeout(() => {
       try {
-        const box = document.querySelector(".tc-modal__body");
+        const box = document.querySelector(".tc-modal__body, .tc-root");
         if (box && !box.querySelector(".tc-hint")) {
           const hint = document.createElement("div");
           hint.className = "tc-hint";
@@ -214,11 +244,10 @@ function attachUxFallback(ui) {
 
   function scheduleImmediateReopen(delay = 500) {
     const now = Date.now();
-    // якщо пройшло >10с — обнуляємо лічильник
     if (now - reopenGuard.ts > 10000) reopenGuard = { ts: now, count: 0 };
     reopenGuard.count++;
     reopenGuard.ts = now;
-    if (reopenGuard.count > 4) { // не більше 4 автопроб за 10с
+    if (reopenGuard.count > 4) {
       log("reopen guard tripped; skip");
       return;
     }
@@ -228,10 +257,13 @@ function attachUxFallback(ui) {
   }
 
   try {
-    // деякі версії TonConnectUI дають boolean, інші — об'єкт/рядок
     ui.onModalStateChange?.((s) => {
-      const isOpen = (s === true) || (s === "opened") || (s?.open === true);
+      const isOpen =
+        (s === true) || (s === "opened") || (s?.open === true) ||
+        (s?.state === "opened");
       log("modal state:", s);
+      markTcOpen(isOpen);
+
       if (!isOpen && !getWalletAddress()) {
         // модал закрили без конекту → одразу повертаємо
         scheduleImmediateReopen(300);
@@ -241,7 +273,7 @@ function attachUxFallback(ui) {
     log("onModalStateChange hook error:", e);
   }
 
-  // резервний «повільний» фолбек: якщо статус-чейндж без адреси — відкриваємо з паузою
+  // резервний «повільний» фолбек
   ui.__magtScheduleFallback = () => {
     if (fallbackTimer) clearTimeout(fallbackTimer);
     fallbackTimer = setTimeout(() => {
@@ -251,7 +283,9 @@ function attachUxFallback(ui) {
 }
 
 const RETURN_URL = `${location.origin}/`;
-const TWA_RETURN_URL = `${location.origin}/`; // якщо з’явиться TWA-бот — заміниш
+const TWA_RETURN_URL = `${location.origin}/`;
+
+const MANIFEST_URL = "https://magtcoin.com/tonconnect-manifest.json?v=3";
 
 async function mountPrimaryAt(root) {
   if (primaryUi) return primaryUi;
@@ -264,7 +298,7 @@ async function mountPrimaryAt(root) {
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
 
   const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: "/tonconnect-manifest.json",
+    manifestUrl: MANIFEST_URL,
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
     restoreConnection: true,
@@ -280,7 +314,7 @@ async function mountPrimaryAt(root) {
   return ui;
 }
 
-/** Монтуємо другі інстанси кнопки в мобільні слоти (той самий стейт, інший контейнер) */
+/** Монтуємо другі інстанси кнопки в мобільні слоти */
 async function mountSecondaryAt(rootOrId, existingRefName = "mobile") {
   await waitTonLib();
   if (!window.TON_CONNECT_UI) return null;
@@ -288,14 +322,13 @@ async function mountSecondaryAt(rootOrId, existingRefName = "mobile") {
   const root = typeof rootOrId === "string" ? document.getElementById(rootOrId) : rootOrId;
   if (!root || !(root instanceof HTMLElement)) return null;
 
-  // не перезатираємо, якщо вже є TonConnectUI в цьому контейнері
   if (root.dataset.tcMounted === "1") return null;
 
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
   try { root.innerHTML = ""; } catch {}
 
   const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: "/tonconnect-manifest.json",
+    manifestUrl: MANIFEST_URL,
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
     restoreConnection: true,
@@ -327,14 +360,14 @@ export async function mountTonButtons() {
     }
   }
 
-  // МОБІЛЬНА інлайн-кнопка (біля бургера)
+  // МОБІЛЬНА інлайн-кнопка
   const inlineRoot = document.getElementById("tonconnect-mobile-inline");
   if (inlineRoot && !inlineRoot.dataset.tcMounted) {
     mobileInlineUi = await mountSecondaryAt(inlineRoot, "inline").catch(() => null);
     if (mobileInlineUi) created.push(mobileInlineUi);
   }
 
-  // МОБІЛЬНА кнопка всередині дроуера
+  // МОБІЛЬНА в дроуері
   const drawerRoot = document.getElementById("tonconnect-mobile");
   if (drawerRoot && !drawerRoot.dataset.tcMounted) {
     mobileDrawerUi = await mountSecondaryAt(drawerRoot, "drawer").catch(() => null);
@@ -350,18 +383,6 @@ export function getWalletAddress() {
 }
 export function getTonConnect() {
   return primaryUi || window.__tcui || null;
-}
-
-function _isConnected(ui) {
-  if (!ui) return false;
-  return Boolean(
-    ui?.account?.address ||
-    ui?.state?.account?.address ||
-    ui?.wallet?.account?.address ||
-    ui?.connector?.wallet?.account?.address ||
-    ui?.tonConnect?.account?.address ||
-    ui?._wallet?.account?.address
-  );
 }
 
 export async function forceDisconnect() {
@@ -420,6 +441,9 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}) {
         });
         log("subscribed to onStatusChange");
       } catch (e) { log("onStatusChange subscribe error:", e); }
+
+      // одразу позначимо захисники модалки
+      attachUxFallback(ui);
     }
 
     if (primaryUi) await bindOn(primaryUi);
