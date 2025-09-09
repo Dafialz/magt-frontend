@@ -22,12 +22,13 @@
   <!-- Tailwind конфіг -->
   <script src="/assets/tw-config.js?v=17"></script>
 
-<!-- правильно (файли з кореня) -->
-<link rel="stylesheet" href="/assets/styles.css?v=18">
-<link rel="stylesheet" href="/assets/inline.css?v=17">
+  <!-- стилі (лежать у /assets) -->
+  <link rel="stylesheet" href="/assets/styles.css?v=18">
+  <link rel="stylesheet" href="/assets/inline.css?v=17">
 
   <!-- бібліотеки -->
-  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <!-- ВАЖЛИВО: фіксуємо стабільну версію TonConnect UI замість @latest -->
+  <script src="https://unpkg.com/@tonconnect/ui@2.1.0/dist/tonconnect-ui.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tonweb@0.0.66/dist/tonweb.min.js"></script>
 
   <!-- === API override БЕЗ гонок: має виконатися ДО модулів === -->
@@ -103,8 +104,8 @@
         </label>
         <label class="block">
           <span class="text-sm text-neutral-400" data-i18n="widgets.calc.listing">Ціна лістингу (USD)</span>
-          <input id="calc-listing" type="number" min="0" step="0.000001" inputmode="decimal"
-                class="mt-2 w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10" placeholder="0.01">
+          <input id="calc-listing" type="number" min="0" step="0.000001" inputmode="decimal
+"                class="mt-2 w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10" placeholder="0.01">
         </label>
       </div>
 
