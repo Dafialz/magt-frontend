@@ -150,51 +150,65 @@ function initMobileNav() {
     if (e.target.closest('a,button,summary')) close();
   });
 
-  // --- >>> Антизакриття під час TonConnect / будь-яких діалогів <<< ---
-  const isInsideTonConnectOrDialog = (t) => !!(
-    t.closest(
-      [
-        // TonConnect UI
-        '.tc-root', '.tc-modal', '.tc-overlay', '.tc-widget', '.tc-list', '.tc-wallets-modal',
-        '.tc-modal__body', '.tc-modal__backdrop',
-        '[data-tc-widget]', '[class*="ton-connect"]', '[class*="tonconnect"]', '[id^="tc-"]',
-        // загальні діалоги/оверлеї
-        '[role="dialog"]', '[aria-modal="true"]', 'dialog', '.modal', '.overlay'
-      ].join(', ')
-    )
-  );
+  // --- Антизакриття під час TonConnect / будь-яких діалогів (враховує shadow DOM) ---
+  const eventPathHas = (e, selector) => {
+    const path = (typeof e.composedPath === 'function') ? e.composedPath() : [];
+    for (const n of path) {
+      if (!n || !(n instanceof Node)) continue;
+      if (n.nodeType !== 1) continue;
+      const el = /** @type {Element} */(n);
+      if (el.matches?.(selector)) return true;
+      // якщо це хост shadow-root
+      const host = (el.shadowRoot && el.shadowRoot.host) ? el.shadowRoot.host : null;
+      if (host && (host.matches?.(selector))) return true;
+    }
+    return false;
+  };
+
+  const isInsideTonConnectOrDialogEvent = (e) => {
+    const SEL = [
+      // TonConnect UI
+      '.tc-root', '.tc-modal', '.tc-overlay', '.tc-wallets-modal', '[data-tc-widget]',
+      '[class*="ton-connect"]', '[class*="tonconnect"]', '[id^="tc-"]',
+      // generic dialogs
+      '[role="dialog"]', '[aria-modal="true"]', 'dialog', '.modal', '.overlay',
+      // custom elements (на деяких збірках TonConnect)
+      'tonconnect-ui', 'ton-connect-ui', 'tonconnect-ui-modal', 'ton-connect-ui-modal'
+    ].join(', ');
+    return eventPathHas(e, SEL);
+  };
 
   const hasAnyTonConnectOverlayOpen = () => {
     const el = document.querySelector(
-      [
-        '.tc-modal', '.tc-overlay', '.tc-wallets-modal', '.tc-root [role="dialog"]',
-        '[aria-modal="true"]'
-      ].join(', ')
+      '.tc-modal, .tc-overlay, .tc-wallets-modal, [aria-modal="true"], [role="dialog"]'
     );
     if (!el) return false;
     const style = window.getComputedStyle(el);
     return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
   };
 
-  // якщо відкрита TC-модалка — не закриваємо меню взагалі
-  const guardedClose = () => { if (!hasAnyTonConnectOverlayOpen()) close(); };
+  const guardedClose = () => {
+    if (!hasAnyTonConnectOverlayOpen()) close();
+  };
 
   // обробники поза панеллю: не чіпаємо кліки всередині TC / діалогів
   const onDocTap = (e) => {
+    if (!checkbox?.checked) return; // меню й так закрите
+    if (isInsideTonConnectOrDialogEvent(e)) return;
+
     const t = e.target;
-    if (nav.contains(t)) return;
-    if (isInsideTonConnectOrDialog(t)) return;
+    if (t?.closest?.('#mobile-panel') || t?.closest?.('label[for="nav-burger"]')) return;
+
     guardedClose();
   };
 
   // capture=true, щоб реагувати раніше за «булькаючі» хендлери
   document.addEventListener('click', onDocTap, true);
-  document.addEventListener('mousedown', onDocTap, true);
-  document.addEventListener('touchstart', onDocTap, { passive: true, capture: true });
+  document.addEventListener('pointerdown', onDocTap, { passive: true, capture: true });
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      if (hasAnyTonConnectOverlayOpen()) return; // Esc належить модалці — ігноруємо
+      if (hasAnyTonConnectOverlayOpen()) return; // Esc належить модалці
       guardedClose();
     }
   });
