@@ -35,7 +35,6 @@ import { getPresaleStats } from "./ton.js";
     if (isInsideTonConnect(e)) {
       // даємо TonConnect обробити подію, але не пускаємо вище
       e.stopPropagation();
-      e.stopImmediatePropagation?.();
     }
   };
   // тільки bubbling — не ламаємо взаємодію всередині TonConnect
@@ -53,7 +52,6 @@ import { getPresaleStats } from "./ton.js";
       const open = st.display !== "none" && st.visibility !== "hidden" && st.opacity !== "0";
       if (open) {
         e.stopPropagation();
-        e.stopImmediatePropagation?.();
       }
     } catch {}
   };
