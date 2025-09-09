@@ -206,28 +206,8 @@
   <script type="module" src="/js/i18n.js?v=17"></script>
   <script type="module" src="/js/accordion.js?v=17"></script>
 
-  <!-- Надійний імпорт TonConnect після вставки partials -->
-  <script type="module">
-    const importOnce = () => {
-      if (window.__tcImported) return;
-      window.__tcImported = true;
-      import('/js/tonconnect.js?v=17').catch(()=>{});
-    };
-
-    // 1) коли частини підвантажені
-    window.addEventListener('partials:loaded', importOnce, { once: true });
-    window.addEventListener('partials:main-ready', importOnce, { once: true });
-
-    // 2) якщо події проскочили — DOM уже готовий
-    if (document.readyState !== 'loading') {
-      queueMicrotask(importOnce);
-    } else {
-      window.addEventListener('DOMContentLoaded', () => queueMicrotask(importOnce), { once: true });
-    }
-
-    // 3) остання страховка
-    setTimeout(importOnce, 0);
-  </script>
+  <!-- Надійне підключення TonConnect -->
+  <script src="/js/tonconnect.js?v=18" defer></script>
 
   <script type="module" src="/js/ui.js?v=17"></script>
   <script type="module" src="/js/widgets.js?v=17"></script>
