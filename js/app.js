@@ -150,12 +150,12 @@ function initMobileNav() {
     if (e.target.closest('a,button,summary')) close();
   });
 
-  // ігноруємо кліки в TonConnect/діалогах
-  const isInsideTonConnectOrDialog = (t) => {
-    return !!(
-      t.closest('.tc-modal, .tc-root, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"], [role="dialog"], dialog, .modal, .overlay')
-    );
-  };
+  // ігноруємо кліки всередині TonConnect UI
+const isInsideTonConnectOrDialog = (t) => {
+  return !!(
+    t.closest('.tc-root, .tc-modal, .tc-overlay, [data-tc-widget], [class*="ton-connect"], [id^="tc-"]')
+  );
+};
 
   document.addEventListener('click', (e) => {
     const t = e.target;
