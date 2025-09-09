@@ -15,9 +15,8 @@ let readyPromise = null;
 const DBG = (() => { try { return !!JSON.parse(localStorage.getItem("magt_debug") || "false"); } catch { return false; } })();
 const log = (...a) => { if (DBG) { try { console.log("[TC]", ...a); } catch {} } };
 
-// Стабільний маніфест; RETURN_URL поки не задаємо навмисно
 const MANIFEST_URL = "https://magtcoin.com/tonconnect-manifest.json";
-// const RETURN_URL   = location.origin + "/";
+// const RETURN_URL = location.origin + "/";
 
 function isB64(s){ return typeof s === "string" && /^(EQ|UQ)[A-Za-z0-9_-]{46,68}$/.test((s||"").trim()); }
 function short(a){ return a ? a.slice(0,4)+"…"+a.slice(-4) : ""; }
@@ -47,49 +46,103 @@ function setCached(addr){
   }
 }
 
-/* ---------------- UX-guard: не давати модалці «зникнути» без підключення --- */
-function attachModalGuard(ui){
-  if (!ui || ui.__mtGuard) return;
-  ui.__mtGuard = true;
+/* -------------------- Супер-guard проти передчасного закриття -------------------- */
+function attachHardModalGuard(ui){
+  if (!ui || ui.__mtHardGuard) return;
+  ui.__mtHardGuard = true;
 
-  let reopenCount = 0;
-  let lastTick = 0;
+  // Активний захист: доки немає адреси, але не довше 20с з моменту першого відкриття
+  let guardActive = false;
+  let guardStart = 0;
+  const GUARD_LIMIT_MS = 20000;
 
-  function canReopen() {
-    const now = Date.now();
-    if (now - lastTick > 10000) reopenCount = 0; // «вікно» 10с
-    return reopenCount < 3; // не більше 3 автоспроб
-  }
+  const guardOn = () => { guardActive = true; guardStart = Date.now(); };
+  const guardOff = () => { guardActive = false; };
 
-  function tryReopen(delay = 350){
-    if (!canReopen()) return;
-    reopenCount++;
-    lastTick = Date.now();
-    setTimeout(() => {
-      if (!getWalletAddress()) {
-        try { ui.openModal?.(); } catch {}
-      }
-    }, delay);
-  }
+  const guardAllowed = () => {
+    if (!guardActive) return false;
+    if (cachedB64) { guardOff(); return false; }
+    if (Date.now() - guardStart > GUARD_LIMIT_MS) { guardOff(); return false; }
+    return true;
+  };
 
+  // 1) Перехоплюємо закриття через API
+  try {
+    const origClose = ui.closeModal?.bind(ui);
+    if (origClose) {
+      ui.closeModal = async (...args) => {
+        if (guardAllowed()) {
+          log("closeModal blocked by guard");
+          return; // ігноруємо
+        }
+        return origClose(...args);
+      };
+    }
+  } catch {}
+
+  // 2) Глобальні перехоплювачі кліків/клавіш, що можуть закрити модалку
+  const shouldBlockEvent = (t) => {
+    if (!guardAllowed()) return false;
+    // backdrop / overlay / кнопка закриття / сам діалог
+    return !!(
+      t.closest('.tc-overlay, .tc-modal') ||
+      t.closest('[class*="tc-"][aria-label="Close"], .tc-modal__close, [data-testid="modal-close"]')
+    );
+  };
+
+  const onClickCapture = (e) => {
+    if (shouldBlockEvent(e.target)) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      // Підстрахуємося і відкриємо знову
+      try { ui.openModal?.(); } catch {}
+    }
+  };
+
+  const onKeydownCapture = (e) => {
+    if (!guardAllowed()) return;
+    if (e.key === "Escape") {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      try { ui.openModal?.(); } catch {}
+    }
+  };
+
+  document.addEventListener("click", onClickCapture, true);
+  document.addEventListener("touchstart", onClickCapture, { passive: true, capture: true });
+  document.addEventListener("keydown", onKeydownCapture, true);
+
+  // 3) Відслідковуємо стан модалки і автоматично її утримуємо відкритою
   try {
     ui.onModalStateChange?.((s) => {
       const isOpen = (s === true) || (s === "opened") || (s?.open === true);
       log("modal state:", s);
-      if (!isOpen && !getWalletAddress()) {
-        tryReopen(320);
+      if (isOpen) {
+        if (!cachedB64) guardOn();
+      } else {
+        if (guardAllowed()) {
+          // миттєво повертаємо
+          try { ui.openModal?.(); } catch {}
+        }
       }
     });
-  } catch (e) {
-    log("onModalStateChange hook error:", e);
-  }
+  } catch (e) { log("onModalStateChange hook error:", e); }
 
+  // 4) Фолбек на будь-яке “тихе” закриття
   ui.__mtScheduleFallback = () => {
-    setTimeout(() => { if (!getWalletAddress()) tryReopen(0); }, 700);
+    setTimeout(() => {
+      if (guardAllowed()) {
+        try { ui.openModal?.(); } catch {}
+      }
+    }, 300);
   };
+
+  // 5) При появі адреси – відключаємо guard
+  const stopGuardWhenAddress = () => { if (cachedB64) guardOff(); else setTimeout(stopGuardWhenAddress, 300); };
+  stopGuardWhenAddress();
 }
 
-/* ============ Пошук першого доступного контейнера під кнопку ============ */
+/* ---------------------- Пошук контейнера для кнопки ---------------------- */
 function pickFirstAvailableRoot(){
   const ids = ["tonconnect", "tonconnect-mobile-inline", "tonconnect-mobile"];
   for (const id of ids){
@@ -99,11 +152,10 @@ function pickFirstAvailableRoot(){
   return null;
 }
 
-/* =========================== Монтування (один раз) =========================== */
+/* ------------------------------ Монтування UI ------------------------------ */
 async function mountAt(root){
   await waitTonLib();
   if (!root || !(root instanceof HTMLElement)) return null;
-
   if (root.dataset.tcMounted === "1" && primaryUi) return primaryUi;
 
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
@@ -119,7 +171,7 @@ async function mountAt(root){
 
   const ui = new window.TON_CONNECT_UI.TonConnectUI(cfg);
 
-  attachModalGuard(ui);
+  attachHardModalGuard(ui);
 
   root.dataset.tcMounted = "1";
   primaryUi = ui;
@@ -144,7 +196,7 @@ export async function mountTonButtons(){
   return created;
 }
 
-/* ============================== Public API ============================== */
+/* -------------------------------- Public API -------------------------------- */
 export function getTonConnect(){ return primaryUi || window.__tcui || null; }
 export function getWalletAddress(){ return isB64(cachedB64) ? cachedB64 : (cachedB64 || null); }
 
@@ -183,7 +235,6 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
 
     window.__tcui = ui;
 
-    // 1) підписка на зміни статусу
     try {
       ui.onStatusChange?.((wallet)=>{
         const addr = wallet?.account?.address || null;
@@ -194,23 +245,17 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
           return;
         }
 
-        // Адреси немає:
         const hadAddressBefore = !!cachedB64;
-
         if (hadAddressBefore) {
-          // це справжній дисконект після попереднього підключення
           setCached(null);
           try { onDisconnect && onDisconnect(); } catch{}
         } else {
-          // ще жодного підключення не було — не чіпаємо стан,
-          // лише дозволяємо м’який фолбек від guard’а
           try { ui.__mtScheduleFallback?.(); } catch {}
         }
       });
       log("subscribed onStatusChange");
     } catch(e){ log("onStatusChange error:", e); }
 
-    // 2) початкове відновлення
     try {
       const w = await ui.getWallet?.();
       const addr = w?.account?.address;
@@ -222,7 +267,7 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
   return readyPromise;
 }
 
-/* ===================== Перемонтування після partials ===================== */
+/* ----------------------- Перемонтування після partials ---------------------- */
 function hookPartialsRemount(){
   const rebind = () => { mountTonButtons().catch(()=>{}); };
   window.addEventListener("partials:loaded", rebind);
@@ -231,7 +276,7 @@ function hookPartialsRemount(){
 }
 hookPartialsRemount();
 
-/* ================================ Auto-init ================================ */
+/* --------------------------------- Auto-init -------------------------------- */
 (function auto(){
   const run = ()=>{ initTonConnect().catch(()=>{}); };
   if (document.readyState === "loading") {
@@ -239,7 +284,7 @@ hookPartialsRemount();
   } else run();
 })();
 
-/* ================================= Debug ================================= */
+/* ---------------------------------- Debug ---------------------------------- */
 try { window.getTonConnect = getTonConnect; } catch {}
 try { window.getWalletAddress = getWalletAddress; } catch {}
 try { window.openConnectModal = openConnectModal; } catch {}
