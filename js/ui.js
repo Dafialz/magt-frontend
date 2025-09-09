@@ -4,68 +4,6 @@ import { ui, state, refreshUiRefs } from "./state.js";
 import { fmt as utilFmt, clamp, setBtnLoading } from "./utils.js";
 import { getPresaleStats } from "./ton.js";
 
-/* ===== TonConnect modal SHIELD (захист від глобальних кліків/ESC) ===== */
-(function setupTonConnectShieldOnce() {
-  if (window.__magtTcShieldInstalled) return;
-  window.__magtTcShieldInstalled = true;
-
-  const SEL_TC = [
-    // TonConnect UI (різні класи/варіанти)
-    ".tc-root", ".tc-modal", ".tc-overlay", ".tc-wallets-modal", ".tc-modal__body", ".tc-modal__backdrop",
-    "[data-tc-widget]", '[class*="ton-connect"]', '[class*="tonconnect"]', '[id^="tc-"]',
-    // custom elements
-    "tonconnect-ui", "ton-connect-ui", "tonconnect-ui-modal", "ton-connect-ui-modal",
-    // generic dialogs
-    "[role='dialog']", "[aria-modal='true']", "dialog", ".modal", ".overlay"
-  ].join(", ");
-
-  function eventPathHasSelector(e, selector) {
-    const path = (typeof e.composedPath === "function") ? e.composedPath() : [];
-    for (const n of path) {
-      if (n && n.nodeType === 1) {
-        const el = /** @type {Element} */(n);
-        if (el.matches?.(selector)) return true;
-        const host = (el.shadowRoot && el.shadowRoot.host) ? el.shadowRoot.host : null;
-        if (host && host.matches?.(selector)) return true;
-      }
-    }
-    return false;
-  }
-
-  function isInsideTonConnect(e) {
-    return eventPathHasSelector(e, SEL_TC);
-  }
-
-  function tcOverlayOpen() {
-    const el = document.querySelector(".tc-modal, .tc-overlay, .tc-wallets-modal, [aria-modal='true'], [role='dialog']");
-    if (!el) return false;
-    const st = window.getComputedStyle(el);
-    return st.display !== "none" && st.visibility !== "hidden" && st.opacity !== "0";
-  }
-
-  // 1) Гасимо кліки/тачі всередині TonConnect, щоб до інших глобальних хендлерів вони не дійшли
-  const absorb = (e) => {
-    if (isInsideTonConnect(e)) {
-      e.stopPropagation();
-      // Не робимо preventDefault, щоб не ламати взаємодію всередині модалки
-    }
-  };
-  // 👇 Переведено на bubbling (capture:false), щоб не перехоплювати внутрішні кліки TonConnect
-  document.addEventListener("click", absorb, false);
-  document.addEventListener("pointerdown", absorb, { capture: false, passive: true });
-  document.addEventListener("touchstart", absorb, { capture: false, passive: true });
-
-  // 2) Esc: якщо відкрита TonConnect-модалка — не віддаємо Esc іншим слухачам
-  const onKey = (e) => {
-    if (e.key === "Escape" && tcOverlayOpen()) {
-      e.stopPropagation();
-      // Не блокуємо всередині TonConnect — вона сама обробить Esc
-    }
-  };
-  // 👇 Також на bubbling
-  document.addEventListener("keydown", onKey, false);
-})();
-
 /* ===== БАЗА ДЛЯ API ===== */
 const IS_LOCAL = (location.hostname === "localhost" || location.hostname === "127.0.0.1");
 const API_BASE =
