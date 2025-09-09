@@ -15,10 +15,8 @@ let readyPromise = null;
 const DBG = (() => { try { return !!JSON.parse(localStorage.getItem("magt_debug") || "false"); } catch { return false; } })();
 const log = (...a) => { if (DBG) { try { console.log("[TC]", ...a); } catch {} } };
 
-// Використовуємо стабільний маніфест та мінімальну конфіг без twaReturnUrl
+// Стабільний маніфест; RETURN_URL поки не задаємо навмисно
 const MANIFEST_URL = "https://magtcoin.com/tonconnect-manifest.json";
-// Деякі гаманці коректніше працюють без явного returnUrl (особливо у розширеннях)
-// Якщо потрібно — розкоментуй рядок нижче
 // const RETURN_URL   = location.origin + "/";
 
 function isB64(s){ return typeof s === "string" && /^(EQ|UQ)[A-Za-z0-9_-]{46,68}$/.test((s||"").trim()); }
@@ -68,7 +66,7 @@ function attachModalGuard(ui){
     reopenCount++;
     lastTick = Date.now();
     setTimeout(() => {
-      if (!getWalletAddress()) { // лише якщо ще не підключено
+      if (!getWalletAddress()) {
         try { ui.openModal?.(); } catch {}
       }
     }, delay);
@@ -86,7 +84,6 @@ function attachModalGuard(ui){
     log("onModalStateChange hook error:", e);
   }
 
-  // Запасний «м’який» фолбек (може викликатись із onStatusChange)
   ui.__mtScheduleFallback = () => {
     setTimeout(() => { if (!getWalletAddress()) tryReopen(0); }, 700);
   };
@@ -107,7 +104,6 @@ async function mountAt(root){
   await waitTonLib();
   if (!root || !(root instanceof HTMLElement)) return null;
 
-  // не плодимо інстанси в тому ж root
   if (root.dataset.tcMounted === "1" && primaryUi) return primaryUi;
 
   const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
@@ -118,9 +114,8 @@ async function mountAt(root){
     buttonRootId: id,
     uiPreferences: { theme: "DARK", borderRadius: "m" },
     restoreConnection: true
+    // actionsConfiguration: { returnUrl: RETURN_URL }
   };
-  // Якщо потрібен явний повернення у мобільних — раскоментуй:
-  // cfg.actionsConfiguration = { returnUrl: RETURN_URL };
 
   const ui = new window.TON_CONNECT_UI.TonConnectUI(cfg);
 
@@ -192,15 +187,24 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
     try {
       ui.onStatusChange?.((wallet)=>{
         const addr = wallet?.account?.address || null;
+
         if (addr && isB64(addr)) {
           setCached(addr);
           try { onConnect && onConnect(addr); } catch{}
-        } else {
-          const was = cachedB64;
+          return;
+        }
+
+        // Адреси немає:
+        const hadAddressBefore = !!cachedB64;
+
+        if (hadAddressBefore) {
+          // це справжній дисконект після попереднього підключення
           setCached(null);
-          // якщо закрили без підключення — м’яко дозволяємо фолбеку підняти модалку
+          try { onDisconnect && onDisconnect(); } catch{}
+        } else {
+          // ще жодного підключення не було — не чіпаємо стан,
+          // лише дозволяємо м’який фолбек від guard’а
           try { ui.__mtScheduleFallback?.(); } catch {}
-          if (was && onDisconnect) { try { onDisconnect(); } catch{} }
         }
       });
       log("subscribed onStatusChange");
