@@ -21,6 +21,7 @@ function short(a){ return a ? a.slice(0,4)+"…"+a.slice(-4) : ""; }
 function dispatchAddress(addr){
   try { window.dispatchEvent(new CustomEvent("magt:address",{detail:{address:addr||null}})); } catch{}
   try {
+    // якщо ui.setOwnRefLink існує як глобальна – підстрахуємо реф-посилання
     if (typeof window.setOwnRefLink === "function") window.setOwnRefLink(addr || "");
   } catch {}
 }
@@ -39,69 +40,81 @@ async function waitTonLib(timeoutMs=15000){
 function setCached(addr){
   const prev = cachedB64;
   cachedB64 = addr || null;
-  if (cachedB64 !== prev) log("address:", short(cachedB64));
-  if (cachedB64 !== prev) dispatchAddress(cachedB64);
+  if (cachedB64 !== prev) {
+    log("address:", short(cachedB64));
+    dispatchAddress(cachedB64);
+  }
 }
 
-// ---------- mount ----------
-async function mountAt(root, tag="primary"){
-  await waitTonLib();
-  const el = typeof root === "string" ? document.getElementById(root) : root;
-  if (!el || !(el instanceof HTMLElement)) return null;
-  if (el.dataset.tcMounted === "1") return null;
-
-  const id = el.id || (el.id = "tcroot-" + Math.random().toString(36).slice(2));
-  try { el.innerHTML = ""; } catch {}
-
-  const ui = new window.TON_CONNECT_UI.TonConnectUI({
-    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json?v=3",
-    buttonRootId: id,
-    uiPreferences: { theme: "DARK", borderRadius: "m" },
-    restoreConnection: true,
-    actionsConfiguration: { returnUrl: location.origin + "/", twaReturnUrl: location.origin + "/" }
-  });
-
-  el.dataset.tcMounted = "1";
-  log(`TonConnectUI mounted (${tag}) -> #${id}`);
-  return ui;
-}
+/* ======================= Mount (тільки один інстанс) ======================= */
 
 async function waitHeaderRoot(timeoutMs=8000){
   const t0 = performance.now();
   return new Promise((res)=>{
     (function loop(){
       const el = document.getElementById("tonconnect");
-      if (el) return res(el);
+      if (el instanceof HTMLElement) return res(el);
       if (performance.now()-t0 > timeoutMs) return res(null);
       setTimeout(loop,120);
     })();
   });
 }
 
+async function mountPrimaryAt(root){
+  await waitTonLib();
+  if (!root || !(root instanceof HTMLElement)) return null;
+
+  // не монтуємо двічі в той самий контейнер
+  if (root.dataset.tcMounted === "1" && primaryUi) return primaryUi;
+
+  const id = root.id || (root.id = "tcroot-" + Math.random().toString(36).slice(2));
+  try { root.innerHTML = ""; } catch {}
+
+  const ui = new window.TON_CONNECT_UI.TonConnectUI({
+    manifestUrl: "https://magtcoin.com/tonconnect-manifest.json",
+    buttonRootId: id,
+    uiPreferences: { theme: "DARK", borderRadius: "m" },
+    restoreConnection: true,
+    // мінімально потрібний returnUrl (без twaReturnUrl)
+    actionsConfiguration: { returnUrl: location.origin + "/" }
+  });
+
+  root.dataset.tcMounted = "1";
+  primaryUi = ui;
+  window.__tcui = ui;
+
+  log("TonConnectUI mounted at #" + id);
+  return ui;
+}
+
 export async function mountTonButtons(){
   const headerRoot = await waitHeaderRoot();
+  if (!headerRoot) {
+    log("no #tonconnect root found; skip mount");
+    return [];
+  }
+
   const created = [];
 
-  if (!primaryUi && headerRoot) {
-    primaryUi = await mountAt(headerRoot, "primary");
-    if (primaryUi) created.push(primaryUi);
-  } else if (headerRoot && !headerRoot.dataset.tcMounted) {
-    const u = await mountAt(headerRoot, "primary(rebind)");
-    if (u) { primaryUi = u; created.push(u); }
+  // Монтуємо лише ГОЛОВНУ кнопку в хедері
+  if (!primaryUi) {
+    const u = await mountPrimaryAt(headerRoot).catch(()=>null);
+    if (u) created.push(u);
+  } else if (!headerRoot.dataset.tcMounted) {
+    // якщо partials перерендерили nav і стерли атрибут
+    const u = await mountPrimaryAt(headerRoot).catch(()=>null);
+    if (u) created.push(u);
   }
 
-  const inline = document.getElementById("tonconnect-mobile-inline");
-  if (inline && !inline.dataset.tcMounted) {
-    const u = await mountAt(inline, "mobile-inline"); if (u) created.push(u);
-  }
-  const drawer = document.getElementById("tonconnect-mobile");
-  if (drawer && !drawer.dataset.tcMounted) {
-    const u = await mountAt(drawer, "mobile-drawer"); if (u) created.push(u);
-  }
+  // ВАЖЛИВО: мобільні інстанси свідомо ВИМКНЕНО, щоб уникнути конфліктів
+  // const inline = document.getElementById("tonconnect-mobile-inline");
+  // const drawer = document.getElementById("tonconnect-mobile");
+
   return created;
 }
 
-// ---------- public ----------
+/* ======================= Public ======================= */
+
 export function getTonConnect(){ return primaryUi || window.__tcui || null; }
 export function getWalletAddress(){ return isB64(cachedB64) ? cachedB64 : (cachedB64 || null); }
 
@@ -168,7 +181,7 @@ export async function initTonConnect({ onConnect, onDisconnect } = {}){
   return readyPromise;
 }
 
-// ---------- re-mount hooks for partials ----------
+/* ======================= Remount hooks for partials ======================= */
 function hookPartialsRemount(){
   const rebind = () => { mountTonButtons().catch(()=>{}); };
   window.addEventListener("partials:loaded", rebind);
@@ -177,7 +190,7 @@ function hookPartialsRemount(){
 }
 hookPartialsRemount();
 
-// ---------- auto ----------
+/* ======================= Auto-init ======================= */
 (function auto(){
   const run = ()=>{ initTonConnect().catch(()=>{}); };
   if (document.readyState === "loading") {
@@ -185,7 +198,7 @@ hookPartialsRemount();
   } else run();
 })();
 
-// ---------- debug ----------
+/* ======================= Debug ======================= */
 try { window.getTonConnect = getTonConnect; } catch {}
 try { window.getWalletAddress = getWalletAddress; } catch {}
 try { window.openConnectModal = openConnectModal; } catch {}
