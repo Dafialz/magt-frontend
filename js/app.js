@@ -16,9 +16,9 @@ import { onBuyClick } from "./buy.js";
 import { refreshClaimSection, startClaimPolling, stopClaimPolling } from "./claim.js";
 import { api } from "./utils.js";
 
-/* =================== ГЛОБАЛЬНИЙ ЩИТ ДЛЯ TONCONNECT (capture) =================== */
-/* Це дублює захист локальних компонентів і гарантує, що ЖОДЕН інший глобальний
-   слухач (меню, оверлеї тощо) не зловить клік/ESC всередині TonConnect. */
+/* =================== ГЛОБАЛЬНИЙ ЩИТ ДЛЯ TONCONNECT (bubbling) =================== */
+/* Версія тільки на bubbling: дозволяємо клікам усередині модалки дійти до цілей,
+   але не даємо цим подіям «вилізти» у зовнішні глобальні хендлери. */
 (function setupTonConnectGlobalShieldOnce() {
   if (window.__magtTcGlobalShieldInstalled) return;
   window.__magtTcGlobalShieldInstalled = true;
@@ -58,23 +58,22 @@ import { api } from "./utils.js";
     } catch { return false; }
   }
 
-  // УСІ ці слухачі — у capture-режимі, щоб зупиняти бульбашку ДО інших глобальних хендлерів
+  // Лише bubbling! Це блокує зовнішні глобальні обробники, але не ламає кнопки в модалці
   const absorb = (e) => {
     if (isInsideTonConnect(e)) {
-      // блокуємо поширення, але НЕ блокуємо default — TonConnect працює як треба
       e.stopPropagation();
       e.stopImmediatePropagation?.();
     }
   };
-  document.addEventListener("click", absorb, true);
-  document.addEventListener("pointerdown", absorb, { capture: true, passive: true });
-  document.addEventListener("touchstart", absorb, { capture: true, passive: true });
+  document.addEventListener("click", absorb, false);
+  document.addEventListener("pointerdown", absorb, { capture: false, passive: true });
+  document.addEventListener("touchstart", absorb, { capture: false, passive: true });
 
+  // Для Esc залишаємо capture, але лише гасимо «назовні», не заважаючи самій модалці
   const onKey = (e) => {
     if (e.key === "Escape" && tcOverlayOpen()) {
       e.stopPropagation();
       e.stopImmediatePropagation?.();
-      // не робимо preventDefault — TonConnect сам закриє, якщо потрібно
     }
   };
   document.addEventListener("keydown", onKey, true);
